@@ -14,6 +14,12 @@ uv run python scripts/setup.py --skip-download
 Run `uv run python scripts/setup.py` (add `--with-cover` for covers and hums), and check that `models/converted`
 contains `conversion.json` and the `ar-*.safetensors` files.
 
+**Every job fails with "Converted directory has missing or unexpected files: … unexpected=['vae/LICENSE', …]".**
+An install made with a studio from before 2026-10-14 fetched the generator repo's latest commit, which since
+2026-10-08 also carries a `vae/` folder the generator check rejects. Pull, then re-run
+`uv run python scripts/setup.py`: setup now downloads pinned revisions and removes `models/converted/vae` (nothing
+is re-downloaded; the VAE the studio uses is `models/vae`).
+
 **Cover or Hum is disabled.**
 The page lists what is missing: ffmpeg, SheetSage2 or MERT (install them with `scripts/setup.py --with-cover`),
 or `librosa` for Hum (`uv sync`).

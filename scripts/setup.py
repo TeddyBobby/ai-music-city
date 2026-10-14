@@ -53,13 +53,18 @@ def download(with_cover: bool, force: bool = False, with_hum: bool = False) -> N
     if force or not manifest.is_file() or not _complete(config.CONVERTED_DIR,
                                                         json.loads(manifest.read_text())["files"]):
         print(f"[setup] downloading {config.MODEL_REPO} -> {config.CONVERTED_DIR}", flush=True)
-        snapshot_download(config.MODEL_REPO, local_dir=str(config.CONVERTED_DIR))
+        snapshot_download(config.MODEL_REPO, revision=config.MODEL_REVISION, local_dir=str(config.CONVERTED_DIR))
     else:
         print(f"[setup] generator already complete in {config.CONVERTED_DIR}", flush=True)
     _tidy(config.CONVERTED_DIR)
+    stray_vae = config.CONVERTED_DIR / "vae"  # left by an unpinned download of the repo's main branch
+    if stray_vae.is_dir():
+        print(f"[setup] removing {stray_vae} (not part of the pinned generator; the VAE lives in {config.VAE_DIR})",
+              flush=True)
+        shutil.rmtree(stray_vae)
     if force or not _complete(config.VAE_DIR, _VAE_SOURCE_FILES):
         print(f"[setup] downloading {config.VAE_REPO} -> {config.VAE_DIR}", flush=True)
-        snapshot_download(config.VAE_REPO, local_dir=str(config.VAE_DIR))
+        snapshot_download(config.VAE_REPO, revision=config.VAE_REVISION, local_dir=str(config.VAE_DIR))
     else:
         print(f"[setup] VAE already complete in {config.VAE_DIR}", flush=True)
     _tidy(config.VAE_DIR)

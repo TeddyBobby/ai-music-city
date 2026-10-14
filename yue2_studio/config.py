@@ -46,9 +46,13 @@ MIN_CLIP_S = 1.0
 MAX_CLIP_S = 3600.0
 
 # Hugging Face repositories (revisions for the transcription models are the ones pinned by
-# lyra.transcription.model; scripts/setup.py asserts they still agree).
+# lyra.transcription.model; scripts/setup.py asserts they still agree). The generator and VAE are pinned
+# too: lyra's verify_conversion rejects any file it does not know, so an upstream commit that adds one
+# (vanch007/mlx-Yue2-3B@5f7620e added a vae/ folder) would break every fresh install.
 MODEL_REPO = "vanch007/mlx-Yue2-3B"
+MODEL_REVISION = "fa66d203dd56d7e033e05ee8b32269768984c4cc"
 VAE_REPO = "m-a-p/YuE2-Vae"
+VAE_REVISION = "152733a19ad43aa67e367f9b5503ef8075bb5126"
 SHEETSAGE_REPO = "m-a-p/SheetSage2"
 SHEETSAGE_REVISION = "eab522a8168e8b8b8c4856bf8609cd86198f01fe"
 MERT_REPO = "m-a-p/MERT-v2-FullSong"

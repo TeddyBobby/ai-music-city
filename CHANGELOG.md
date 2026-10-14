@@ -2,6 +2,17 @@
 
 All notable changes to YuE2 Studio. Dates are when the work was merged to `main`.
 
+## 2026-10-14 — Fresh installs failed every job
+
+### Fixed
+- **Every job failed on new installs with "Converted directory has missing or unexpected files: …
+  unexpected=['vae/LICENSE', …]".** `scripts/setup.py` downloaded the latest commit of
+  `vanch007/mlx-Yue2-3B`, which on 2026-10-08 gained a `vae/` folder; lyra's generator check rejects any
+  file it doesn't know. Setup now pins the generator (`fa66d20`) and the VAE (`m-a-p/YuE2-Vae@152733a`) to
+  exact revisions (`config.MODEL_REVISION` / `VAE_REVISION`; the weights are byte-identical to before) and
+  removes a stray `models/converted/vae`. **Affected installs: pull and re-run `uv run python
+  scripts/setup.py`** — it cleans up without re-downloading.
+
 ## 2026-09-25 — Low-memory mode for 16 GB Macs
 
 ### Added
