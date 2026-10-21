@@ -320,6 +320,25 @@ async def test_default_preset_setting_applies_to_submits(client, api):
 # -- jobs: create + stream + artifacts ------------------------------------------------------------
 
 
+async def test_http_sampling_limits_reach_worker_and_engine(client, api, engine):
+    limits = {"abc_sampling": {"max_tokens": 1200}, "semantic_sampling": {"max_tokens": 600}}
+    response = await api.submit({"kind": "create", "preset": "custom", "precision": "4bit",
+                                 "ode_steps": 8, "params": {**BASE, **limits}})
+    job = response["job"]
+    done = await api.wait(job["id"])
+    assert done["status"] == "done"
+    requests = [request for kind, request in engine.calls if kind == "create_song"]
+    request = next(request for request in requests if request["id"] == job["id"])
+    for key, value in limits.items():
+        assert job["params"][key] == value
+        assert done["params"][key] == value
+        assert request[key] == value
+    invalid = await client.post("/api/jobs", json={"kind": "create", "params": {
+        **BASE, "semantic_sampling": {"max_tokens": 100}}})
+    assert invalid.status_code == 400
+    assert invalid.json()["error"]["code"] == "validation_error"
+
+
 async def test_submit_create_then_stream_to_done(client, api):
     body = await api.submit({"kind": "create", "preset": "fast", "params": {**BASE, "title": "Test"}})
     job = body["job"]
@@ -1524,19 +1543,28 @@ async def test_spa_fallback_and_static(client, static_dir):
     assert r.headers["cache-control"] == "no-cache"  # modules revalidate (ETag) on every load
     r = await client.get("/static/missing.js")
     assert r.status_code == 404 and r.json()["error"]["code"] == "not_found"
+    (static_dir / "dist").mkdir()
+    (static_dir / "dist" / "index.html").write_text("<!doctype html><title>React studio</title>")
+    r = await client.get("/player/example")
+    assert r.status_code == 200 and "React studio" in r.text
+    assert "real ui" not in r.text
 
 
 async def test_bundled_static_ui_is_served(make_app, home):
+    import re
+
     from yue2_studio.main import STATIC_DIR
 
-    assert (STATIC_DIR / "index.html").is_file() and (STATIC_DIR / "app.js").is_file()
+    assert (STATIC_DIR / "dist" / "index.html").is_file()
     async with make_app(FakeEngine(delay=0), home=home, static_dir=STATIC_DIR, lifespan=False) as (app, c):
         r = await c.get("/")
-        assert r.status_code == 200 and "<title>" in r.text and "/static/app.js" in r.text
+        assert r.status_code == 200 and "<title>" in r.text and "/static/dist/assets/" in r.text
+        script = re.search(r'<script[^>]+src="([^"]+)"', r.text).group(1)
+        style = re.search(r'<link[^>]+rel="stylesheet"[^>]+href="([^"]+)"', r.text).group(1)
         assert (await c.get("/#/library")).status_code == 200
-        r = await c.get("/static/app.js")
+        r = await c.get(script)
         assert r.status_code == 200 and "javascript" in r.headers["content-type"]
-        r = await c.get("/static/styles.css")
+        r = await c.get(style)
         assert r.status_code == 200 and "text/css" in r.headers["content-type"]
 
 

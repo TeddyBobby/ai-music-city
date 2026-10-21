@@ -1,0 +1,307 @@
+{
+  "version": "2.0-视觉方向稿",
+  "date": "2026-10-21",
+  "chosenDirection": "专业音乐工作室：石墨灰、紧凑布局，参考 Logic / Ableton 的工作区组织方式",
+  "figmaUrl": "https://www.figma.com/design/jg2KsbcHQCBkAkWnA83f7j?node-id=21-963",
+  "assistantUrl": "https://www.figma.com/design/jg2KsbcHQCBkAkWnA83f7j?node-id=21-1270",
+  "pageId": "20:1011",
+  "pageName": "02 / 工作室方向",
+  "screens": {
+    "create": "21:963",
+    "assistant": "21:1270"
+  },
+  "scope": "本轮重做创作工作台与助手展开状态，用于评审新的视觉方向；其余页面保留在旧版页面，未完成同风格迁移。",
+  "changes": [
+    "中性石墨灰、4px控件圆角、克制的暖橙强调",
+    "作品名称替代宣传式大标题",
+    "左侧作品浏览器、中间歌词与版本、右侧生成参数或创作讨论",
+    "助手与歌词同屏，歌词建议清楚标为尚未采用",
+    "紧凑播放控制与版本表格；去掉装饰卡片和重复抽象封面"
+  ],
+  "unchangedScope": "仅设计，无应用代码实现、Hermes启动、模型下载或API调用。",
+  "validation": [
+    "原生可编辑图层，无完整UI栅格图",
+    "中文字体 Noto Sans SC；时间数字 Geist Mono",
+    "自动布局边界检查无溢出",
+    "创作、助手和控件截图通过检查",
+    "参数与创作讨论可以通过原型切换"
+  ],
+  "ledger": {
+    "createdNodeIds": [
+      "20:1061",
+      "20:1057",
+      "20:1062",
+      "20:1058",
+      "20:1063",
+      "20:1059",
+      "20:1064",
+      "20:1060",
+      "20:1065",
+      "20:1066",
+      "20:1067",
+      "20:1068",
+      "20:1070",
+      "20:1072",
+      "20:1074"
+    ],
+    "mutatedNodeIds": [
+      "20:1011"
+    ],
+    "page": "20:1011",
+    "variables": {
+      "primitive/bg": "VariableID:20:1013",
+      "primitive/bar": "VariableID:20:1014",
+      "primitive/side": "VariableID:20:1015",
+      "primitive/field": "VariableID:20:1016",
+      "primitive/raised": "VariableID:20:1017",
+      "primitive/line": "VariableID:20:1018",
+      "primitive/ink": "VariableID:20:1019",
+      "primitive/muted": "VariableID:20:1020",
+      "primitive/subtle": "VariableID:20:1021",
+      "primitive/accent": "VariableID:20:1022",
+      "primitive/accentLow": "VariableID:20:1023",
+      "primitive/onAccent": "VariableID:20:1024",
+      "primitive/selected": "VariableID:20:1025",
+      "primitive/good": "VariableID:20:1026",
+      "color/bg": "VariableID:20:1028",
+      "color/bar": "VariableID:20:1029",
+      "color/side": "VariableID:20:1030",
+      "color/field": "VariableID:20:1031",
+      "color/raised": "VariableID:20:1032",
+      "color/line": "VariableID:20:1033",
+      "color/ink": "VariableID:20:1034",
+      "color/muted": "VariableID:20:1035",
+      "color/subtle": "VariableID:20:1036",
+      "color/accent": "VariableID:20:1037",
+      "color/accentLow": "VariableID:20:1038",
+      "color/onAccent": "VariableID:20:1039",
+      "color/selected": "VariableID:20:1040",
+      "color/good": "VariableID:20:1041",
+      "space/4": "VariableID:20:1042",
+      "space/8": "VariableID:20:1043",
+      "space/12": "VariableID:20:1044",
+      "space/16": "VariableID:20:1045",
+      "space/20": "VariableID:20:1046",
+      "space/24": "VariableID:20:1047",
+      "space/32": "VariableID:20:1048",
+      "radius/control": "VariableID:20:1049"
+    },
+    "palette": {
+      "bg": "#202224",
+      "bar": "#292B2E",
+      "side": "#252729",
+      "field": "#1B1D1F",
+      "raised": "#333539",
+      "line": "#414347",
+      "ink": "#E4E5E7",
+      "muted": "#A8AAAD",
+      "subtle": "#81858A",
+      "accent": "#C9956F",
+      "accentLow": "#41372F",
+      "onAccent": "#1C1D1F",
+      "selected": "#383B40",
+      "good": "#B7C0AC"
+    },
+    "styles": {
+      "title": "S:21dcb70d24b0d6ae477bbe2a934d39737699c8b0,",
+      "section": "S:fd97471c355f140e6545996c2bd859abb15fa897,",
+      "body": "S:de228406f0ad92b7f4e543313aa9e2ba611f085c,",
+      "small": "S:990c8484e6133ea53b56106dbedfa6d78136113c,",
+      "control": "S:18cc640106d54ec079e973caa53685b1c653fe66,",
+      "lyrics": "S:272ee639774d50e1cb6d3dfa37cd888b8a84ba64,",
+      "mono": "S:523e531fbe44842f663c84448978ab7967e2cf2f,"
+    },
+    "buttons": {
+      "主要": "20:1057",
+      "次要": "20:1058",
+      "文字": "20:1059",
+      "选中": "20:1060"
+    },
+    "labelProp": "文字#20:5",
+    "specimen": "20:1066",
+    "collections": [
+      "VariableCollectionId:20:1012",
+      "VariableCollectionId:20:1027"
+    ],
+    "scopes": [
+      {
+        "name": "color/bg",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/bar",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/side",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/field",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/raised",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/line",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/ink",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/muted",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/subtle",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/accent",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/accentLow",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/onAccent",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/selected",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "color/good",
+        "scopes": [
+          "FRAME_FILL",
+          "SHAPE_FILL",
+          "TEXT_FILL",
+          "STROKE_COLOR"
+        ]
+      },
+      {
+        "name": "space/4",
+        "scopes": [
+          "GAP"
+        ]
+      },
+      {
+        "name": "space/8",
+        "scopes": [
+          "GAP"
+        ]
+      },
+      {
+        "name": "space/12",
+        "scopes": [
+          "GAP"
+        ]
+      },
+      {
+        "name": "space/16",
+        "scopes": [
+          "GAP"
+        ]
+      },
+      {
+        "name": "space/20",
+        "scopes": [
+          "GAP"
+        ]
+      },
+      {
+        "name": "space/24",
+        "scopes": [
+          "GAP"
+        ]
+      },
+      {
+        "name": "space/32",
+        "scopes": [
+          "GAP"
+        ]
+      },
+      {
+        "name": "radius/control",
+        "scopes": [
+          "CORNER_RADIUS"
+        ]
+      }
+    ],
+    "fonts": [
+      "Noto Sans SC",
+      "Geist Mono"
+    ]
+  }
+}

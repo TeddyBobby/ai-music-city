@@ -1,0 +1,462 @@
+.song-reviews {
+  min-width: 0;
+  color: var(--text);
+  font-size: 13px;
+  padding: 25px 3px 32px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.song-reviews .song-review-scores {
+  container-type: inline-size;
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  gap: clamp(18px, 4vw, 48px);
+  padding: 0 0 27px;
+  margin-bottom: 23px;
+  border-bottom: 1px solid var(--line);
+}
+.song-reviews .song-score-badge {
+  --score-size: clamp(90px, 36cqw, 146px);
+  --score-ink: #111;
+  display: flex;
+  position: relative;
+  flex: 0 0 var(--score-size);
+  flex-direction: column;
+  align-items: center;
+  width: var(--score-size);
+  padding: calc(var(--score-size) * 0.22) 0 0;
+  color: var(--score-ink);
+  border-radius: 6px;
+  background: transparent;
+}
+:root:not([data-theme="light"]) .song-score-badge {
+  --score-ink: #f2f2ee;
+}
+.song-reviews .song-score-ai {
+  --score-ink: #ff3535;
+}
+:root:not([data-theme="light"]) .song-score-ai {
+  --score-ink: #ff5e58;
+}
+.song-reviews .song-score-crown {
+  position: absolute;
+  width: calc(var(--score-size) * 0.3);
+  height: calc(var(--score-size) * 0.18);
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+}
+.song-reviews .song-score-ring {
+  display: grid;
+  place-items: center;
+  position: relative;
+  flex: none;
+  width: var(--score-size);
+  height: var(--score-size);
+  border: calc(var(--score-size) * 0.0685) solid currentColor;
+  border-radius: 50%;
+}
+.song-reviews .song-score-manual .song-score-ring {
+  border-width: calc(var(--score-size) * 0.0343);
+}
+.song-reviews .song-score-manual .song-score-ring::after {
+  content: "";
+  position: absolute;
+  inset: calc(var(--score-size) * 0.0274);
+  border: calc(var(--score-size) * 0.0274) solid currentColor;
+  border-radius: inherit;
+  pointer-events: none;
+}
+.song-reviews .song-score-ring strong {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: calc(var(--score-size) * 0.37);
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -3px;
+  padding-right: 3px;
+  font-variant-numeric: tabular-nums;
+}
+.song-reviews .song-score-badge.is-empty strong {
+  font-size: calc(var(--score-size) * 0.28);
+  font-weight: 500;
+  letter-spacing: 0;
+  padding-right: 0;
+}
+.song-reviews .song-score-caption {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  margin-top: 16px;
+  font-size: clamp(10px, 3cqw, 13px);
+  line-height: 1.5;
+  color: var(--text);
+  white-space: nowrap;
+}
+.song-reviews .song-score-manual {
+  cursor: pointer;
+}
+.song-reviews .song-score-manual:hover .song-score-caption {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+.song-reviews .song-review-manual {
+  scroll-margin-top: 18px;
+}
+.song-reviews .song-review-kicker {
+  display: block;
+  color: var(--accent);
+  font-size: 10px;
+  letter-spacing: 1.8px;
+  margin-bottom: 7px;
+}
+.song-reviews .song-review-deck h3 {
+  font-size: 19px;
+  font-weight: 600;
+  letter-spacing: -0.3px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.song-reviews .song-review-deck p {
+  font-size: 12px;
+  line-height: 1.85;
+  color: var(--muted);
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+.song-reviews .song-review-basis {
+  margin-top: 17px;
+  color: var(--muted);
+  font-size: 10px;
+  line-height: 1.8;
+}
+.song-reviews .song-review-byline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 15px;
+  color: var(--muted);
+  font-size: 10px;
+  margin-top: 16px;
+  padding-top: 13px;
+  border-top: 1px solid var(--line);
+}
+.song-reviews .song-review-byline span {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+.song-reviews .song-review-prose {
+  margin-top: 17px;
+  font-size: 13px;
+  line-height: 2;
+  overflow-wrap: anywhere;
+  white-space: pre-line;
+}
+.song-reviews .song-review-prose p + p {
+  margin-top: 12px;
+}
+.song-reviews .song-review-notes {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+  margin-top: 21px;
+  padding-top: 16px;
+  border-top: 1px solid var(--line);
+}
+.song-reviews .song-review-notes h4 {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
+  font-weight: 600;
+}
+.song-reviews .song-review-notes h4 svg {
+  color: var(--accent);
+  flex: none;
+}
+.song-reviews .song-review-notes ul,
+.song-reviews .song-review-sources ul {
+  list-style: none;
+  padding: 0;
+  margin: 8px 0 0;
+}
+.song-reviews .song-review-notes li {
+  font-size: 11px;
+  line-height: 1.9;
+  color: var(--muted);
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+.song-reviews .song-review-details {
+  margin-top: 15px;
+}
+.song-reviews .song-review-details .mantine-Accordion-item {
+  border-color: var(--line);
+}
+.song-reviews .song-review-details .mantine-Accordion-control {
+  padding: 0;
+  color: var(--muted);
+  background: transparent;
+}
+.song-reviews .song-review-details .mantine-Accordion-control:hover {
+  color: var(--text);
+}
+.song-reviews .song-review-details .mantine-Accordion-label {
+  padding: 12px 0;
+  font-size: 11px;
+}
+.song-reviews .song-review-details .mantine-Accordion-content {
+  padding: 2px 0 17px;
+}
+.song-reviews .song-review-dimensions {
+  display: grid;
+  gap: 15px;
+}
+.song-reviews .song-review-dimension-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 11px;
+  margin-bottom: 7px;
+}
+.song-reviews .song-review-dimension-title strong {
+  color: var(--accent);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.song-reviews .song-review-dimensions .mantine-Progress-root {
+  background: var(--line);
+}
+.song-reviews .song-review-dimensions .mantine-Progress-section {
+  background: var(--accent);
+}
+.song-reviews .song-review-dimensions p {
+  font-size: 11px;
+  margin-top: 6px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.song-reviews .song-review-sources {
+  font-size: 10px;
+  color: var(--muted);
+  padding-top: 15px;
+}
+.song-reviews .song-review-audio-evidence {
+  padding-top: 17px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.song-reviews .song-review-audio-evidence dl {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 9px 24px;
+  margin: 9px 0 0;
+}
+.song-reviews .song-review-audio-evidence dl > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+.song-reviews .song-review-audio-evidence dd {
+  margin: 0;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+.song-reviews .song-review-audio-evidence p {
+  line-height: 1.8;
+  margin-top: 9px;
+}
+.song-reviews .song-review-sources li {
+  margin-top: 3px;
+  line-height: 1.8;
+  overflow-wrap: anywhere;
+}
+.song-reviews .song-review-ai-action {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 18px;
+  flex-wrap: wrap;
+}
+.song-reviews .song-review-ai-action > span {
+  font-size: 10px;
+  color: var(--muted);
+  line-height: 1.8;
+}
+.song-reviews .song-review-error {
+  color: var(--danger);
+  font-size: 11px;
+  line-height: 1.8;
+  margin-top: 12px;
+  overflow-wrap: anywhere;
+}
+.song-reviews .song-review-manual {
+  border-top: 1px solid var(--line);
+  margin-top: 29px;
+  padding-top: 22px;
+}
+.song-reviews .song-review-manual-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.song-reviews .song-review-manual-heading h3 {
+  font-size: 14px;
+  font-weight: 600;
+}
+.song-reviews .song-review-manual-heading > span {
+  font-size: 10px;
+  color: var(--muted);
+}
+.song-reviews .song-review-rating-control {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+}
+.song-reviews .song-review-score-input {
+  flex: 0 0 120px;
+}
+.song-reviews .song-review-score-input input {
+  min-height: 43px;
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+  padding-left: 12px;
+  font-size: 17px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.4px;
+}
+.song-reviews .song-review-score-input .mantine-NumberInput-control {
+  color: var(--muted);
+  border-color: var(--line);
+}
+.song-reviews .song-review-slider-wrap {
+  flex: 1;
+  min-width: 0;
+  padding: 0 8px 14px;
+}
+.song-reviews .song-review-slider-wrap .mantine-Slider-markLabel {
+  font-size: 10px;
+  color: var(--muted);
+}
+.song-reviews .song-review-slider-wrap .is-unrated .mantine-Slider-thumb {
+  background: var(--bg);
+  border-color: var(--muted);
+}
+.song-reviews .song-review-rating-caption {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 27px;
+  margin: 5px 0 13px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.song-reviews .song-review-rating-caption .btn {
+  min-height: 24px;
+  height: 24px;
+  padding: 0 2px;
+  font-size: 10px;
+}
+.song-reviews .song-review-rating-caption .mantine-Button-label {
+  font-size: 10px;
+}
+.song-reviews .song-review-comment .mantine-Textarea-label {
+  color: var(--text);
+  font-size: 11px;
+  margin-bottom: 7px;
+  font-weight: 500;
+}
+.song-reviews .song-review-comment textarea {
+  background: var(--surface);
+  border-color: var(--line);
+  color: var(--text);
+  font-size: 12px;
+  line-height: 1.8;
+  padding: 10px 12px;
+}
+.song-reviews .song-review-comment textarea:focus,
+.song-reviews .song-review-score-input input:focus {
+  border-color: var(--accent);
+}
+.song-reviews .song-review-comment textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.75;
+}
+.song-reviews .song-review-comment-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+.song-reviews .song-review-form-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 17px;
+  flex-wrap: wrap;
+}
+.song-reviews .song-review-saved {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  color: var(--muted);
+  font-size: 10px;
+}
+.song-reviews .song-review-form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-left: auto;
+}
+.song-reviews.song-review-loading,
+.song-reviews.song-review-unavailable {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 180px;
+  gap: 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.song-reviews.song-review-unavailable {
+  flex-direction: column;
+  text-align: center;
+}
+.song-reviews.song-review-load-error p {
+  font-size: 12px;
+  color: var(--danger);
+  margin-bottom: 12px;
+}
+@media (max-width: 700px) {
+  .song-reviews .song-score-caption {
+    font-size: 12px;
+    gap: 5px;
+  }
+  .song-reviews .song-review-deck h3 {
+    font-size: 16px;
+  }
+  .song-reviews .song-review-rating-control {
+    gap: 14px;
+  }
+  .song-reviews .song-review-score-input {
+    flex-basis: 110px;
+  }
+  .song-reviews .song-review-notes {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+  .song-reviews .song-review-audio-evidence dl {
+    grid-template-columns: 1fr;
+  }
+}

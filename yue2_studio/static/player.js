@@ -4,19 +4,28 @@
 // up without subscriptions that would leak across re-renders). The queue is [track] for a single song and
 // [tracks...] for an album; prev/next and auto-advance only matter when it holds more than one.
 import { songUrl } from "./api.js";
-import { h, jobTitle, store, toast } from "./ui.js";
+import { h, jobTitle, store, toast, fmt, fill, updateArtwork } from "./ui.js";
 
 let queue = [], idx = -1, restoring = false; // restoring: src set from storage, never played yet
 const listeners = new Set();
 
-const audio = h("audio", { controls: true, preload: "metadata", "aria-label": "Now playing" });
-const prevBtn = h("button", { type: "button", class: "icon ghost sm", title: "Previous track", "aria-label": "Previous track", onclick: () => player.prev() }, "⏮");
-const nextBtn = h("button", { type: "button", class: "icon ghost sm", title: "Next track", "aria-label": "Next track", onclick: () => player.next() }, "⏭");
-const nowTitle = h("span", { class: "title" }), nowSub = h("span", { class: "sub" });
-const now = h("a", { class: "now", href: "#", title: "Open the song page" }, nowTitle, nowSub);
-const pos = h("span", { class: "pos num", hidden: true });
-const closeBtn = h("button", { type: "button", class: "icon ghost sm", title: "Stop and hide the player", "aria-label": "Close player", onclick: () => player.stop() }, "✕");
-const bar = h("footer", { class: "player-bar", "aria-label": "Player" }, h("div", { class: "player-inner" }, prevBtn, now, nextBtn, pos, audio, closeBtn));
+const audio = h("audio", { preload: "metadata", "aria-label": "正在试听的作品" });
+const prevBtn = h("button", {type:"button",class:"icon ghost sm player-prev",title:"上一首","aria-label":"上一首",onclick:()=>player.prev()},h("img",{src:"/static/assets/eaf28.svg",alt:""}));
+const nextBtn = h("button", {type:"button",class:"icon ghost sm player-next",title:"下一首","aria-label":"下一首",onclick:()=>player.next()},h("img",{src:"/static/assets/88755.svg",alt:""}));
+const nowTitle=h("span",{class:"title"}),nowSub=h("span",{class:"sub"});
+const now=h("a",{class:"now",href:"#/library",title:"查看正在试听的作品"},nowTitle,nowSub);
+const pos=h("span",{class:"pos num",hidden:true});
+const toggleBtn=h("button",{type:"button",class:"primary player-toggle",onclick:()=>audio.paused?player.resume():player.pause()},"播放");
+const elapsed=h("span",{class:"player-time"},"00:00"),duration=h("span",{class:"player-time end"},"00:00");
+const seek=h("input",{class:"player-seek",type:"range",min:0,max:100,step:.1,value:0,"aria-label":"试听进度",oninput:()=>{if(Number.isFinite(audio.duration))audio.currentTime=audio.duration*Number(seek.value)/100;}});
+const volume=h("input",{class:"player-volume",type:"range",min:0,max:1,step:.01,value:store.get("player.volume",.8),"aria-label":"音量",oninput:()=>{audio.volume=Number(volume.value);store.set("player.volume",audio.volume);}});audio.volume=Number(volume.value);
+const playlist=h("div",{class:"player-playlist",hidden:true,"aria-label":"播放队列"});
+const queueBtn=h("button",{type:"button",class:"ghost player-queue-toggle","aria-expanded":"false",onclick:()=>{playlist.hidden=!playlist.hidden;queueBtn.setAttribute("aria-expanded",String(!playlist.hidden));paintPlaylist();}},"播放队列");
+const cover=h("img",{class:"player-cover",src:"/static/assets/ed355.svg",alt:"听见唱片"});
+const bar=h("footer",{class:"player-bar","aria-label":"试听播放器"},h("div",{class:"player-inner"},cover,now,prevBtn,toggleBtn,nextBtn,pos,elapsed,seek,duration,h("img",{class:"player-volume-icon",src:"/static/assets/ef08b.svg",alt:""}),volume,queueBtn,audio),playlist);
+function paintPlaylist(){fill(playlist,h("div",{class:"row between"},h("b",{},"播放队列"),h("button",{class:"ghost sm",onclick:()=>{playlist.hidden=true;queueBtn.setAttribute("aria-expanded","false");}},"关闭")),queue.length?queue.map((t,i)=>h("button",{class:i===idx?"primary":"ghost",onclick:()=>player.play(queue,i)},t.title,h("small",{},i===idx?"当前试听":"播放"))):h("p",{class:"hint"},"从「我的作品」选择一首歌试听。"));}
+function paintTime(){elapsed.textContent=fmt.dur(audio.currentTime||0);duration.textContent=fmt.dur(Number.isFinite(audio.duration)?audio.duration:0);seek.value=audio.duration?audio.currentTime/audio.duration*100:0;seek.disabled=!current();}
+for(const event of["timeupdate","loadedmetadata","durationchange"])audio.addEventListener(event,paintTime);
 
 const current = () => queue[idx] || null;
 const state = () => ({ track: current(), idx, queue: queue.slice(), playing: !!current() && !audio.paused });
@@ -29,6 +38,7 @@ export function trackOf(job, sub = null) {
 /** Point the element at `t` unless it already is (same id keeps the position for toggle/resume; the
  *  sub line may still differ when the same song is replayed from another context, so re-announce). */
 function setTrack(t) {
+  updateArtwork(cover, t.id, "player");
   if (audio.dataset.id === t.id && audio.getAttribute("src") && !audio.error) { announce(t); return; }
   audio.dataset.id = t.id; audio.src = t.src;
   announce(t); persist();
@@ -101,24 +111,25 @@ export const player = {
 /** ▶/⏸ button bound to a job (disabled without audio). Painted on creation and on every state change. */
 export function playButton(job, { sub = null, size = "sm", label = false } = {}) {
   const ok = job.status === "done" && !!(job.artifacts && job.artifacts.audio);
-  const btn = h("button", { type: "button", class: `play${size ? " " + size : ""}`, dataset: { playId: job.id, playTitle: jobTitle(job), playLabel: label ? "1" : "" }, disabled: !ok, title: ok ? null : "No audio for this job",
+  const btn = h("button", { type: "button", class: `play${size ? " " + size : ""}`, dataset: { playId: job.id, playTitle: jobTitle(job), playLabel: label ? "1" : "" }, disabled: !ok, title: ok ? null : "这个任务还没有可试听的音频",
     onclick: () => { if (!player.toggle(job.id)) player.play([trackOf(job, sub)]); } });
   paintButton(btn);
   return btn;
 }
 function paintButton(btn) {
   const on = player.isPlaying(btn.dataset.playId), label = btn.dataset.playLabel === "1";
-  btn.textContent = on ? (label ? "⏸ Pause" : "⏸") : (label ? "▶ Play" : "▶");
+  btn.textContent = on ? (label ? "暂停试听" : "⏸") : (label ? "试听" : "▶");
   btn.classList.toggle("playing", on);
-  btn.setAttribute("aria-label", `${on ? "Pause" : "Play"} ${btn.dataset.playTitle}`);
+  btn.setAttribute("aria-label", `${on ? "暂停试听" : "试听"} ${btn.dataset.playTitle}`);
 }
 
 function paint() {
   const t = current(), s = state();
-  nowTitle.textContent = t ? t.title : ""; nowSub.textContent = t && t.sub ? t.sub : ""; nowSub.hidden = !(t && t.sub);
+  if (cover.dataset.coverJob !== (t?.id || "")) updateArtwork(cover, t?.id, "player");
+  nowTitle.textContent=t?`试听：${t.title}`:"还没有选择试听作品"; nowSub.textContent=t?"已完成作品 · 不影响生成":"生成完成后即可试听"; nowSub.hidden=false; toggleBtn.disabled=!t; toggleBtn.textContent=s.playing?"暂停":"播放"; paintTime(); if(!playlist.hidden)paintPlaylist();
   now.href = t ? t.href : "#";
   const multi = queue.length > 1;
-  prevBtn.hidden = !multi; nextBtn.hidden = !multi; pos.hidden = !multi;
+  prevBtn.hidden=false;nextBtn.hidden=false;prevBtn.disabled=!multi;pos.hidden=!multi;
   nextBtn.disabled = idx >= queue.length - 1;
   pos.textContent = multi ? `${idx + 1}/${queue.length}` : "";
   for (const b of document.querySelectorAll("[data-play-id]")) paintButton(b);
@@ -133,7 +144,7 @@ function persist() {
 
 function announce(t) {
   if (!("mediaSession" in navigator)) return;
-  try { navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.sub || "", album: "YuE2 Studio" }); } catch { /* not supported */ }
+  try { navigator.mediaSession.metadata = new MediaMetadata({ title: t.title, artist: t.sub || "", album: "听见" }); } catch { /* not supported */ }
 }
 
 audio.addEventListener("play", () => { restoring = false; paint(); });
@@ -143,7 +154,7 @@ audio.addEventListener("ended", () => player.next());
 audio.addEventListener("error", () => {
   const t = current(); if (!t || !audio.getAttribute("src")) return; // stop() empties the element; not an error
   if (restoring) { player.stop(); return; } // the remembered song is gone: hide quietly
-  toast(`Could not play ${t.title}`, "err");
+  toast(`无法播放《${t.title}》`, "err");
   // `paused` stays false after a load error: pause so buttons do not stick at ⏸, and forget the id so a
   // retry of this track reloads it instead of hitting setTrack's same-id short-circuit.
   audio.pause(); delete audio.dataset.id;
@@ -173,3 +184,4 @@ function restore() {
 
 document.body.append(bar);
 restore();
+paint();

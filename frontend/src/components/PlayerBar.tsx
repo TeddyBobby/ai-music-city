@@ -1,0 +1,234 @@
+import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
+import { Popover, Slider, UnstyledButton } from "@mantine/core";
+import {
+  Play,
+  Pause,
+  SkipBack,
+  SkipForward,
+  Volume2,
+  VolumeX,
+  ListMusic,
+  Maximize2,
+  X,
+} from "lucide-react";
+import { usePlayer } from "../state/player";
+import { usePlayerOverlay } from "../state/playerOverlay";
+import { Artwork, IconButton } from "./ui";
+import { duration, titleOf } from "../lib/utils";
+import { useAutoHidePlayerBar } from "../hooks/useAutoHidePlayerBar";
+import "../pages/Player.css";
+
+export function PlayerBar() {
+  const p = usePlayer(),
+    expand = usePlayerOverlay((s) => s.open),
+    fullscreenOpen = usePlayerOverlay((s) => s.opened),
+    [queueOpen, setQueueOpen] = useState(false),
+    [pointerInside, setPointerInside] = useState(false),
+    [focusInside, setFocusInside] = useState(false),
+    [dragging, setDragging] = useState(false);
+  const location = useLocation();
+  const { hidden, reveal } = useAutoHidePlayerBar({
+    locked: queueOpen || fullscreenOpen || pointerInside || focusInside || dragging,
+    resetKey: `${location.key}:${p.current?.id ?? ""}`,
+  });
+  useEffect(() => {
+    if (!dragging) return;
+    const release = () => setDragging(false);
+    window.addEventListener("pointerup", release);
+    window.addEventListener("pointercancel", release);
+    return () => {
+      window.removeEventListener("pointerup", release);
+      window.removeEventListener("pointercancel", release);
+    };
+  }, [dragging]);
+  function openPlayer() {
+    setQueueOpen(false);
+    expand();
+  }
+  return (
+    <footer
+      className="player-dock"
+      aria-label="全局播放器"
+      data-hidden={hidden || undefined}
+      aria-hidden={hidden || undefined}
+      inert={hidden || undefined}
+      onPointerEnter={() => {
+        setPointerInside(true);
+        reveal();
+      }}
+      onPointerLeave={() => setPointerInside(false)}
+      onPointerDownCapture={() => setDragging(true)}
+      onFocusCapture={(event) => {
+        setFocusInside((event.target as HTMLElement).matches(":focus-visible"));
+        reveal();
+      }}
+      onBlurCapture={(event) => {
+        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
+          setFocusInside(false);
+      }}
+    >
+      <div className="dock-track">
+        <UnstyledButton
+          className="dock-cover-trigger"
+          onClick={openPlayer}
+          disabled={!p.current}
+          aria-label="展开全屏播放器"
+        >
+          <Artwork job={p.current} size={44} />
+          <span className="dock-cover-expand">
+            <Maximize2 size={17} />
+          </span>
+        </UnstyledButton>
+        <div>
+          <UnstyledButton
+            onClick={openPlayer}
+            disabled={!p.current}
+            className="dock-title"
+            aria-label={
+              p.current ? `展开全屏播放器：${titleOf(p.current)}` : undefined
+            }
+          >
+            {p.current ? titleOf(p.current) : "选一首歌，听听看"}
+          </UnstyledButton>
+          <span className="muted small">
+            {p.current
+              ? p.current.take?.project_name || "AI乐之城 · 我的作品"
+              : "从作品库开始播放"}
+          </span>
+        </div>
+      </div>
+      <div className="dock-main">
+        <div className="dock-controls">
+          <IconButton label="上一首" onClick={p.prev} disabled={!p.current}>
+            <SkipBack size={16} />
+          </IconButton>
+          <IconButton
+            className="dock-play"
+            label={p.playing ? "暂停" : "播放"}
+            disabled={!p.current}
+            onClick={p.toggle}
+          >
+            {p.playing ? (
+              <Pause size={16} fill="currentColor" />
+            ) : (
+              <Play size={16} fill="currentColor" />
+            )}
+          </IconButton>
+          <IconButton
+            label="下一首"
+            onClick={p.next}
+            disabled={!p.current || p.queue.length < 2}
+          >
+            <SkipForward size={16} />
+          </IconButton>
+        </div>
+        <div className="dock-progress">
+          <time>{duration(p.time)}</time>
+          <Slider
+            className="dock-seek-slider"
+            thumbLabel="播放进度"
+            min={0}
+            max={p.duration || 1}
+            step={0.1}
+            value={Math.min(p.time, p.duration || 0)}
+            onChange={p.seek}
+            disabled={!p.current}
+            label={duration}
+            size={3}
+            thumbSize={9}
+          />
+          <time>{duration(p.duration)}</time>
+        </div>
+      </div>
+      <div className="dock-tools">
+        <IconButton
+          label={p.volume ? "静音" : "取消静音"}
+          onClick={() => p.setVolume(p.volume ? 0 : 0.7)}
+        >
+          {p.volume ? <Volume2 size={17} /> : <VolumeX size={17} />}
+        </IconButton>
+        <Slider
+          className="dock-volume-slider"
+          thumbLabel="音量"
+          min={0}
+          max={1}
+          step={0.01}
+          value={p.volume}
+          onChange={p.setVolume}
+          label={(value) => `${Math.round(value * 100)}%`}
+          size={3}
+          thumbSize={9}
+        />
+        <Popover
+          opened={queueOpen}
+          onChange={setQueueOpen}
+          position="top-end"
+          withArrow
+          shadow="lg"
+          width={340}
+          zIndex={200}
+          trapFocus
+          returnFocus
+        >
+          <Popover.Target>
+            <IconButton
+              label="播放队列"
+              aria-expanded={queueOpen}
+              className={queueOpen ? "active" : ""}
+              onClick={() => setQueueOpen(!queueOpen)}
+            >
+              <ListMusic size={18} />
+            </IconButton>
+          </Popover.Target>
+          <Popover.Dropdown className="dock-queue-popover">
+            <div className="row between">
+              <h3>
+                播放队列 <small>{p.queue.length}</small>
+              </h3>
+              <IconButton
+                label="关闭播放队列"
+                onClick={() => setQueueOpen(false)}
+              >
+                <X size={16} />
+              </IconButton>
+            </div>
+            {p.queue.length ? (
+              p.queue.map((j, i) => (
+                <UnstyledButton
+                  key={`${j.id}-${i}`}
+                  className={`queue-track ${i === p.index ? "active" : ""}`}
+                  onClick={() => p.play(p.queue, i)}
+                >
+                  <span className="small muted">
+                    {String(i + 1).padStart(2, "0")}
+                  </span>
+                  <span>{titleOf(j)}</span>
+                  {i === p.index && p.playing ? (
+                    <span className="playing-bars">
+                      <i />
+                      <i />
+                      <i />
+                    </span>
+                  ) : (
+                    <time>{duration(j.timing?.audio_seconds)}</time>
+                  )}
+                </UnstyledButton>
+              ))
+            ) : (
+              <p className="muted">播放歌曲后会显示在这里。</p>
+            )}
+          </Popover.Dropdown>
+        </Popover>
+        <IconButton
+          label="展开全屏播放器"
+          className="dock-expand"
+          onClick={openPlayer}
+          disabled={!p.current}
+        >
+          <Maximize2 size={16} />
+        </IconButton>
+      </div>
+    </footer>
+  );
+}

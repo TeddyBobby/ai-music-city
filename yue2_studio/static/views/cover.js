@@ -20,6 +20,15 @@ function parseTime(text) {
 const showTime = (s) => { const m = Math.floor(s / 60), r = +(s % 60).toFixed(1); return m ? `${m}:${String(r).padStart(r < 10 ? 2 : 1, "0")}` : String(r); };
 
 export async function coverView({ el, query, app }) {
+  try { app.status = await api.status(); } catch { app.status = null; }
+  if (!app.status?.cover?.available) {
+    fill(el, h("div", {class:"view-head"}, h("h1", {}, "音频改编"), h("span", {class:"sub"}, "保留上传音频的旋律，重新编曲。")),
+      h("section", {class:"panel stack"}, h("span", {class:"tag"}, app.status ? "未启用" : "本机服务未连接"),
+        h("h2", {}, app.status ? "所需附加模型尚未安装" : "暂时无法读取本机能力"),
+        h("p", {class:"muted"}, app.status ? "音频改编需要 SheetSage2 与 MERT 旋律识别模型。当前可以使用歌词创作，不会自动下载附加模型。" : "确认听见服务仍在运行后，再打开此页面。"),
+        h("div", {class:"row"}, h("a", {class:"btn primary",href:query.track ? `#/create?track=${encodeURIComponent(query.track)}` : "#/create"}, "返回歌词创作"), h("a", {class:"btn",href:"#/settings"}, "查看本机设置"))));
+    return {};
+  }
   const saved = store.get("cover", { style: "", lyrics: "", task: "melody-full", mode: "cover", clip_start: "", clip_end: "", cfg_scale: "", seed: "", random_seed: true, title: "", preset: (app.settings && app.settings.default_preset) || "quality", precision: "8bit", ode_steps: 16, loras: [], upload_id: "" });
   let upload = null, dirty = false, task = saved.task, mode = saved.mode === "continue" ? "continue" : "cover";
   let trackId = null; // ?track=<id>: closure only, never in store("cover")

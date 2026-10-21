@@ -20,7 +20,7 @@ from pathlib import Path  # noqa: E402
 
 from fastapi import FastAPI  # noqa: E402
 
-from yue2_studio import __version__, api, projects, uploads  # noqa: E402
+from yue2_studio import __version__, api, assistant_api, plaza_api, projects, review_api, uploads  # noqa: E402
 from yue2_studio.jobs import JobStore  # noqa: E402
 from yue2_studio.worker import EventBus, Worker  # noqa: E402
 
@@ -59,13 +59,15 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
         try:
             yield
         finally:
+            await app.state.reviews.close()
+            await app.state.assistant.close()
             await asyncio.to_thread(worker.stop)
             if worker.alive:  # still inside an engine call: leave the connection for it
                 log.warning("worker did not stop in time; leaving the job store open")
             else:
                 store.close()
 
-    app = FastAPI(title="YuE2 Studio", version=__version__, lifespan=lifespan, docs_url="/api/docs",
+    app = FastAPI(title="听见 · 本地音乐工作台", version=__version__, lifespan=lifespan, docs_url="/api/docs",
                   openapi_url="/api/openapi.json", redoc_url=None)
     app.state.paths = paths
     app.state.store = store
@@ -75,6 +77,9 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
     app.state.fake = is_fake
     api.install_error_handlers(app)
     app.include_router(api.router)
+    assistant_api.install(app)
+    review_api.install(app)
+    plaza_api.install(app)
     api.install_static(app, static_dir or STATIC_DIR)
     return app
 

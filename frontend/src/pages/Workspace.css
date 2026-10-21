@@ -1,0 +1,687 @@
+.wk-page {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-width: 0;
+  font-size: 13px;
+}
+.wk-page h2 {
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  margin: 0;
+}
+.wk-page h3 {
+  font-size: 13px;
+  font-weight: 600;
+  margin: 0;
+}
+.wk-page p {
+  margin: 0;
+  line-height: 1.65;
+}
+.wk-page textarea {
+  min-width: 0;
+  font: inherit;
+}
+.wk-page textarea {
+  resize: vertical;
+}
+.wk-page .field {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.wk-page .field > small {
+  font-size: 12px;
+  line-height: 1.65;
+}
+.wk-page .row {
+  flex-wrap: wrap;
+}
+.wk-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  color: var(--danger);
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.wk-inline-error {
+  color: var(--danger);
+  overflow-wrap: anywhere;
+}
+.wk-dialog-actions {
+  justify-content: flex-end;
+  margin-top: 20px;
+}
+.wk-danger-text {
+  color: var(--danger) !important;
+}
+.wk-project-create {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  padding: 18px;
+}
+.wk-project-create .field {
+  flex: 1;
+  max-width: 520px;
+}
+.wk-project-create > .btn,
+.wk-project-create > button {
+  min-height: 38px;
+}
+.wk-project-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+.wk-project-card {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  min-width: 0;
+}
+.wk-project-symbol {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  font-size: 23px;
+  color: var(--muted);
+}
+.wk-project-name {
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  text-decoration: none;
+}
+.wk-project-name:hover {
+  color: var(--accent);
+}
+.wk-description {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.wk-project-counts {
+  gap: 16px;
+  color: var(--muted);
+}
+.wk-project-updated {
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  margin-top: auto;
+}
+.wk-project-overview {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 18px;
+}
+.wk-overview-copy {
+  min-width: 0;
+  max-width: 48%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+.wk-overview-copy > p {
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+.wk-overview-title {
+  gap: 8px 14px;
+}
+.wk-overview-title > h2 {
+  overflow-wrap: anywhere;
+}
+.wk-overview-title > span {
+  white-space: nowrap;
+}
+.wk-overview-links {
+  gap: 4px;
+  margin-left: -10px;
+}
+.wk-album-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-end;
+}
+.wk-album-actions .btn {
+  font-size: 12px;
+}
+.wk-page .is-disabled {
+  opacity: 0.4;
+  pointer-events: none;
+}
+.wk-project-editor {
+  display: grid;
+  grid-template-columns: 238px minmax(0, 1fr);
+  gap: 18px;
+  align-items: start;
+}
+.wk-track-sidebar {
+  padding: 16px;
+}
+.wk-track-sidebar > h2 {
+  margin-bottom: 14px;
+}
+.wk-track-nav {
+  list-style: none;
+  padding: 0;
+  margin: 0 -7px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.wk-track-nav button {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  gap: 10px;
+  text-align: left;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  padding: 11px 8px;
+  color: var(--text);
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.wk-track-nav button:hover {
+  background: var(--surface-2);
+}
+.wk-track-nav button.is-selected {
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+.wk-track-number {
+  font-variant-numeric: tabular-nums;
+  color: var(--muted);
+  font-size: 12px;
+}
+.wk-track-label {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.wk-track-label small {
+  display: block;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.5;
+  margin-top: 4px;
+}
+.wk-playing {
+  color: var(--accent);
+}
+.wk-new-track {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+.wk-track-detail {
+  padding: 18px;
+  min-width: 0;
+}
+.wk-track-heading {
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 16px;
+}
+.wk-track-heading h2 {
+  margin-top: 4px;
+}
+.wk-track-heading > .row {
+  gap: 4px;
+}
+.wk-track-heading .btn,
+.wk-track-heading button {
+  font-size: 12px;
+}
+.wk-chosen-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px dashed var(--line);
+  border-radius: 7px;
+  background: var(--field);
+}
+.wk-chosen-summary.has-chosen {
+  border-style: solid;
+}
+.wk-chosen-summary .wk-chosen-title {
+  color: var(--text);
+}
+.wk-takes-toolbar {
+  gap: 12px;
+  margin-top: 24px;
+  padding-bottom: 14px;
+}
+.wk-takes-toolbar h3 span {
+  margin-left: 6px;
+  font-weight: 400;
+}
+.wk-takes-toolbar > .row {
+  gap: 8px;
+}
+.wk-takes-toolbar .btn {
+  font-size: 12px;
+}
+.wk-takes-filters {
+  gap: 12px;
+  padding-bottom: 16px;
+}
+.wk-takes-filters select {
+  padding: 6px 8px;
+  font-size: 12px;
+}
+.wk-filter-tabs {
+  gap: 4px;
+}
+.wk-filter-tabs button,
+.wk-votes button {
+  background: transparent;
+  color: var(--muted);
+  border: 1px solid transparent;
+  border-radius: 6px;
+  padding: 6px 10px;
+  font: inherit;
+  cursor: pointer;
+}
+.wk-filter-tabs button[aria-pressed="true"],
+.wk-votes button[aria-pressed="true"] {
+  color: var(--accent);
+  background: var(--surface-2);
+  border-color: var(--line);
+}
+.wk-takes-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.wk-take {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  background: var(--field);
+  min-width: 0;
+}
+.wk-take.is-chosen {
+  border-color: color-mix(in srgb, var(--accent) 48%, var(--line));
+}
+.wk-take-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.wk-take-title {
+  flex: 1;
+  min-width: 0;
+}
+.wk-take-title > .wk-take-title-button {
+  display: block;
+  color: var(--text);
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  margin-bottom: 6px;
+  text-decoration: none;
+}
+.wk-take-title > .wk-take-title-button:hover {
+  color: var(--accent);
+}
+.wk-take-title > .row {
+  gap: 9px;
+  font-size: 11px;
+}
+.wk-take-actions {
+  gap: 5px;
+}
+.wk-take-actions button {
+  font-size: 12px;
+}
+.wk-take-feedback {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.wk-votes {
+  gap: 2px !important;
+}
+.wk-votes button {
+  font-size: 12px;
+  padding: 5px 8px;
+  border-color: var(--line);
+}
+.wk-stars {
+  display: flex;
+  gap: 1px;
+}
+.wk-stars button {
+  font-size: 18px;
+  line-height: 24px;
+  width: 23px;
+  height: 26px;
+  padding: 0;
+  color: var(--muted);
+  background: none;
+  border: 0;
+  cursor: pointer;
+  opacity: 0.55;
+}
+.wk-stars button.is-active {
+  color: var(--accent);
+  opacity: 1;
+}
+.wk-stars button:disabled,
+.wk-votes button:disabled {
+  cursor: wait;
+  opacity: 0.5;
+}
+.wk-take-time {
+  margin-left: auto;
+  font-size: 11px;
+}
+.wk-note-form {
+  display: flex;
+  gap: 8px;
+}
+.wk-note-form input {
+  flex: 1;
+  font-size: 12px !important;
+}
+.wk-note-form button {
+  white-space: nowrap;
+  font-size: 12px;
+}
+.wk-project-footer {
+  padding: 0 2px;
+}
+.wk-settings-page {
+  max-width: 1160px;
+}
+.wk-settings-layout {
+  display: grid;
+  grid-template-columns: minmax(390px, 1.35fr) minmax(300px, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+.wk-settings-form {
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  min-width: 0;
+}
+.wk-section-heading {
+  padding-bottom: 2px;
+  gap: 12px;
+}
+.wk-memory-field input[type="range"] {
+  width: 100%;
+  margin: 3px 0;
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+.wk-memory-field strong {
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.wk-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  cursor: pointer;
+  line-height: 1.5;
+}
+
+.wk-settings-advanced {
+  border-top: 1px solid var(--line);
+  padding-top: 14px;
+}
+.wk-settings-advanced summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--muted);
+  user-select: none;
+}
+.wk-settings-advanced[open] > summary {
+  margin-bottom: 16px;
+  color: var(--text);
+}
+.wk-settings-advanced > .stack {
+  gap: 14px;
+}
+.wk-settings-save {
+  padding-top: 18px;
+  border-top: 1px solid var(--line);
+  gap: 10px;
+}
+.wk-settings-save > .row {
+  gap: 5px;
+}
+.wk-settings-side {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+.wk-status-card {
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+.wk-status-card > .row {
+  gap: 8px;
+}
+.wk-status-card h2 {
+  font-size: 14px;
+}
+.wk-status-card > .row button {
+  font-size: 12px;
+  min-height: 28px;
+  padding: 4px 8px;
+}
+.wk-model-name {
+  font-size: 15px;
+  font-weight: 500;
+}
+.wk-kv {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  column-gap: 22px;
+  row-gap: 10px;
+  margin: 2px 0;
+}
+.wk-kv dt {
+  color: var(--muted);
+}
+.wk-kv dd {
+  margin: 0;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.wk-paths {
+  font-size: 11px;
+  row-gap: 12px;
+  grid-template-columns: 1fr;
+}
+.wk-paths dd {
+  text-align: left;
+  overflow-wrap: anywhere;
+  margin-top: -6px;
+  line-height: 1.6;
+}
+.wk-capability {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--line);
+}
+.wk-capability:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+.wk-capability > .row {
+  gap: 8px;
+}
+.wk-capability p {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+.wk-connect-link {
+  align-self: flex-start;
+  font-size: 12px;
+}
+.wk-settings-side .wk-settings-advanced {
+  padding-top: 12px;
+}
+.wk-settings-side .wk-settings-advanced[open] > summary {
+  margin-bottom: 14px;
+}
+@media (max-width: 1180px) {
+  .wk-project-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .wk-project-editor {
+    grid-template-columns: 200px minmax(0, 1fr);
+  }
+  .wk-take-main {
+    flex-wrap: wrap;
+  }
+  .wk-take-actions {
+    margin-left: auto;
+  }
+  .wk-settings-layout {
+    grid-template-columns: minmax(330px, 1.15fr) minmax(280px, 1fr);
+  }
+}
+@media (max-width: 900px) {
+  .wk-project-overview {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .wk-overview-copy {
+    max-width: 100%;
+  }
+  .wk-album-actions {
+    align-items: flex-start;
+  }
+  .wk-project-editor {
+    grid-template-columns: 1fr;
+  }
+  .wk-track-nav {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    max-height: 230px;
+    overflow: auto;
+  }
+  .wk-new-track {
+    flex-direction: row;
+  }
+  .wk-new-track input {
+    flex: 1;
+  }
+  .wk-settings-layout {
+    grid-template-columns: 1fr;
+  }
+  .wk-settings-side {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-items: start;
+  }
+  .wk-status-card:last-child {
+    grid-column: 1/-1;
+  }
+}
+@media (max-width: 560px) {
+  .wk-project-grid,
+  .wk-track-nav,
+  .wk-settings-side {
+    grid-template-columns: 1fr;
+  }
+  .wk-project-create {
+    align-items: stretch;
+    flex-direction: column;
+  }
+  .wk-settings-form {
+    padding: 16px;
+  }
+  .wk-take-main {
+    gap: 8px;
+  }
+  .wk-take-title {
+    min-width: 160px;
+  }
+  .wk-take-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+  .wk-take-time {
+    margin-left: 0;
+  }
+  .wk-note-form {
+    flex-direction: column;
+  }
+  .wk-track-heading > .row {
+    justify-content: flex-start;
+  }
+  .wk-project-overview {
+    padding: 16px;
+  }
+  .wk-settings-save {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+
+.wk-note-form > .ui-input {
+  flex: 1;
+  min-width: 0;
+}
+.wk-takes-filters > .ui-select {
+  width: 142px;
+}
+.wk-take-cover {
+  flex: none;
+  overflow: hidden;
+  border-radius: 6px;
+}
+.wk-take-title-button {
+  text-align: left;
+  max-width: 100%;
+}
+.wk-memory-field .mantine-Slider-root {
+  margin: 8px 0;
+}
+.wk-chosen-title:hover {
+  color: var(--accent);
+}

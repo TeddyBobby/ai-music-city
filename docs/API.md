@@ -65,6 +65,16 @@ Types: `str`, `int`, `float`, `bool`, `[T]` list, `T?` nullable, `enum(a|b)`.
 | `cfg_scale` | float? | `null` = engine default |
 | `abc` | str? | supplied score; **400 if non-empty and `cot=off`** |
 | `title` | str? | display only |
+| `abc_sampling` | object? | optional `{"max_tokens": int}`; 32..4096, strict integer; omitted/null uses the native default (4096) |
+| `semantic_sampling` | object? | optional `{"max_tokens": int}`; 200..9000, strict integer; omitted/null uses the native default (9000) |
+
+These overrides expose only `max_tokens`; other nested fields are rejected. The lower bounds preserve the
+native minimum token counts (ABC 32, semantic 200), and the upper bounds allow shortening the native limits
+without increasing them. The engine still checks that the prompt and requested tokens fit its context.
+For a bounded instrumental smoke test use `abc_sampling: {"max_tokens": 1200}` and
+`semantic_sampling: {"max_tokens": 600}` (up to about 24 seconds of audio). Reaching the limit is recorded
+as `truncated`, so the resulting excerpt may end before a natural ending. Limits are persisted with the job
+and passed unchanged to the engine; `VariationsParams.base` accepts the same fields.
 
 ### RegenerateParams
 
@@ -76,6 +86,8 @@ Types: `str`, `int`, `float`, `bool`, `[T]` list, `T?` nullable, `enum(a|b)`.
 | `lyrics` | str? | `null` → inherit parent |
 | `seed` | int? | `null` → inherit parent seed |
 | `title` | str? | `null` → inherit |
+| `abc_sampling` | object? | same validation as Create; omitted = inherit parent, explicit null = reset to native default |
+| `semantic_sampling` | object? | same validation as Create; omitted = inherit parent, explicit null = reset to native default |
 
 `cot` is inherited from the parent; if the parent had `cot=off` the server uses `melody`. Preset/precision/ode_steps
 come from the common submit fields (below), defaulting to the parent's. Stored `params` contains the resolved
@@ -756,3 +768,82 @@ events), synthesize, decode — with a configurable delay per event (default 0.0
 `{"fake": true}` as `plan/plan.json` and `song/result.json` (`status: "complete"`), `summary.json`, and for covers a
 `transcription/score.abc`; returns the summary dict above. `FakeEngine(fail=True)` raises in `synthesize` to
 exercise the `failed` path.
+
+## Song reviews
+
+Reviews are separate from project take annotations and their existing 1–5 stars.
+They are stored locally in `data/reviews/reviews.db`. All review endpoints require
+a loopback host and reject cross-origin requests. Individual review routes require
+an existing, completed song with an audio artifact.
+
+| Method | Route | Behavior |
+|--------|-------|----------|
+| GET | `/api/reviews?ids=<comma-separated IDs>` | At most 60 IDs; returns `{reviews: {id: {manual_score, has_comment, ai_score, ai_status}}}`. |
+| GET | `/api/reviews/{id}` | Returns `{job_id, manual, ai}`. `manual` is null or `{score, comment, updated_at}`. |
+| PUT | `/api/reviews/{id}/manual` | Body `{score: number|null, comment: string}`. Scores are 0–10 in 0.1 increments; comments are at most 4000 characters. Either a score or nonblank comment is required. |
+| DELETE | `/api/reviews/{id}/manual` | Clears only the personal review; returns the current review envelope. |
+| POST | `/api/reviews/{id}/ai` | Starts a background assessment and returns the envelope with HTTP 202. Duplicate active requests return 409. |
+
+`ai` contains `status` (`idle`, `running`, `complete`, `failed`), `result`, `error`,
+`started_at`, and `updated_at`. Poll GET while running. The last successful result
+remains available during regeneration and after a failed attempt. Service restart
+marks interrupted assessments as failed, with a retryable message.
+
+AI results contain `score`, `headline`, `summary`, `body`, `dimensions`, `strengths`,
+`suggestions`, `model`, `created_at`, `basis`, and `evidence`. The configured Hermes
+text model receives bounded ABC/lyrics/style and locally measured audio statistics,
+not the audio file. Evidence explicitly records `direct_audio_listening: false`.
+Measurements stream at most 120 seconds (5.76 million frames), distributed across
+longer recordings. Invalid model output never produces a fallback score.
+
+## Local music plaza
+
+Publication records live independently in `data/plaza/plaza.db` and survive restarts.
+This is a **local preview**, not Internet publishing, login, or a multi-user service.
+Every endpoint requires a loopback host and same-origin access. Responses explicitly
+include `scope: "local"`, and the author is the placeholder `{id: "local", name: "本机创作者"}`.
+Before hosting publicly, replace this boundary with authentication, ownership checks,
+and an explicitly public song representation; the current local-only `job` is the
+same Job JSON used by the private workspace, including creation parameters.
+
+| Method | Route | Behavior |
+|--------|-------|----------|
+| GET | `/api/plaza?query=&offset=0&limit=30` | Returns `{posts, total, scope: "local"}` newest published first. Search title, style and caption case-insensitively. `offset >= 0`, `limit` is 1–100, and query is at most 200 characters. Search and invalid-song exclusion precede pagination. There is no vocal/instrumental category; legacy `kind` parameters are ignored. |
+| GET | `/api/plaza/{job_id}` | Returns `{post, scope: "local"}`; `post` is null if this eligible song has not been published. |
+| PUT | `/api/plaza/{job_id}` | Body `{caption: string}` (0–600 characters; no extra fields). Publishes or updates one record per song and returns the post envelope. Updates retain the original publication date. |
+| DELETE | `/api/plaza/{job_id}` | HTTP 204; removes only the publication record. Original music, audio, projects and reviews remain untouched. Repeated withdrawal is safe, including when the song's audio has subsequently disappeared. |
+| GET | `/api/plaza/albums?query=&offset=0&limit=24` | Returns `{albums, total, scope: "local"}` newest published first. Search album title, caption, and available tracks' title/style. Query and pagination limits match the singles feed. |
+| POST | `/api/plaza/albums` | Body `{title, caption, job_ids}`. Creates a new album and returns HTTP 201 with `{album, scope: "local"}`. Title is required, trimmed, 1–80 characters; caption is a required string of 0–600 characters; `job_ids` is an ordered list of 2–50 distinct strings. Extra fields are rejected. Every selected track must be complete and playable. |
+| GET | `/api/plaza/albums/{id}` | Returns `{album, scope: "local"}`; unknown album returns 404. Albums remain visible when some or all tracks become unavailable. |
+| PUT | `/api/plaza/albums/{id}` | Same body/validation as create; replaces title, caption and ordered track list while preserving original publication date. Unknown album returns 404. Invalid tracks leave the previous album unchanged. |
+| DELETE | `/api/plaza/albums/{id}` | HTTP 204, including repeated withdrawal or unknown IDs. Deletes only the album publication, preserving every song, single publication, project and review. |
+| GET | `/api/plaza/rankings?query=` | Returns `{manual, ai, scope: "local"}`; each array contains up to 100 `{rank, score, post}` entries from published, currently playable singles. Search matches the singles feed and preserves each entry's position in the full ranking. |
+
+`PlazaPost` contains `id` (equal to `job_id`), `job_id`, `caption`, `author`,
+`published_at`, `updated_at`, `can_manage: true`, and `job`.
+No engagement counters or other users are fabricated.
+
+`PlazaAlbum` contains `id` (a generated UUID), `title`, `caption`, ordered `job_ids`,
+`tracks` (currently playable Job objects in original order), `track_count` (playable count),
+`unavailable_count`, `duration_seconds` (sum of known durations of playable tracks),
+`author`, `published_at`, `updated_at`, and `can_manage: true`. Albums use a separate
+table in the same SQLite database. Installing the feature preserves existing single
+publication records. Publishing an album never automatically publishes its tracks as
+singles; album withdrawal never withdraws singles.
+
+Rankings read existing personal and AI review records without initiating AI work.
+The personal chart uses saved numeric `manual.score`; a comment without a score does
+not rank. The AI chart uses only a completed AI result's numeric score; running or
+failed evaluations are excluded, including those with an older retained result.
+Scores must be finite numbers between 0 and 10 (zero is valid). The charts remain
+separate: no mixed score or fabricated popularity. Ordering is score descending,
+publication date descending, then song ID ascending. `rank` is a sequential global
+position assigned before search filtering. Edits to saved ratings affect rankings
+on the next request. No album-level rating is inferred from its tracks.
+
+Publishing and individual GET require an existing `done` job with a real
+`song/audio.flac` artifact inside its song directory. Unknown songs return 404;
+unfinished songs or missing audio return 409. Unsafe artifact paths return 404.
+Deleted songs, missing audio and unfinished jobs are hidden from the feed immediately.
+Invalid input returns the standard JSON error envelope with HTTP 400; storage errors
+return HTTP 503 without exposing local paths.

@@ -1,175 +1,42 @@
 import { api } from "../api.js";
-import { assistBox, fill, h, loraPicker, presetPicker, rememberGroup, seedField, store, toast, toastError, trackBanner } from "../ui.js";
+import { fill, h, loraPicker, presetPicker, rememberGroup, seedField, store, toast, toastError, trackBanner, coverArt, presetName } from "../ui.js";
 import { liveCard, resultCard } from "./jobcard.js";
-
-const RECENT_MAX = 20;
-
-const GENRES = ["pop, female vocal, upbeat", "lo-fi hip hop", "orchestral cinematic", "indie rock, male vocal", "jazz trio", "edm, synth", "warm piano ballad", "city pop, groovy bass"];
-const SECTIONS = ["[Intro]", "[Verse]", "[Pre-Chorus]", "[Chorus]", "[Bridge]", "[Interlude]", "[Outro]"];
-const DEFAULTS = { title: "", style: "", lyrics: "", cot: "full", seed: "", random_seed: true, cfg_scale: "", abc: "", count: 1, random_seeds: false, preset: "quality", precision: "8bit", ode_steps: 16, loras: [] };
-
-export async function createView({ el, query, app }) {
-  const saved = { ...DEFAULTS, ...store.get("create", {}) };
-  if (app.settings && !store.get("create")) saved.preset = app.settings.default_preset || saved.preset;
-  if (query.from) {
-    try {
-      const { job } = await api.job(query.from);
-      Object.assign(saved, { title: job.params.title || "", style: job.params.style || "", lyrics: job.params.lyrics || "", cot: job.params.cot || "full",
-        seed: job.seed, random_seed: false, cfg_scale: job.params.cfg_scale ?? "", abc: job.params.abc || "", preset: job.preset, precision: job.precision, ode_steps: job.ode_steps, loras: job.loras || [], count: 3 });
-      toast(`Prefilled from ${job.title || job.id.slice(0, 8)} — set Variations and submit`, "info");
-    } catch (e) { toastError(e); }
-  }
-  // ?track=<id>: the submission becomes a take of that track. Kept in this closure only — never in store("create").
-  let trackId = null;
-  const banner = await trackBanner(query.track, { onDismiss: () => { trackId = null; history.replaceState(null, "", "#/create"); } });
-  if (banner) trackId = banner.track.id;
-
-  const f = {
-    title: h("input", { id: "f-title", type: "text", value: saved.title, placeholder: "Optional display title", autocomplete: "off" }),
-    style: h("textarea", { id: "f-style", rows: 2, placeholder: "e.g. dreamy indie pop, female vocal, warm guitars, 96 BPM", required: true }, saved.style),
-    lyrics: h("textarea", { id: "f-lyrics", class: "lyrics", placeholder: "[Verse]\nfirst line…\n\n[Chorus]\n…", required: true }, saved.lyrics),
-    seed: seedField({ id: "f-seed", seed: saved.seed, random: saved.random_seed !== false, onChange: () => { collect(); updateCount(); } }),
-    cfg: h("input", { id: "f-cfg", type: "number", min: 0, max: 20, step: 0.1, value: saved.cfg_scale, placeholder: "engine default" }),
-    abc: h("textarea", { id: "f-abc", class: "mono", rows: 8, placeholder: "X:1\nT:\nM:4/4\nL:1/16\nK:C\n…" }, saved.abc),
-    count: h("input", { id: "f-count", type: "number", min: 1, max: 16, step: 1, value: saved.count }),
-    random: h("input", { id: "f-random", type: "checkbox", checked: !!saved.random_seeds }),
-  };
-  // A new take is titled after its track (editable); the track name is not remembered as this form's title.
-  if (banner) f.title.value = banner.track.name;
-  let cot = saved.cot;
-  const cotSeg = h("div", { class: "seg", role: "group", "aria-label": "Mode" }, ["full", "melody", "off"].map((m) =>
-    h("button", { type: "button", dataset: { m }, "aria-pressed": String(m === cot), onclick: () => { cot = m; cotSeg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.m === cot))); abcDetails.hidden = cot === "off"; } }, m)));
-  const presets = presetPicker({ preset: saved.preset, precision: saved.precision, ode_steps: saved.ode_steps }, app.status && app.status.presets);
-  let adapters = app.status && app.status.loras ? app.status.loras.adapters : [];
-  const loras = loraPicker(saved.loras, adapters);
-  // Instrumental AR adapters (name contains "inst") overrun to the length cap with timed section tags.
-  const instHint = h("span", { class: "hint", hidden: true }, "Instrumental adapter: use bare section tags ([intro], [verse]…) or [instrumental] in the lyrics — timed tags tend to overrun to the length cap; songs land around 3–5 min regardless of the plan.");
-  const isInst = (name) => { const a = adapters.find((x) => x.name === name); return /inst/i.test(name) && (!a || !a.parts || a.parts.includes("ar")); };
-  const updateInstHint = () => { instHint.hidden = !loras.value().some((l) => isInst(l.name)); };
-  loras.addEventListener("input", updateInstHint); updateInstHint();
-  const onStatus = (s) => { if (s && s.loras) { adapters = s.loras.adapters; loras.update(adapters); updateInstHint(); } };
-  app.listeners.add(onStatus);
-  // Claude assist: fills title/style/lyrics/mode/CFG; applyFields returns the previous values so the box can undo.
-  function applyFields(fields) {
-    const prev = {};
-    for (const k of ["title", "style", "lyrics"]) if (k in fields) { prev[k] = f[k].value; f[k].value = fields[k] ?? ""; }
-    if ("cfg_scale" in fields) { prev.cfg_scale = f.cfg.value === "" ? null : Number(f.cfg.value); f.cfg.value = fields.cfg_scale === null || fields.cfg_scale === undefined ? "" : fields.cfg_scale; }
-    if ("cot" in fields) { prev.cot = cot; const b = cotSeg.querySelector(`[data-m="${fields.cot}"]`); if (b) b.click(); }
-    collect();
-    return prev;
-  }
-  const getContext = () => { const c = { title: f.title.value.trim(), style: f.style.value.trim(), lyrics: f.lyrics.value.trim(), cot, cfg_scale: f.cfg.value === "" ? null : Number(f.cfg.value) }; for (const k in c) if (c[k] === "" || c[k] === null) delete c[k]; return c; };
-  const assist = assistBox({ page: "create", app, getContext, apply: applyFields });
-  app.listeners.add(assist.onStatus);
-  const abcDetails = h("details", { hidden: cot === "off", open: !!saved.abc }, h("summary", {}, "Supply an ABC score (optional)"),
-    h("p", { class: "hint" }, "Paste an ABC score (or load a .abc/.txt file) to skip planning; the engine follows it. Not allowed with mode “off”."),
-    h("label", { class: "row small" }, "Load file", h("input", { id: "f-abc-file", type: "file", accept: ".abc,.txt,text/plain", style: "width:auto", onchange: async (e) => {
-      const file = e.target.files[0]; if (!file) return;
-      try { f.abc.value = await file.text(); collect(); toast(`Loaded ${file.name}`, "ok"); } catch (err) { toast(`Could not read ${file.name}: ${err.message}`, "err"); }
-      e.target.value = "";
-    } })), f.abc);
-  const submit = h("button", { type: "submit", class: "primary", id: "f-submit" }, "Create song");
-  const variationsHint = h("span", { class: "hint" });
-  const updateCount = () => { const n = Number(f.count.value) || 1; submit.textContent = n > 1 ? `Create ${n} variations` : "Create song"; variationsHint.textContent = n > 1 ? "Submitted as one group; seeds " + (f.random.checked || f.seed.isRandom() ? "independent random" : "seed, seed+1, …") : ""; };
-  f.count.addEventListener("input", updateCount); f.random.addEventListener("change", updateCount); updateCount();
-
-  const insertTag = (tag) => { const t = f.lyrics, s = t.selectionStart, v = t.value; const pre = v.slice(0, s), post = v.slice(t.selectionEnd); const nl = !pre ? "" : pre.endsWith("\n\n") ? "" : pre.endsWith("\n") ? "\n" : "\n\n"; t.value = pre + nl + tag + "\n" + post; t.focus(); t.selectionStart = t.selectionEnd = (pre + nl + tag + "\n").length; };
-
-  const form = h("form", { class: "stack", onsubmit: onSubmit },
-    h("div", { class: "stack" }, assist.el,
-      h("label", { class: "field" }, h("span", { class: "lbl" }, "Title"), f.title),
-      h("label", { class: "field" }, h("span", { class: "lbl" }, h("span", {}, "Style"), h("span", {}, "required")), f.style),
-      h("div", { class: "chips", "aria-label": "Genre suggestions" }, GENRES.map((g) => h("button", { type: "button", class: "chip", onclick: () => { f.style.value = f.style.value.trim() ? f.style.value.replace(/,?\s*$/, ", ") + g : g; f.style.focus(); } }, g))),
-      h("label", { class: "field" }, h("span", { class: "lbl" }, h("span", {}, "Lyrics"), h("span", {}, "section tags below")), f.lyrics),
-      h("div", { class: "chips", "aria-label": "Insert section tag" }, SECTIONS.map((t) => h("button", { type: "button", class: "chip", onclick: () => insertTag(t) }, t))),
-      abcDetails),
-    h("div", { class: "panel stack" },
-      h("label", { class: "field" }, h("span", { class: "lbl" }, "Mode (chain of thought)"), cotSeg,
-        h("span", { class: "hint" }, "full = plan score + arrangement, melody = plan melody only, off = no score")),
-      h("div", { class: "field" }, h("span", { class: "lbl" }, "Preset"), presets),
-      h("div", { class: "field" }, h("span", { class: "lbl" }, "LoRA adapters"), loras,
-        h("span", { class: "hint" }, "Merged into the AR / acoustic weights for this job; stack an AR adapter with a NAR one. Scale 1 = as trained."), instHint),
-      h("div", { class: "grid2" },
-        h("div", { class: "field" }, h("span", { class: "lbl" }, "Seed"), f.seed),
-        h("label", { class: "field" }, h("span", { class: "lbl" }, "CFG scale"), f.cfg)),
-      h("div", { class: "grid2" },
-        h("label", { class: "field" }, h("span", { class: "lbl" }, "Variations"), f.count),
-        h("label", { class: "check", style: "align-self:end;padding-bottom:6px" }, f.random, "random seeds")),
-      variationsHint,
-      submit));
-  // Results: jobs submitted from this page (persisted ids), newest first; live cards while running.
-  const results = h("div", { class: "stack" });
-  const resultsEmpty = h("div", { class: "empty" }, "Songs you create here appear in this column — play them as soon as they finish, then tweak and submit another take.");
-  const resultsHead = h("div", { class: "row between" }, h("h3", {}, "Results"), h("button", { type: "button", class: "ghost sm", onclick: clearResults }, "Clear list"));
-  const live = new Map(); // id -> liveCard
-  fill(el, h("div", { class: "view-head" }, h("h1", {}, "Create"), h("span", { class: "sub" }, "Describe the style, write lyrics with section tags, pick a preset — results play right here.")),
-    banner ? banner.el : null,
-    h("div", { class: "cols results-layout" }, form, h("div", { class: "stack results-col" }, resultsHead, results, resultsEmpty)));
-
-  const recent = () => store.get("recent", []);
-  const setRecent = (ids) => store.set("recent", ids.slice(0, RECENT_MAX));
-  function clearResults() { live.forEach((c) => c.close()); live.clear(); setRecent([]); fill(results); resultsEmpty.hidden = false; resultsHead.querySelector("button").hidden = true; }
-  function dismiss(job) { setRecent(recent().filter((id) => id !== job.id)); const el = results.querySelector(`[data-id="${job.id}"]`); el && el.remove(); const c = live.get(job.id); if (c) { c.close(); live.delete(job.id); } syncEmpty(); }
-  function syncEmpty() { const n = results.children.length; resultsEmpty.hidden = n > 0; resultsHead.querySelector("button").hidden = n === 0; }
-  function useSeed(job) { f.seed.setSeed(job.seed); collect(); f.seed.input.focus(); toast(`Seed ${job.seed} copied into the form (random seed off)`, "info", { timeout: 2500 }); }
-  const doneCard = (job) => resultCard(job, { onUseSeed: useSeed, onDismiss: dismiss });
-  /** Show a job in the results column (prepend unless `replace` gives an existing node). */
-  function show(job, replace = null) {
-    const prev = live.get(job.id); if (prev) { prev.close(); live.delete(job.id); }
-    let node;
-    if (["done", "failed", "cancelled"].includes(job.status)) node = doneCard(job);
-    else {
-      const c = liveCard(job, { scoreCollapsed: true, onFinish: (c2, j) => show(j, c2.el), onGone: async (c2) => { try { show((await api.job(c2.job.id)).job, c2.el); } catch { dismiss(c2.job); } } });
-      live.set(job.id, c); node = c.el;
-    }
-    if (replace && replace.parentNode === results) replace.replaceWith(node); else results.prepend(node);
-    syncEmpty();
-  }
-  async function restore() {
-    const ids = recent(); if (!ids.length) { syncEmpty(); return; }
-    const found = [];
-    for (const id of ids.slice().reverse()) { // oldest first so prepend leaves newest on top
-      try { const { job } = await api.job(id); found.unshift(id); show(job); }
-      catch (e) { if (e.status !== 404) console.warn("recent job", id, e.message); }
-    }
-    setRecent(found);
-  }
-  await restore();
-  const tick = setInterval(() => live.forEach((c) => c.paint()), 1000);
-
-  function collect() {
-    const v = { title: f.title.value.trim(), style: f.style.value.trim(), lyrics: f.lyrics.value, cot, seed: f.seed.raw(), random_seed: f.seed.isRandom(),
-      cfg_scale: f.cfg.value === "" ? "" : Number(f.cfg.value), abc: f.abc.value, count: Math.max(1, Number(f.count.value) || 1), random_seeds: f.random.checked, loras: loras.value(), ...presets.value() };
-    store.set("create", trackId ? { ...v, title: saved.title } : v);
-    return v;
-  }
-  form.addEventListener("input", collect);
-
-  async function onSubmit(e) {
-    e.preventDefault();
-    const v = collect();
-    if (!v.style || !v.lyrics.trim()) return toast("Style and lyrics are required", "err");
-    if (v.abc.trim() && v.cot === "off") return toast("An ABC score cannot be used with mode “off” — pick full or melody", "err");
-    const base = { style: v.style, lyrics: v.lyrics, cot: v.cot, seed: f.seed.value(), cfg_scale: v.cfg_scale === "" ? null : v.cfg_scale, abc: v.abc.trim() || null, title: v.title || null };
-    const common = { preset: v.preset, precision: v.precision, ode_steps: v.ode_steps, loras: v.loras, track_id: trackId };
-    const link = banner && trackId ? { href: `#/project/${banner.track.project_id}`, label: "Open project" } : undefined;
-    submit.disabled = true;
-    try {
-      let jobs;
-      if (v.count > 1) {
-        const r = await api.submit({ kind: "variations", params: { count: v.count, base, random_seeds: v.random_seeds || v.random_seed, label: null }, ...common });
-        rememberGroup(r.group, r.jobs); jobs = r.jobs;
-        toast(`Queued ${r.jobs.length} variations${trackId ? ` as takes of “${banner.track.name}”` : ""}`, "ok", { link });
-      } else {
-        const r = await api.submit({ kind: "create", params: base, ...common });
-        jobs = [r.job];
-        toast(`Queued “${r.job.title || r.job.id.slice(0, 8)}”${trackId ? ` as a take of “${banner.track.name}”` : ""}`, "ok", { link });
-      }
-      setRecent([...jobs.map((j) => j.id).reverse(), ...recent().filter((id) => !jobs.some((j) => j.id === id))]);
-      for (const job of jobs) show(job);
-      results.parentNode.scrollTop = 0;
-    } catch (err) { toastError(err); }
-    submit.disabled = false; // queue another take right away
-  }
-  return { unmount() { clearInterval(tick); app.listeners.delete(onStatus); app.listeners.delete(assist.onStatus); live.forEach((c) => c.close()); } };
+const DEFAULTS={title:"",style:"",lyrics:"",cot:"full",seed:"",random_seed:true,cfg_scale:"",abc:"",count:1,random_seeds:false,preset:"fast",precision:"8bit",ode_steps:8,loras:[]};
+const GENRES=["华语流行","温柔民谣","轻快女声","木吉他"];
+const SECTIONS=[["[Verse]","主歌"],["[Chorus]","副歌"],["[Interlude]","间奏"],["[Outro]","结尾"]];
+export async function createView({el,query,app}){
+  // Saved hardware settings must be loaded before first form render.
+  if(!app.settings){try{app.settings=await api.settings();}catch{}}
+  if(!app.status){try{app.status=await api.status();}catch{}}
+  const cached=store.get("create",null),saved={...DEFAULTS,...cached};
+  if(!cached)saved.preset=app.settings?.default_preset||"fast";
+  if(query.from){try{const{job}=await api.job(query.from);Object.assign(saved,{...job.params,seed:job.seed,random_seed:false,preset:job.preset,precision:job.precision,ode_steps:job.ode_steps,loras:job.loras||[],count:1});toast("已带入原作品参数，可修改后创作。");}catch(e){toastError(e);}}
+  let trackId=null,closed=false;
+  const banner=await trackBanner(query.track,{onDismiss:()=>{trackId=null;history.replaceState(null,"","#/create");}});if(banner)trackId=banner.track.id;
+  const f={title:h("input",{id:"f-title",type:"text",value:banner?.track.name||saved.title,placeholder:"为这首歌起个名字（选填）",autocomplete:"off"}),style:h("textarea",{id:"f-style",rows:2,required:true,placeholder:"例如：温暖的华语流行，清澈女声，木吉他与钢琴，轻快而治愈。"},saved.style),lyrics:h("textarea",{id:"f-lyrics",class:"lyrics",required:true,placeholder:"[Verse]\n写下你的第一句歌词\n\n[Chorus]\n让故事从这里开始"},saved.lyrics),seed:seedField({id:"f-seed",seed:saved.seed,random:saved.random_seed!==false}),cfg:h("input",{id:"f-cfg",type:"number",min:0,max:20,step:.1,value:saved.cfg_scale,placeholder:"使用模型默认值"}),abc:h("textarea",{id:"f-abc",class:"mono",rows:8,placeholder:"X:1\nK:C\n…"},saved.abc),count:h("input",{id:"f-count",type:"number",min:1,max:16,step:1,value:saved.count}),random:h("input",{type:"checkbox",checked:!!saved.random_seeds})};
+  let cot=saved.cot;const modes={full:"完整编曲",melody:"只编旋律",off:"自由生成"};
+  const cotSeg=h("div",{class:"seg","aria-label":"编曲方式"},Object.entries(modes).map(([m,name])=>h("button",{type:"button",dataset:{m},"aria-pressed":String(m===cot),onclick:()=>{cot=m;cotSeg.querySelectorAll("button").forEach(b=>b.setAttribute("aria-pressed",String(b.dataset.m===cot)));abcDetails.hidden=cot==="off";collect();}},name)));
+  const presets=presetPicker(saved,app.status?.presets),loras=loraPicker(saved.loras,app.status?.loras?.adapters||[]);
+  const field=(label,input,hint=null)=>h("label",{class:"field"},h("span",{class:"lbl"},label,hint?h("span",{},hint):null),input);
+  const assistantLink=label=>h("a",{class:"btn sm",href:"#/assistant"},label);
+  const tagButton=([tag,label])=>h("button",{type:"button",class:"chip",onclick:()=>{const t=f.lyrics,s=t.selectionStart,v=t.value,pre=v.slice(0,s);t.value=pre+(pre&&!pre.endsWith("\n")?"\n\n":"")+tag+"\n"+v.slice(t.selectionEnd);collect();t.focus();}},"＋ "+label);
+  const abcDetails=h("details",{hidden:cot==="off",open:!!saved.abc},h("summary",{},"提供 ABC 乐谱（可选）"),h("p",{class:"hint"},"导入已有乐谱后将跳过编谱阶段。"),h("input",{type:"file",accept:".abc,.txt,text/plain",onchange:async e=>{const file=e.target.files[0];if(file){f.abc.value=await file.text();collect();}}}),f.abc);
+  const nextDraft=h("div",{class:"next-draft",hidden:true},h("b",{},"继续创作下一首"),h("p",{},"修改这里不会改变当前任务。"));
+  const summary=h("small");const advanced=h("details",{class:"form-advanced"},h("summary",{},h("img",{src:"/static/assets/64b45.svg",alt:""}),h("span",{},"高级设置"),summary,h("b",{},"展开")),h("div",{class:"panel stack"},field("编曲方式",cotSeg),field("生成模式",presets),h("p",{class:"hint"},"快速模式已在本机验证；质量模式与自定义精度尚未在本机验收。"),field("风格适配器",loras),h("div",{class:"grid2"},field("随机种子",f.seed),field("风格引导强度",f.cfg)),h("div",{class:"grid2"},field("生成版本数",f.count),h("label",{class:"check"},f.random,"每个版本使用随机种子")),abcDetails));
+  const submit=h("button",{type:"submit",id:"f-submit",class:"primary"},"开始生成 →"),submitTitle=h("span"),submitHint=h("span",{class:"hint"},"每次结果自动保存到「我的作品」");
+  const draftNotice=h("div",{class:"warnbox row between assistant-draft-notice",hidden:true});
+  const form=h("form",{class:"stack create-form",onsubmit:onSubmit},nextDraft,draftNotice,h("div",{class:"stack form-basic"},field("作品名称",f.title,"选填"),h("div",{class:"field"},h("div",{class:"lbl"},h("label",{for:"f-style"},"音乐风格 · 必填"),assistantLink("曲风建议")),f.style),h("div",{class:"chips"},GENRES.map(g=>h("button",{type:"button",class:"chip",onclick:()=>{f.style.value=(f.style.value.trim()?f.style.value.trim()+"，":"")+g;collect();}},g))),h("div",{class:"field"},h("div",{class:"lbl"},h("label",{for:"f-lyrics"},"歌词 · 必填"),assistantLink("助手写词")),h("div",{class:"chips section-chips"},SECTIONS.map(tagButton)),f.lyrics)),advanced,h("div",{class:"submit-row"},h("div",{},submitTitle,submitHint),submit));
+  const results=h("div",{class:"stack"});const empty=h("div",{class:"empty-result"},h("div",{class:"row between"},h("h3",{},"本次作品"),h("span",{class:"tag"},"待生成")),h("div",{class:"record-placeholder"},h("img",{src:"/static/assets/d4763.svg",alt:"听见唱片"})),h("h2",{},"下一首歌，值得期待。"),h("p",{},"生成完成后，在这里试听、下载，或者继续探索另一个版本。"),h("ol",{},h("li",{},"写下你想唱的故事"),h("li",{},"交给本机生成"),h("li",{},"试听并保存喜欢的版本")));
+  const recent=h("div",{class:"panel stack"}),head=h("h1",{},"把灵感，变成一首歌。"),sub=h("span",{class:"sub"},"写下歌词，选择风格。让每一个想法都有声音。");
+  fill(el,h("div",{class:"view-head"},head,sub),banner?.el,h("div",{class:"cols results-layout"},form,h("div",{class:"stack results-col"},results,empty,recent)));
+  const cards=new Map();let recentJobs=[],busy=false;
+  function collect(){const v={title:f.title.value.trim(),style:f.style.value.trim(),lyrics:f.lyrics.value,cot,seed:f.seed.raw(),random_seed:f.seed.isRandom(),cfg_scale:f.cfg.value===""?"":Number(f.cfg.value),abc:f.abc.value,count:Math.min(16,Math.max(1,Number(f.count.value)||1)),random_seeds:f.random.checked,loras:loras.value(),...presets.value()};store.set("create",trackId?{...v,title:saved.title}:v);summary.textContent=`${modes[cot]} · ${f.seed.isRandom()?"随机变化":"固定种子"} · ${v.count} 个版本`;submitTitle.textContent=busy?"准备好后加入队列":`${presetName(v.preset)}${v.preset==="fast"?" · 适合本机":""}`;submit.textContent=busy?(v.count>1?`加入 ${v.count} 个版本到队列`:"加入队列"):(v.count>1?`生成 ${v.count} 个版本 →`:"开始生成 →");return v;}
+  form.addEventListener("input",collect);form.addEventListener("click",()=>queueMicrotask(collect));collect();
+  if(query.assistantDraft){try{const draft=JSON.parse(localStorage.getItem("yue2-assistant-draft")||"null");if(draft){const before={title:f.title.value,style:f.style.value,lyrics:f.lyrics.value};for(const key of["title","style","lyrics"])if(typeof draft[key]==="string")f[key].value=draft[key];localStorage.removeItem("yue2-assistant-draft");collect();fill(draftNotice,h("span",{},"已填入助手建议，可继续编辑。"),h("button",{type:"button",class:"ghost sm",onclick:()=>{for(const key of Object.keys(before))f[key].value=before[key];collect();draftNotice.hidden=true;toast("已恢复填入前的草稿。");}},"撤销填入"));draftNotice.hidden=false;}}catch{toast("助手草稿无法读取，请重新填入。","err");}}
+  function onStatus(status){loras.update(status?.loras?.adapters||[]);busy=!!status?.queue?.running||!!status?.queue?.queued;nextDraft.hidden=!busy;head.textContent=busy?"音乐正在生成":"把灵感，变成一首歌。";sub.textContent=busy?"当前任务在右侧更新，你也可以继续准备下一首。":"写下歌词，选择风格。让每一个想法都有声音。";collect();}
+  app.listeners.add(onStatus);onStatus(app.status);
+  async function refresh(){try{const[active,done]=await Promise.all([api.jobs({status:"queued,running",limit:20}),api.jobs({status:"done",limit:1})]);if(closed)return;const ids=new Set(active.jobs.map(j=>j.id));for(const[id,c]of cards)if(!ids.has(id)){c.close();c.el.remove();cards.delete(id);}for(const job of active.jobs.slice().reverse()){if(cards.has(job.id)){cards.get(job.id).update(job);continue;}const c=liveCard(job,{scoreCollapsed:true,onFinish:()=>{refresh();app.refreshStatus?.();},onGone:refresh});cards.set(job.id,c);results.append(c.el);}empty.hidden=cards.size>0;recentJobs=done.jobs;fill(recent,h("div",{class:"row between"},h("h3",{},"最近生成"),h("a",{href:"#/library",class:"hint"},"查看全部")),done.jobs.length?resultCard(done.jobs[0]):h("p",{class:"hint"},"还没有完成的作品。"));}catch(e){if(!closed)toastError(e);}}
+  async function onSubmit(e){e.preventDefault();const v=collect();if(!v.style||!v.lyrics.trim())return toast("请填写音乐风格和歌词。","err");if(v.abc.trim()&&cot==="off")return toast("提供乐谱时请选择完整编曲或只编旋律。","err");submit.disabled=true;const base={style:v.style,lyrics:v.lyrics,cot,seed:f.seed.value(),cfg_scale:v.cfg_scale===""?null:v.cfg_scale,abc:v.abc.trim()||null,title:v.title||null};const common={preset:v.preset,precision:v.precision,ode_steps:v.ode_steps,loras:v.loras,track_id:trackId};try{if(v.count>1){const r=await api.submit({kind:"variations",params:{count:v.count,base,random_seeds:v.random_seeds||v.random_seed,label:null},...common});rememberGroup(r.group,r.jobs);toast(`已加入 ${r.jobs.length} 个版本，按顺序生成。`,"ok");}else{await api.submit({kind:"create",params:base,...common});toast("已加入队列，完成后自动保存。","ok");}await refresh();await app.refreshStatus?.();}catch(err){toastError(err);}submit.disabled=false;}
+  await refresh();const poll=setInterval(refresh,5000),tick=setInterval(()=>cards.forEach(c=>c.paint()),1000);
+  return{unmount(){closed=true;clearInterval(poll);clearInterval(tick);app.listeners.delete(onStatus);cards.forEach(c=>c.close());}};
 }

@@ -26,7 +26,7 @@ export function toast(message, kind = "info", { link, timeout = 6000 } = {}) {
   const box = document.getElementById("toasts");
   const t = h("div", { class: `toast ${kind}` },
     h("span", {}, message, link ? [" ", h("a", { href: link.href }, link.label)] : null),
-    h("button", { class: "ghost sm", "aria-label": "Dismiss", onclick: () => t.remove() }, "✕"));
+    h("button", { class: "ghost sm", "aria-label": "关闭", onclick: () => t.remove() }, "✕"));
   box.append(t);
   while (box.children.length > 4) box.firstChild.remove();
   if (timeout) setTimeout(() => t.remove(), timeout);
@@ -36,7 +36,8 @@ export const toastError = (e) => toast(e && e.message ? `${e.message}${e.code ? 
 
 export function applyTheme(theme, { persist = true } = {}) {
   const root = document.documentElement;
-  if (theme === "light" || theme === "dark") root.dataset.theme = theme; else delete root.dataset.theme;
+  if (theme === "light" || theme === "dark") root.dataset.theme = theme;
+  else root.dataset.theme = matchMedia("(prefers-color-scheme: light)").matches ? "light" : "dark";
   if (persist) store.set("theme", theme || "system");
 }
 
@@ -47,16 +48,16 @@ export const store = {
 };
 
 export const fmt = {
-  secs(s) { if (s === null || s === undefined || Number.isNaN(s)) return "—"; s = Math.round(s); return s >= 3600 ? `${Math.floor(s / 3600)}h ${Math.floor((s % 3600) / 60)}m` : s >= 60 ? `${Math.floor(s / 60)}m ${String(s % 60).padStart(2, "0")}s` : `${s}s`; },
-  dur(s) { if (s === null || s === undefined) return "—"; const m = Math.floor(s / 60), r = Math.round(s % 60); return `${m}:${String(r).padStart(2, "0")}`; },
-  when(iso) { if (!iso) return "—"; const d = new Date(iso), diff = (Date.now() - d) / 1000; if (diff < 60) return "just now"; if (diff < 3600) return `${Math.floor(diff / 60)} min ago`; if (diff < 86400) return `${Math.floor(diff / 3600)} h ago`; return d.toLocaleString(undefined, { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); },
+  secs(s) { if (s === null || s === undefined || Number.isNaN(s)) return "—"; s = Math.round(s); return s >= 3600 ? `${Math.floor(s / 3600)}小时 ${Math.floor((s % 3600) / 60)}分` : s >= 60 ? `${Math.floor(s / 60)}分 ${String(s % 60).padStart(2, "0")}秒` : `${s}秒`; },
+  dur(s) { if (s === null || s === undefined || !Number.isFinite(s)) return "—"; s = Math.round(s); const m = Math.floor(s / 60), r = s % 60; return `${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}`; },
+  when(iso) { if (!iso) return "—"; const d = new Date(iso), diff = (Date.now() - d) / 1000; if (diff < 60) return "刚刚"; if (diff < 3600) return `${Math.floor(diff / 60)} 分钟前`; if (diff < 86400) return `${Math.floor(diff / 3600)} 小时前`; return d.toLocaleString("zh-CN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }); },
   gib(x) { return x === null || x === undefined ? "—" : `${Number(x).toFixed(1)} GiB`; },
   tps(x) { return x ? `${x.toFixed(0)} tok/s` : "—"; },
   excerpt(s, n = 80) { s = (s || "").replace(/\s+/g, " ").trim(); return s.length > n ? s.slice(0, n - 1) + "…" : s; },
 };
 
 export const STAGE_ORDER = ["load", "transcribe", "hum", "plan", "semantic", "synthesize", "decode", "save"];
-export const STAGE_NAMES = { load: "Load", transcribe: "Transcribe", hum: "Hum", plan: "Plan", semantic: "Semantic", synthesize: "Synthesize", decode: "Decode", save: "Save", e2e: "Total" };
+export const STAGE_NAMES = { load: "准备模型", transcribe: "识别旋律", hum: "分析哼唱", plan: "编写乐谱", semantic: "生成音乐", synthesize: "合成音频", decode: "处理音频", save: "保存作品", e2e: "总用时" };
 // Typical share of wall time per stage (from PLAN timings: plan 16 s, semantic 36 s, synth 27 s, decode 3 s).
 const STAGE_WEIGHT = { load: 0.04, transcribe: 0.06, hum: 0.03, plan: 0.18, semantic: 0.42, synthesize: 0.26, decode: 0.03, save: 0.01 };
 
@@ -127,16 +128,16 @@ document.addEventListener("play", (e) => stopPlayback(e.target), true);
 /** Minimal MIDI preview via abcjs' synth. Returns a toggle button. */
 export function scorePlayer(getVisual) {
   let synth = null, playing = false;
-  const btn = h("button", { onclick: toggle }, "▶ Play score (MIDI)");
+  const btn = h("button", { onclick: toggle }, "播放乐谱（MIDI）");
   function setPlaying(on) {
-    playing = on; btn.textContent = on ? "■ Stop" : "▶ Play score (MIDI)";
+    playing = on; btn.textContent = on ? "停止" : "播放乐谱（MIDI）";
     if (on) midiPlayer = btn; else if (midiPlayer === btn) midiPlayer = null;
   }
   async function toggle() {
     if (playing) { synth && synth.stop(); setPlaying(false); return; }
     const visual = getVisual();
-    if (!visual || !window.ABCJS || !ABCJS.synth || !ABCJS.synth.supportsAudio()) return toast("Audio synthesis is not supported in this browser", "err");
-    btn.disabled = true; btn.textContent = "Loading sounds…";
+    if (!visual || !window.ABCJS || !ABCJS.synth || !ABCJS.synth.supportsAudio()) return toast("当前浏览器不支持乐谱试听", "err");
+    btn.disabled = true; btn.textContent = "正在加载音色…";
     try {
       synth = new ABCJS.synth.CreateSynth();
       // chordsOff: YuE2 scores carry chord symbols ("C", "Am", …) and abcjs would otherwise add its own
@@ -157,21 +158,21 @@ export function scorePlayer(getVisual) {
 /** Preset picker with custom precision/steps. value(): {preset, precision, ode_steps}. */
 export function presetPicker(initial = {}, presets = null) {
   const list = presets || [{ name: "quality", label: "Quality", description: "BF16 AR, 32 ODE steps (reference quality)" }, { name: "fast", label: "Fast", description: "8-bit AR, 8 ODE steps (faster than realtime)" }, { name: "custom", label: "Custom", description: "Pick precision (bf16/8bit/4bit) and 4-64 ODE steps" }];
-  const state = { preset: initial.preset || "quality", precision: initial.precision || "8bit", ode_steps: initial.ode_steps || 16 };
+  const state = { preset: initial.preset || "fast", precision: initial.precision || "8bit", ode_steps: initial.ode_steps || 8 };
   const seg = h("div", { class: "seg", role: "group", "aria-label": "Preset" });
-  const prec = h("select", { id: "f-precision", "aria-label": "Precision", onchange: (e) => { state.precision = e.target.value; } },
+  const prec = h("select", { id: "f-precision", "aria-label": "模型精度", onchange: (e) => { state.precision = e.target.value; } },
     ["bf16", "8bit", "4bit"].map((p) => h("option", { value: p, selected: p === state.precision }, p)));
   const steps = h("input", { id: "f-ode", type: "number", min: 4, max: 64, step: 1, value: state.ode_steps, "aria-label": "ODE steps", onchange: (e) => { state.ode_steps = Math.max(4, Math.min(64, Number(e.target.value) || 16)); e.target.value = state.ode_steps; } });
   const custom = h("div", { class: "grid2", hidden: state.preset !== "custom" },
-    h("label", { class: "field" }, h("span", { class: "lbl" }, "Precision"), prec),
-    h("label", { class: "field" }, h("span", { class: "lbl" }, "ODE steps 4–64"), steps));
+    h("label", { class: "field" }, h("span", { class: "lbl" }, "模型精度"), prec),
+    h("label", { class: "field" }, h("span", { class: "lbl" }, "合成步数 4–64"), steps));
   const desc = h("div", { class: "hint" });
   const sync = () => {
     seg.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.p === state.preset)));
     custom.hidden = state.preset !== "custom";
-    const p = list.find((x) => x.name === state.preset); desc.textContent = p ? p.description : "";
+    const p = list.find((x) => x.name === state.preset); desc.textContent = p ? (p.name === "fast" ? "8bit 量化 · 8 步合成 · 本机已验证" : p.name === "quality" ? "BF16 · 32 步合成 · 本机尚未验收" : "自定义精度与 4–64 步合成；未经本机验收") : "";
   };
-  for (const p of list) seg.append(h("button", { type: "button", dataset: { p: p.name }, onclick: () => { state.preset = p.name; sync(); } }, p.label || p.name));
+  for (const p of list) seg.append(h("button", { type: "button", dataset: { p: p.name }, onclick: () => { state.preset = p.name; sync(); } }, presetName(p.name)));
   sync();
   const el = h("div", { class: "stack" }, seg, desc, custom);
   el.value = () => state.preset === "custom" ? { ...state } : { preset: state.preset, precision: null, ode_steps: null };
@@ -189,24 +190,24 @@ export function loraPicker(initial = [], adapters = []) {
   let list = (adapters || []).filter((a) => a.kind !== "hum"); // hum adapters belong to the Hum page
   const body = h("div", { class: "stack", style: "gap:6px" });
   const hint = h("span", { class: "hint" });
-  const add = h("button", { type: "button", class: "ghost sm", onclick: () => { const free = usable().find((a) => !rows.some((r) => r.name === a.name)); rows.push({ name: free ? free.name : (usable()[0] || {}).name || "", scale: 1 }); paint(); fire(); } }, "+ Add LoRA");
+  const add = h("button", { type: "button", class: "ghost sm", onclick: () => { const free = usable().find((a) => !rows.some((r) => r.name === a.name)); rows.push({ name: free ? free.name : (usable()[0] || {}).name || "", scale: 1 }); paint(); fire(); } }, "＋ 添加适配器");
   const el = h("div", { class: "stack", style: "gap:6px" }, body, h("div", { class: "row" }, add, hint));
   const usable = () => list.filter((a) => a.valid);
   const describe = (a) => a ? `${a.parts.map((p) => p.toUpperCase()).join("+")}${a.rank ? ` · rank ${a.rank}` : ""}${a.metadata && a.metadata.intended_cot ? ` · cot ${a.metadata.intended_cot}` : ""}` : "";
   function fire() { el.dispatchEvent(new Event("input", { bubbles: true })); }
   function paint() {
     fill(body, rows.map((row, i) => {
-      const sel = h("select", { "aria-label": "LoRA adapter", onchange: (e) => { row.name = e.target.value; note.textContent = describe(list.find((a) => a.name === row.name)); fire(); } },
+      const sel = h("select", { "aria-label": "风格适配器", onchange: (e) => { row.name = e.target.value; note.textContent = describe(list.find((a) => a.name === row.name)); fire(); } },
         [...(row.name && !list.some((a) => a.name === row.name) ? [{ name: row.name, valid: false, error: "not found in models/loras" }] : []), ...list].map((a) =>
           h("option", { value: a.name, selected: a.name === row.name, disabled: !a.valid, title: a.valid ? describe(a) : a.error }, a.valid ? a.name : `${a.name} (unusable)`)));
-      const scale = h("input", { type: "number", min: 0, max: 4, step: 0.05, value: row.scale, "aria-label": "LoRA scale", style: "width:84px", onchange: (e) => { row.scale = Math.max(0, Math.min(4, Number(e.target.value) || 0)); e.target.value = row.scale; fire(); } });
+      const scale = h("input", { type: "number", min: 0, max: 4, step: 0.05, value: row.scale, "aria-label": "适配器强度", style: "width:84px", onchange: (e) => { row.scale = Math.max(0, Math.min(4, Number(e.target.value) || 0)); e.target.value = row.scale; fire(); } });
       const note = h("span", { class: "hint", style: "flex:1 1 100%" }, describe(list.find((a) => a.name === row.name)));
       return h("div", { class: "row nowrap", style: "flex-wrap:wrap" }, h("div", { style: "flex:1 1 160px;min-width:0" }, sel), h("span", { class: "hint" }, "×"), scale,
-        h("button", { type: "button", class: "icon ghost", title: "Remove", "aria-label": "Remove LoRA", onclick: () => { rows.splice(i, 1); paint(); fire(); } }, "✕"), note);
+        h("button", { type: "button", class: "icon ghost", title: "移除", "aria-label": "移除适配器", onclick: () => { rows.splice(i, 1); paint(); fire(); } }, "✕"), note);
     }));
     const n = usable().length;
     add.disabled = n === 0 || rows.length >= Math.min(8, n);
-    hint.textContent = n === 0 ? "No adapters found — drop .safetensors files into models/loras." : rows.length ? "" : `${n} adapter${n === 1 ? "" : "s"} available; none selected.`;
+    hint.textContent = n === 0 ? "未安装风格适配器。可将 .safetensors 文件放入 models/loras。" : rows.length ? "" : `${n} adapter${n === 1 ? "" : "s"} available; none selected.`;
   }
   paint();
   el.value = () => rows.filter((r) => r.name).map((r) => ({ name: r.name, scale: r.scale }));
@@ -216,7 +217,7 @@ export function loraPicker(initial = [], adapters = []) {
 }
 
 /** What the "mode" chip shows: cot for creates, task for covers, "hum · continue" for hums. */
-export const modeLabel = (job) => job.kind === "hum" ? `hum · ${(job.params.melody || "continue").replace("_", " ")}` : (job.params.cot || job.params.task || "—");
+export const modeLabel = (job) => job.kind === "hum" ? "哼唱创作" : ({full:"完整编曲",melody:"只编旋律",off:"自由生成"}[job.params.cot || job.params.task] || "—");
 
 /** "inst ×0.7, realaudio" for cards and lists; empty string when no adapters. */
 export const loraLabel = (loras) => (loras || []).map((l) => l.scale === 1 ? l.name : `${l.name} ×${l.scale}`).join(", ");
@@ -233,13 +234,13 @@ export const groupLabel = (gid) => { const g = store.get("groups", {})[gid]; ret
  * Seed input with a "Random" toggle. When random is on the input is disabled and value() is null
  * (server picks the seed); when off the field is editable and 🎲 rolls a value client-side.
  */
-export function seedField({ id, seed = "", random = true, onChange = null, randomLabel = "Random" } = {}) {
-  const input = h("input", { id, type: "number", min: 0, max: 2147483647, step: 1, value: seed === null ? "" : seed, placeholder: "random", "aria-label": "Seed" });
-  const dice = h("button", { type: "button", class: "icon", title: "Roll a seed", "aria-label": "Roll a random seed", onclick: () => { input.value = randomSeed(); fire(); } }, "🎲");
+export function seedField({ id, seed = "", random = true, onChange = null, randomLabel = "每次随机" } = {}) {
+  const input = h("input", { id, type: "number", min: 0, max: 2147483647, step: 1, value: seed === null ? "" : seed, placeholder: "随机", "aria-label": "随机种子" });
+  const dice = h("button", { type: "button", class: "icon", title: "生成随机种子", "aria-label": "生成随机种子", onclick: () => { input.value = randomSeed(); fire(); } }, "🎲");
   const toggle = h("input", { id: id + "-random", type: "checkbox", checked: !!random, onchange: () => { sync(); fire(); } });
   const el = h("div", { class: "stack", style: "gap:6px" },
     h("div", { class: "row nowrap" }, input, dice),
-    h("label", { class: "check small", title: "Let the server pick a fresh seed for every submit" }, toggle, randomLabel));
+    h("label", { class: "check small", title: "每次提交使用新的随机种子" }, toggle, randomLabel));
   const sync = () => { input.disabled = toggle.checked; dice.disabled = toggle.checked; input.placeholder = toggle.checked ? "random" : "e.g. 1234"; el.classList.toggle("is-random", toggle.checked); };
   const fire = () => onChange && onChange(el.value(), toggle.checked);
   input.addEventListener("input", fire);
@@ -320,16 +321,16 @@ export function projectTag(job) {
 export function takeControls(job, { onChange = null } = {}) {
   let take = { ...(job.take || {}) };
   const thumb = (v, glyph, label) => h("button", { type: "button", class: "thumb ghost sm", title: label, "aria-label": label, "aria-pressed": "false", onclick: () => save({ thumb: take.thumb === v ? 0 : v }) }, glyph);
-  const up = thumb(1, "👍", "Thumbs up"), down = thumb(-1, "👎", "Thumbs down");
-  const stars = h("div", { class: "stars", role: "group", "aria-label": "Stars" }, [1, 2, 3, 4, 5].map((n) =>
-    h("button", { type: "button", dataset: { n }, title: `${n} star${n === 1 ? "" : "s"}`, "aria-label": `${n} star${n === 1 ? "" : "s"}`, "aria-pressed": "false", onclick: () => save({ stars: take.stars === n ? null : n }) }, "★")));
-  const note = h("input", { type: "text", class: "note", placeholder: "Note…", "aria-label": "Note", maxlength: 4000, value: take.note || "",
+  const up = thumb(1, "👍", "喜欢"), down = thumb(-1, "👎", "不喜欢");
+  const stars = h("div", { class: "stars", role: "group", "aria-label": "星级" }, [1, 2, 3, 4, 5].map((n) =>
+    h("button", { type: "button", dataset: { n }, title: `${n} 星`, "aria-label": `${n} 星`, "aria-pressed": "false", onclick: () => save({ stars: take.stars === n ? null : n }) }, "★")));
+  const note = h("input", { type: "text", class: "note", placeholder: "添加版本备注…", "aria-label": "版本备注", maxlength: 4000, value: take.note || "",
     onchange: () => { if (note.value !== (take.note || "")) save({ note: note.value }); } });
   const el = h("div", { class: "take-controls row" }, h("div", { class: "row nowrap", style: "gap:0" }, up, down), stars, h("div", { class: "note-wrap" }, note));
   function sync() {
     up.setAttribute("aria-pressed", String(take.thumb === 1)); down.setAttribute("aria-pressed", String(take.thumb === -1));
     stars.querySelectorAll("button").forEach((b) => { const on = Number(b.dataset.n) <= (take.stars || 0); b.classList.toggle("on", on); b.setAttribute("aria-pressed", String(Number(b.dataset.n) === take.stars)); });
-    stars.title = take.stars ? `${take.stars} of 5 stars` : "Not rated";
+    stars.title = take.stars ? `${take.stars} / 5 星` : "未评分";
     if (document.activeElement !== note) note.value = take.note || "";
   }
   async function save(patch) {
@@ -344,28 +345,28 @@ export function takeControls(job, { onChange = null } = {}) {
 }
 
 /**
- * Project → track picker with inline "New project…" / "New track…" creation. `onPick(track | null)`
+ * Project → track picker with inline "新建项目…" / "新建曲目…" creation. `onPick(track | null)`
  * fires whenever the selected track changes; value() is the selected track
  * ({id, name, project_id, project_name}) or null; select(projectId, trackId) preselects.
  */
 export function projectPicker({ onPick = null } = {}) {
   let projects = [], tracks = [], project = null, track = null, creating = null; // creating: "project" | "track" | null
-  const pSel = h("select", { "aria-label": "Project", onchange: () => pickProject(pSel.value) });
-  const tSel = h("select", { "aria-label": "Track", onchange: () => pickTrack(tSel.value) });
+  const pSel = h("select", { "aria-label": "项目", onchange: () => pickProject(pSel.value) });
+  const tSel = h("select", { "aria-label": "曲目", onchange: () => pickTrack(tSel.value) });
   const newName = h("input", { type: "text", "aria-label": "New name", maxlength: 200, onkeydown: (e) => { if (e.key === "Enter") { e.preventDefault(); create(); } } });
-  const newBtn = h("button", { type: "button", class: "sm", onclick: create }, "Create");
+  const newBtn = h("button", { type: "button", class: "sm", onclick: create }, "创建");
   const newRow = h("div", { class: "row nowrap", hidden: true, style: "flex:1 1 200px" }, newName, newBtn);
   const el = h("div", { class: "project-picker row" }, h("div", { style: "flex:1 1 160px;min-width:0" }, pSel), h("div", { style: "flex:1 1 160px;min-width:0" }, tSel), newRow);
   const fire = () => onPick && onPick(track);
   function paintProjects() {
-    fill(pSel, h("option", { value: "" }, projects.length ? "— project —" : "No projects yet"), projects.map((p) => h("option", { value: p.id, selected: project && p.id === project.id }, p.name)), h("option", { value: "+" }, "New project…"));
+    fill(pSel, h("option", { value: "" }, projects.length ? "选择项目" : "尚无项目"), projects.map((p) => h("option", { value: p.id, selected: project && p.id === project.id }, p.name)), h("option", { value: "+" }, "新建项目…"));
     if (creating === "project") pSel.value = "+";
   }
   function paintTracks() {
     tSel.hidden = !project;
-    fill(tSel, h("option", { value: "" }, tracks.length ? "— track —" : "No tracks yet"), tracks.map((t) => h("option", { value: t.id, selected: track && t.id === track.id }, t.name)), h("option", { value: "+" }, "New track…"));
+    fill(tSel, h("option", { value: "" }, tracks.length ? "选择曲目" : "尚无曲目"), tracks.map((t) => h("option", { value: t.id, selected: track && t.id === track.id }, t.name)), h("option", { value: "+" }, "新建曲目…"));
     if (creating === "track") tSel.value = "+";
-    newRow.hidden = !creating; newName.placeholder = creating === "project" ? "Project name" : "Track name";
+    newRow.hidden = !creating; newName.placeholder = creating === "project" ? "项目名称" : "曲目名称";
   }
   async function pickProject(id) {
     track = null; tracks = []; creating = id === "+" ? "project" : null;
@@ -414,7 +415,7 @@ export function projectPicker({ onPick = null } = {}) {
  * `onSave(text)` (reverted with a toast when it rejects), Escape cancels. A blank value is not saved
  * unless `allowEmpty`. Returns the element with set(text).
  */
-export function inlineEdit(text, onSave, { tag = "span", cls = "", placeholder = "", multiline = false, allowEmpty = false, title = "Click to edit" } = {}) {
+export function inlineEdit(text, onSave, { tag = "span", cls = "", placeholder = "", multiline = false, allowEmpty = false, title = "点击编辑" } = {}) {
   let value = text || "";
   const label = h(tag, { class: `inline-edit${cls ? " " + cls : ""}`, tabindex: 0, role: "button", title, onclick: edit, onkeydown: (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); edit(); } } });
   const paint = () => { label.textContent = value || placeholder; label.classList.toggle("placeholder", !value); };
@@ -452,8 +453,8 @@ export async function trackBanner(trackId, { onDismiss = null } = {}) {
   let track;
   try { ({ track } = await api.track(trackId)); } catch (e) { toastError(e); return null; }
   const el = h("div", { class: "takebanner row between", role: "status" },
-    h("span", {}, "New take for ", h("a", { href: `#/project/${track.project_id}` }, h("b", {}, track.project_name), " › ", h("b", {}, track.name)), h("span", { class: "hint" }, " — the result is attached to this track.")),
-    h("button", { type: "button", class: "ghost sm", title: "Submit without attaching to this track", "aria-label": "Dismiss", onclick: () => { el.remove(); onDismiss && onDismiss(); } }, "✕"));
+    h("span", {}, "新版本将加入 ", h("a", { href: `#/project/${track.project_id}` }, h("b", {}, track.project_name), " › ", h("b", {}, track.name)), h("span", { class: "hint" }, " — 结果自动收录到这条曲目。")),
+    h("button", { type: "button", class: "ghost sm", title: "取消收录到这条曲目", "aria-label": "关闭", onclick: () => { el.remove(); onDismiss && onDismiss(); } }, "✕"));
   return { el, track };
 }
 
@@ -550,7 +551,7 @@ function showLyrics(btn, title, lyrics) {
   if (lyricsPop.owner && lyricsPop.owner !== btn) lyricsPop.owner.setAttribute("aria-expanded", "false");
   lyricsPop.owner = btn;
   btn.setAttribute("aria-expanded", "true");
-  el.setAttribute("aria-label", `Lyrics: ${title}`);
+  el.setAttribute("aria-label", `歌词：${title}`);
   fill(el, h("div", { class: "lyrics-pop-title" }, title), h("pre", { class: "lyrics-block" }, lyrics));
   el.hidden = false;
   el.scrollTop = 0;
@@ -580,7 +581,7 @@ export function lyricsButton(job) {
   const lyrics = job && job.params && typeof job.params.lyrics === "string" ? job.params.lyrics.trim() : "";
   if (!lyrics) return null;
   const title = jobTitle(job);
-  const btn = h("button", { type: "button", class: "icon ghost sm lyrics-btn", "aria-label": `Lyrics of ${title}`, "aria-expanded": "false", "aria-haspopup": "dialog",
+  const btn = h("button", { type: "button", class: "icon ghost sm lyrics-btn", "aria-label": `查看《${title}》的歌词`, "aria-expanded": "false", "aria-haspopup": "dialog",
     onmouseenter: () => { if (lyricsPop.pinned) return; clearTimeout(lyricsPop.hideTimer); lyricsPop.showTimer = setTimeout(() => showLyrics(btn, title, lyrics), 120); },
     onmouseleave: () => { clearTimeout(lyricsPop.showTimer); if (!lyricsPop.pinned) hideLyrics(200); },
     onfocus: () => { if (!lyricsPop.pinned) showLyrics(btn, title, lyrics); },
@@ -598,12 +599,12 @@ export function lyricsButton(job) {
 /** Kinds whose Quality re-render is a plain regenerate from the score (a hum's carrier is not kept). */
 const QUALITY_KINDS = new Set(["create", "regenerate", "cover"]);
 
-/** "⇧ Quality" for a finished Fast-preset song: queues a regenerate on the Quality preset from its own
+/** "质量版（未验收）" for a finished Fast-preset song: queues a regenerate on the Quality preset from its own
  *  ABC score with the same seed, style, lyrics, title and LoRAs, as a take in the same project track.
  *  It only queues (a toast confirms) and never navigates. null when not applicable. */
 export function qualityButton(job, { onQueued = null } = {}) {
   if (job.status !== "done" || job.preset !== "fast" || !QUALITY_KINDS.has(job.kind) || !(job.artifacts && job.artifacts.score)) return null;
-  const btn = h("button", { type: "button", class: "sm", title: "Regenerate on the Quality preset (bf16, 32 steps) from this song's score and seed",
+  const btn = h("button", { type: "button", class: "sm", title: "使用原乐谱与种子，以 BF16 / 32 步再生成；此模式尚未在本机验收",
     onclick: async () => {
       btn.disabled = true;
       try {
@@ -616,6 +617,43 @@ export function qualityButton(job, { onQueued = null } = {}) {
         if (onQueued) onQueued(queued);
       } catch (e) { toastError(e); }
       btn.disabled = false;
-    } }, "⇧ Quality");
+    } }, "质量版（未验收）");
   return btn;
 }
+
+export const presetName = p => ({fast:"快速模式",quality:"质量模式",custom:"自定义"}[p] || p || "—");
+export const statusName = s => ({done:"已完成",failed:"失败",cancelled:"已取消",queued:"等待中",running:"正在生成"}[s] || s || "—");
+export const kindName = k => ({create:"歌词创作",regenerate:"乐谱再创作",cover:"音频改编",hum:"哼唱成歌"}[k] || k || "—");
+/** Keep actionable Chinese feedback separate from diagnostic text. */
+export function jobError(error) {
+  const raw = typeof error === "string" ? error : JSON.stringify(error);
+  const memory = /MemoryError|memory pressure|out of memory|failed to allocate|insufficient.*memory|内存/i.test(raw || "");
+  const title = memory ? "当前可用内存不足，生成已停止。" : "这次生成未能完成。";
+  const advice = memory ? "关闭占内存较多的应用，等待内存压力降低后，保留原参数重试。建议继续使用快速模式和低内存模式。" : "原歌词和参数已保留，可以重新创作；详细原因可在下方查看。";
+  return h("div", {class:"errbox job-error"}, h("b", {}, title), h("p", {}, advice), h("details", {}, h("summary", {}, "查看技术详情"), h("pre", {class:"block mono"}, raw || "没有更多错误信息")));
+}
+/** Song imagery remains data-driven; the Figma record is the neutral fallback. */
+const artworkCache = new Map();
+const artworkFallback = size => `/static/assets/${size === "hero" ? "d900d" : size === "small" ? "1449e" : size === "player" ? "ed355" : "06eab"}.svg`;
+export async function updateArtwork(img, id, size = "card") {
+  img.dataset.coverJob = id || "";
+  img.dataset.coverSize = size;
+  if (!id) { img.src = artworkFallback(size); img.classList.remove("dynamic-cover"); return; }
+  if (!artworkCache.has(id)) artworkCache.set(id, fetch(`/api/assistant/covers/applied/${encodeURIComponent(id)}`).then(r => r.ok ? r.json() : null).catch(() => null));
+  const applied = await artworkCache.get(id);
+  if (img.dataset.coverJob !== id) return;
+  img.src = applied?.cover_url || artworkFallback(size);
+  img.classList.toggle("dynamic-cover", !!applied?.cover_url);
+}
+export function coverArt(job, size="card") {
+  const src = job?.cover_url || job?.cover?.url || null;
+  const img = h("img", {src:src || artworkFallback(size), class:src?"dynamic-cover":"record-cover",alt:src?`${jobTitle(job)}的封面`:"听见唱片", loading:"lazy"});
+  if (job?.id) updateArtwork(img, job.id, size);
+  return img;
+}
+window.addEventListener("yue2:cover-updated", event => {
+  const id = event.detail?.job_id;
+  if (!id) return;
+  artworkCache.delete(id);
+  document.querySelectorAll("img[data-cover-job]").forEach(img => { if (img.dataset.coverJob === id) updateArtwork(img, id, img.dataset.coverSize); });
+});

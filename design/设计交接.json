@@ -1,0 +1,147 @@
+{
+  "name": "听见 · YuE2 中文音乐工作台",
+  "scope": "中文 Figma 可编辑设计稿；待用户确认后开发",
+  "figmaUrl": "https://www.figma.com/design/jg2KsbcHQCBkAkWnA83f7j?node-id=2-61",
+  "fileKey": "jg2KsbcHQCBkAkWnA83f7j",
+  "account": "TeddyMo",
+  "date": "2026-10-21",
+  "frames": [
+    {
+      "name": "00 · 功能与使用流程",
+      "nodeId": "2:55"
+    },
+    {
+      "name": "01 · 开始创作",
+      "nodeId": "2:56"
+    },
+    {
+      "name": "02 · 正在生成",
+      "nodeId": "2:57"
+    },
+    {
+      "name": "03 · 我的作品",
+      "nodeId": "2:58"
+    },
+    {
+      "name": "04 · 作品详情",
+      "nodeId": "2:59"
+    },
+    {
+      "name": "05 · 项目与候选版本",
+      "nodeId": "2:60"
+    },
+    {
+      "name": "06 · 任务队列",
+      "nodeId": "2:61"
+    },
+    {
+      "name": "07 · 设置与扩展能力",
+      "nodeId": "2:62"
+    },
+    {
+      "name": "08 · 关键状态",
+      "nodeId": "2:63"
+    },
+    {
+      "name": "09 · 组件与设计规范",
+      "nodeId": "2:64"
+    },
+    {
+      "name": "10 · 高级创作设置",
+      "nodeId": "7:748"
+    },
+    {
+      "name": "11 · 乐谱编辑与再生成",
+      "nodeId": "7:791"
+    },
+    {
+      "name": "assistant",
+      "nodeId": "15:562"
+    },
+    {
+      "name": "cover",
+      "nodeId": "15:831"
+    },
+    {
+      "name": "connect",
+      "nodeId": "16:1039"
+    },
+    {
+      "name": "aiStates",
+      "nodeId": "16:1286"
+    },
+    {
+      "name": "applyDraft",
+      "nodeId": "16:1344"
+    },
+    {
+      "name": "coverApplied",
+      "nodeId": "16:1364"
+    },
+    {
+      "name": "coverZoom",
+      "nodeId": "16:1383"
+    },
+    {
+      "name": "connectGuide",
+      "nodeId": "16:1401"
+    },
+    {
+      "name": "draftApplied",
+      "nodeId": "17:867"
+    },
+    {
+      "name": "restoreCover",
+      "nodeId": "17:1141"
+    },
+    {
+      "name": "22 · 当前任务 / 进度详情",
+      "nodeId": "28:959"
+    },
+    {
+      "name": "23 · 当前任务 / 正在取消",
+      "nodeId": "28:996"
+    },
+    {
+      "name": "24 · 生成反馈 / 状态对照",
+      "nodeId": "29:971"
+    },
+    {
+      "name": "25 · 历史任务 / 完成与失败",
+      "nodeId": "30:985"
+    }
+  ],
+  "prototype": {
+    "mainFlow": "开始创作 → 正在生成 → 任务队列；进度详情、取消反馈、历史记录可点击查看",
+    "note": "点击与跳转仅用于设计演示，不调用生成服务",
+    "assistantFlow": "对话 → 歌词预览 → 填入与撤销；封面候选 → 应用与恢复",
+    "progressNote": "已移除5秒自动跳转，生成完成另有状态示例；百分比与时间是设计样例，不连接真实任务"
+  },
+  "validation": [
+    "全部主要页面与新增助手面板已完成截图检查",
+    "原生可编辑图层与本地组件",
+    "Noto Sans SC 中文字体",
+    "真实可用状态与待接入能力分开标注",
+    "生成条按75%填充；宽度828/1104、252/336、432/576均验证",
+    "任务卡、未知进度、取消中、完成态、历史记录均已截图检查",
+    "11处全局播放器明确显示已完成版本；下一首草稿与当前任务分开"
+  ],
+  "featureInventory": "功能核对.json",
+  "preview": "06-任务队列.png",
+  "version": "1.2",
+  "assistantDesign": "AI助手设计交接.json",
+  "latestVisualDirection": {
+    "name": "听见 · 深绿色上一版（细节修订）",
+    "url": "https://www.figma.com/design/jg2KsbcHQCBkAkWnA83f7j?node-id=2-61",
+    "pageId": "0:1",
+    "scope": "保留上一版视觉；修订生成进度、队列、状态、播放器和草稿语义"
+  },
+  "alternativeVisualDirection": {
+    "name": "专业音乐工作室",
+    "url": "https://www.figma.com/design/jg2KsbcHQCBkAkWnA83f7j?node-id=21-963",
+    "manifest": "工作室方向/设计说明.json",
+    "scope": "本轮重做创作工作台与助手展开状态，用于评审新的视觉方向；其余页面保留在旧版页面，未完成同风格迁移。",
+    "status": "未采用；用户选择返回深绿色上一版，仅保留作视觉参考"
+  },
+  "progressRevision": "进度与状态设计交接.json"
+}

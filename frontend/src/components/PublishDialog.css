@@ -1,0 +1,127 @@
+.publish-dialog .mantine-Modal-content {
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--line);
+}
+.publish-dialog .mantine-Modal-header {
+  background: var(--surface);
+}
+.publish-dialog .mantine-Modal-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+.publish-dialog .mantine-Modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+  padding: 8px 24px 24px;
+}
+.publish-dialog .mantine-Modal-header {
+  padding: 20px 24px 12px;
+}
+.publish-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.publish-identity > span {
+  display: grid;
+}
+.publish-identity strong {
+  font-size: 12px;
+  font-weight: 500;
+}
+.publish-identity small {
+  font-size: 10px;
+  color: var(--muted);
+}
+.publish-song-preview {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: var(--field);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 12px;
+}
+.publish-song-preview .artwork {
+  flex: none;
+  border-radius: 6px;
+}
+.publish-song-preview > div:last-child {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+}
+.publish-song-preview strong {
+  font-size: 13px;
+  font-weight: 550;
+  overflow-wrap: anywhere;
+}
+.publish-song-preview span {
+  color: var(--muted);
+  font-size: 11px;
+}
+.publish-dialog .mantine-InputWrapper-label {
+  font-size: 12px;
+}
+.publish-dialog .mantine-InputWrapper-description {
+  font-size: 11px;
+  margin-bottom: 7px;
+  color: var(--muted);
+}
+.publish-dialog .mantine-Textarea-input {
+  font-size: 13px;
+  line-height: 1.8;
+}
+.publish-character-count {
+  margin-top: -12px;
+  color: var(--muted);
+  font-size: 10px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.publish-scope {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 12px;
+  background: var(--surface-2);
+  border-radius: 8px;
+  color: var(--muted);
+  font-size: 11px;
+}
+.publish-scope > svg {
+  flex: none;
+  margin-top: 3px;
+}
+.publish-scope strong {
+  display: block;
+  font-weight: 500;
+  color: var(--text);
+  margin-bottom: 2px;
+}
+.publish-dialog .dialog-actions {
+  margin-top: 0;
+}
+.publish-loading {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.publish-dialog .error-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+@media (max-width: 480px) {
+  .publish-dialog .mantine-Modal-body {
+    padding: 8px 16px 18px;
+  }
+  .publish-dialog .mantine-Modal-header {
+    padding: 16px;
+  }
+}

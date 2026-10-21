@@ -58,6 +58,51 @@ def test_default_preset_comes_from_settings(store):
     assert job.preset == "fast"
 
 
+def test_sampling_limits_survive_storage_variations_and_regeneration(store):
+    limits = {"abc_sampling": {"max_tokens": 1200}, "semantic_sampling": {"max_tokens": 600}}
+    parent = jobs.submit(store, {"kind": "create", "params": {**BASE, **limits}}).jobs[0]
+    # Read from SQLite again: neither serialization nor worker request building may lose the limits.
+    for key, value in limits.items():
+        assert store.get(parent.id).params[key] == value
+        assert jobs.engine_request(store.get(parent.id))[key] == value
+    variations = jobs.submit(store, {"kind": "variations",
+                                     "params": {"count": 2, "base": {**BASE, **limits}}}).jobs
+    regenerated = jobs.submit(store, {"kind": "regenerate", "params": {
+        "parent_id": parent.id, "abc": "X:1\nK:C\nC|"}}).jobs[0]
+    for job in [*variations, regenerated]:
+        for key, value in limits.items():
+            assert job.params[key] == value
+            assert jobs.engine_request(job)[key] == value
+    changed = jobs.submit(store, {"kind": "regenerate", "params": {
+        "parent_id": parent.id, "abc": "X:1\nK:C\nC|", "abc_sampling": None,
+        "semantic_sampling": {"max_tokens": 800}}}).jobs[0]
+    assert "abc_sampling" not in changed.params
+    assert "abc_sampling" not in jobs.engine_request(changed)
+    assert jobs.engine_request(changed)["semantic_sampling"] == {"max_tokens": 800}
+
+
+@pytest.mark.parametrize("field,invalid", [
+    ("abc_sampling", {"max_tokens": 31}),
+    ("abc_sampling", {"max_tokens": 4097}),
+    ("semantic_sampling", {"max_tokens": 199}),
+    ("semantic_sampling", {"max_tokens": 9001}),
+    ("semantic_sampling", {"max_tokens": True}),
+    ("semantic_sampling", {"max_tokens": 600.0}),
+    ("semantic_sampling", {"max_tokens": "600"}),
+    ("semantic_sampling", {"max_tokens": 600, "temperature": 0.2}),
+    ("semantic_sampling", {}),
+])
+@pytest.mark.parametrize("kind", ["create", "variations", "regenerate"])
+def test_invalid_sampling_limits_rejected_before_job_is_created(store, field, invalid, kind):
+    params = {**BASE, field: invalid}
+    if kind == "variations":
+        params = {"count": 2, "base": params}
+    elif kind == "regenerate":
+        params = {"parent_id": "unused", "abc": "X:1\nK:C\nC|", field: invalid}
+    with pytest.raises(ValidationFailure):
+        jobs.submit(store, {"kind": kind, "params": params})
+
+
 @pytest.mark.parametrize("bad", [
     {"kind": "create", "params": {"style": "", "lyrics": "x"}},
     {"kind": "create", "params": {"style": "x"}},

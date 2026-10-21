@@ -1,0 +1,29 @@
+听见首页原创插图 — Generation record
+Generated: 2026-10-21
+Method: built-in Imagegen (tools.image_gen__imagegen), transparent_background=false.
+All images: 1774 × 887 pixels, 2:1 landscape.
+Web versions: JPEG quality 85 converted with macOS sips; unchanged dimensions and composition.
+
+1. discover-landscape
+Original PNG: yue2_studio/static/assets/home/discover-landscape.png
+Web JPEG: yue2_studio/static/assets/home/discover-landscape.jpg
+Prompt:
+Use case: stylized-concept. Asset type: original decorative banner artwork for a refined Chinese music creation website, NOT a screenshot or interface mockup. Primary request: a panoramic 2:1 editorial painterly cinematic dark evergreen forest amphitheater valley, one tiny silhouetted person standing in a golden sunbeam in the right half, evoking listening to music outdoors. Sophisticated album art quality, understated and atmospheric. Composition: landscape 2:1 aspect ratio; left third stays predominantly dark evergreen with sparse low detail for white UI copy to be overlaid separately. Forest and tiny figure concentrated in the right half, luminous warm sunbeam descending diagonally from upper right. Palette: muted forest green, sage, warm ochre, charcoal. Fine organic grain, textured gouache-like painting, intricate but restful. No text, letters, logos, watermark, typography or UI elements.
+
+2. cover-studio
+Original PNG: yue2_studio/static/assets/home/cover-studio.png
+Web JPEG: yue2_studio/static/assets/home/cover-studio.jpg
+Prompt:
+Use case: photorealistic-natural. Asset type: original decorative landscape banner artwork for an elegant music creation website, NOT a screenshot or interface mockup. Primary request: a refined editorial still life of a physical black vinyl record partly emerging from a sage green album sleeve on warm ivory paper, a small olive branch and its delicate shadow, warm amber natural sunlight. Panoramic 2:1 image. Composition: right half holds the large vinyl record and sleeve, left third is quiet warm ivory/olive shadow copy space for text to be overlaid separately. Tactile macro paper textures, subtle analog grain, calm balanced editorial art direction. Palette muted olive, sage, cream, ochre and warm black. No text, letters, labels, logos, watermark or UI elements.
+
+3. night-drive
+Original PNG: yue2_studio/static/assets/home/night-drive.png
+Web JPEG: yue2_studio/static/assets/home/night-drive.jpg
+Prompt:
+Use case: stylized-concept. Asset type: original decorative 2:1 landscape banner for a refined music creation website, not a UI mockup. Cinematic analog film artwork of a retro empty highway toward a vivid orange setting sun, deep midnight blue sky and roadside palm silhouettes. Composition panoramic and elegant, a quiet dreamlike night-drive mood, subtle fine film grain, restrained electric blue / amber / dusty warm red palette. Horizon low-mid frame, no people required. Sophisticated album artwork. No words, letters, logos, license plate text, watermarks or interface elements.
+
+4. color-pop
+Original PNG: yue2_studio/static/assets/home/color-pop.png
+Web JPEG: yue2_studio/static/assets/home/color-pop.jpg
+Prompt:
+Use case: stylized-concept. Asset type: original 2:1 landscape illustration artwork for a refined music creation website, not a UI mockup. An abstract modern album cover made of warm yellow, coral, muted terracotta, pale sky blue and cream color fields, luscious thick oil-paint impasto texture with soft natural sunlight glowing across the surface. Balanced organic broad brushwork, playful dreamy pop music atmosphere, sophisticated gallery painting, light and warm but not neon. Panoramic 2:1 composition, no text, letters, logos, icons, faces, watermark or interface elements.

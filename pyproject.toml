@@ -19,6 +19,7 @@ dependencies = [
   "huggingface-hub",
   "psutil",
   "librosa",
+  "httpx",
 ]
 
 [project.scripts]

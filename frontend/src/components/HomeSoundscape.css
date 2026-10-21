@@ -1,0 +1,55 @@
+.home-soundscape {
+  position: absolute;
+  top: -24px;
+  left: -28px;
+  right: -28px;
+  height: 650px;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  user-select: none;
+  background:
+    radial-gradient(ellipse at 25% 32%, #a2bc7820, transparent 55%),
+    radial-gradient(ellipse at 83% 33%, #5aa38e18, transparent 52%);
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    #000 7%,
+    #000 68%,
+    transparent
+  );
+}
+
+.home-soundscape canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+:root[data-theme="light"] .home-soundscape {
+  background:
+    radial-gradient(ellipse at 25% 32%, #b9cd8926, transparent 55%),
+    radial-gradient(ellipse at 83% 33%, #76b6a51a, transparent 52%);
+}
+
+@media (min-width: 1800px) {
+  .home-soundscape {
+    left: -40px;
+    right: -40px;
+  }
+}
+
+@media (max-width: 1050px) {
+  .home-soundscape {
+    left: -20px;
+    right: -20px;
+  }
+}
+
+@media (max-width: 760px) {
+  .home-soundscape {
+    left: -16px;
+    right: -16px;
+    height: 610px;
+  }
+}

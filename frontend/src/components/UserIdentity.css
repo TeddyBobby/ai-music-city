@@ -1,0 +1,133 @@
+.user-identity {
+  flex: none;
+  padding-left: 14px;
+  border-left: 1px solid var(--line);
+}
+
+.user-identity .user-identity-trigger {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 4px 5px;
+  border-radius: 10px;
+  color: var(--text);
+  transition: background 150ms ease;
+}
+
+.user-identity-trigger:hover,
+.user-identity-trigger[aria-expanded="true"] {
+  background: var(--surface-2);
+}
+
+.user-identity-avatar {
+  flex: none;
+}
+
+.user-identity-avatar .mantine-Avatar-placeholder {
+  color: var(--accent);
+  background: var(--surface-2);
+  border: 1px solid var(--line);
+}
+
+.user-identity-label {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  white-space: nowrap;
+  line-height: 1.3;
+}
+
+.user-identity-label strong,
+.user-identity-summary strong {
+  font-size: 12px;
+  font-weight: 550;
+}
+
+.user-identity-label small {
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.user-identity-chevron {
+  margin-left: 3px;
+  color: var(--muted);
+}
+
+.user-identity-popover {
+  max-width: calc(100vw - 24px);
+  padding: 17px 16px 10px;
+  color: var(--text);
+  background: var(--surface);
+  border-color: var(--line);
+}
+
+.user-identity-summary {
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.user-identity-summary > div:last-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.user-identity-summary > div:last-child > span {
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.user-identity-popover .user-identity-note {
+  margin: 14px 0 12px;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.8;
+}
+
+.user-identity-popover .user-identity-link {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  width: 100%;
+  padding: 10px 8px;
+  border-top: 1px solid var(--line);
+  border-radius: 0 0 7px 7px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+.user-identity-link:hover {
+  background: var(--surface-2);
+}
+
+.user-identity-link > svg:first-child {
+  color: var(--accent);
+}
+
+.user-identity-link > svg:last-child {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+@media (max-width: 760px) {
+  .user-identity {
+    padding-left: 8px;
+  }
+
+  .user-identity .user-identity-trigger {
+    padding: 3px;
+  }
+
+  .user-identity-label,
+  .user-identity-chevron {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .user-identity .user-identity-trigger {
+    transition: none;
+  }
+}

@@ -96,6 +96,20 @@ def _check_seed(value: int | None) -> int | None:
     return value
 
 
+class AbcSamplingLimit(BaseModel):
+    """Length-only override; keep the native 32-token minimum and 4096-token default cap."""
+
+    model_config = ConfigDict(extra="forbid")
+    max_tokens: int = Field(strict=True, ge=32, le=4096)
+
+
+class SemanticSamplingLimit(BaseModel):
+    """Length-only override; native semantic sampling requires at least 200 tokens."""
+
+    model_config = ConfigDict(extra="forbid")
+    max_tokens: int = Field(strict=True, ge=200, le=9000)
+
+
 class CreateParams(_Params):
     style: str
     lyrics: str
@@ -104,6 +118,8 @@ class CreateParams(_Params):
     cfg_scale: float | None = None
     abc: str | None = None
     title: str | None = None
+    abc_sampling: AbcSamplingLimit | None = None
+    semantic_sampling: SemanticSamplingLimit | None = None
 
     @field_validator("style")
     @classmethod
@@ -142,6 +158,8 @@ class RegenerateParams(_Params):
     lyrics: str | None = None
     seed: int | None = None
     title: str | None = None
+    abc_sampling: AbcSamplingLimit | None = None
+    semantic_sampling: SemanticSamplingLimit | None = None
 
     @field_validator("abc")
     @classmethod
@@ -1320,8 +1338,13 @@ def resolve_options(req: SubmitRequest, settings: dict, *, default_preset: str |
 
 
 def _create_params_dict(p: CreateParams, seed: int) -> dict:
-    return {"style": p.style, "lyrics": p.lyrics, "cot": p.cot, "seed": seed, "cfg_scale": p.cfg_scale,
-            "abc": p.abc, "title": p.title}
+    params = {"style": p.style, "lyrics": p.lyrics, "cot": p.cot, "seed": seed,
+              "cfg_scale": p.cfg_scale, "abc": p.abc, "title": p.title}
+    for name in ("abc_sampling", "semantic_sampling"):
+        value = getattr(p, name)
+        if value is not None:
+            params[name] = value.model_dump()
+    return params
 
 
 def default_group_label(base: CreateParams, count: int) -> str:
@@ -1438,6 +1461,13 @@ def _submit(store: JobStore, req: SubmitRequest, *, upload_lookup, lora_lookup,
             "title": p.title if p.title is not None else pp.get("title"),
             "parent_id": parent.id, "cfg_scale": pp.get("cfg_scale"),
         }
+        for name in ("abc_sampling", "semantic_sampling"):
+            if name in p.model_fields_set:
+                value = getattr(p, name)
+                if value is not None:
+                    params[name] = value.model_dump()
+            elif pp.get(name) is not None:
+                params[name] = dict(pp[name])
         if not params["style"] or not params["lyrics"]:
             raise ValidationFailure("parent job has no style/lyrics to inherit")
         job = store.create(kind="regenerate", params=params, options=options, seed=seed, parent_id=parent.id)
@@ -1493,12 +1523,15 @@ def hum_options(job: Job) -> hum.HumOptions:
 
 
 def engine_request(job: Job) -> dict:
-    """The ``SongRequest`` dict the engine accepts (style, lyrics, cot, seed, abc?, cfg_scale?, id)."""
+    """The engine request, including any validated planning / semantic length limits."""
     p = job.params
     request = {"style": p["style"], "lyrics": p["lyrics"], "cot": p.get("cot", "full"), "seed": job.seed,
                "id": job.id}
     if p.get("cfg_scale") is not None:
         request["cfg_scale"] = float(p["cfg_scale"])
+    for name in ("abc_sampling", "semantic_sampling"):
+        if p.get(name) is not None:
+            request[name] = dict(p[name])
     if job.kind == "cover":
         request["cot"] = "full" if p.get("task") == "full" else "melody"
         return request

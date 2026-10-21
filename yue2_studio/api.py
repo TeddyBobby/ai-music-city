@@ -229,7 +229,11 @@ async def get_status(request: Request):
         "queue": {"queued": counts.get("queued", 0), "running": store.running_id()},
         "presets": config.presets_summary(),
         "models": {"converted_dir": str(state.paths.converted_dir), "vae_dir": str(state.paths.vae_dir),
-                   "present": _models_present(request), "precisions": models["precisions"]},
+                   "present": _models_present(request), "precisions": models["precisions"],
+                   "name": "YuE2-3B", "repository": config.MODEL_REPO,
+                   "runtime": "fake" if state.fake else "MLX / Apple GPU",
+                   "location": "local", "quantization_scope": "autoregressive",
+                   "audio_decoder": config.VAE_REPO},
         "cover": _cover_status(request),
         "hum": _hum_status(request),
         "loras": _loras(request),
@@ -759,7 +763,9 @@ async def prune_uploads(request: Request):
 
 
 def spa_response(static_dir: Path) -> HTMLResponse:
-    index = Path(static_dir) / "index.html"
+    index = Path(static_dir) / "dist" / "index.html"
+    if not index.is_file():
+        index = Path(static_dir) / "index.html"
     if index.is_file():
         return HTMLResponse(index.read_text(encoding="utf-8"))
     return HTMLResponse(PLACEHOLDER_HTML)

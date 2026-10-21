@@ -10,7 +10,7 @@ async function request(method, path, body, opts = {}) {
   else if (body !== undefined) { init.headers["Content-Type"] = "application/json"; init.body = JSON.stringify(body); }
   let res;
   try { res = await fetch(path, init); }
-  catch (e) { throw new ApiError(0, "network_error", `Cannot reach the server (${e.message})`); }
+  catch (e) { throw new ApiError(0, "network_error", "无法连接本机服务，请确认听见仍在运行。"); }
   if (res.status === 204) return null;
   const text = await res.text();
   let data = null;

@@ -1,0 +1,42 @@
+.brand-wordmark {
+  display: block;
+  flex: none;
+  width: 166px;
+  max-width: 100%;
+  height: auto;
+  overflow: visible;
+  color: var(--text, #21392e);
+}
+
+.brand-wordmark-ai,
+.brand-wordmark-symbol {
+  stroke: var(--accent, #5a8139);
+  stroke-width: 5.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand-wordmark-letters {
+  stroke: currentColor;
+  stroke-width: 4.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.brand-wordmark-ai .brand-wordmark-signal {
+  stroke: var(--text, #21392e);
+}
+
+.brand-wordmark--compact {
+  width: 34px;
+  height: 34px;
+}
+
+.brand-wordmark-tile {
+  fill: #bfe78f;
+}
+
+.brand-wordmark-symbol {
+  stroke: #253d28;
+  stroke-width: 4.7;
+}

@@ -9,6 +9,15 @@ const MIME_EXT = [["audio/mp4", "m4a"], ["audio/webm;codecs=opus", "webm"], ["au
 const MAX_RECORD_S = 120;
 
 export async function humView({ el, query, app }) {
+  try { app.status = await api.status(); } catch { app.status = null; }
+  if (!app.status?.hum?.available) {
+    fill(el, h("div", {class:"view-head"}, h("h1", {}, "哼唱成歌"), h("span", {class:"sub"}, "用你的哼唱旋律，继续写成一首歌。")),
+      h("section", {class:"panel stack"}, h("span", {class:"tag"}, app.status ? "未启用" : "本机服务未连接"),
+        h("h2", {}, app.status ? "所需附加模型尚未安装" : "暂时无法读取本机能力"),
+        h("p", {class:"muted"}, app.status ? "哼唱成歌需要 SheetSage2 与 MERT 旋律识别模型。当前可以使用歌词创作，不会自动下载附加模型。" : "确认听见服务仍在运行后，再打开此页面。"),
+        h("div", {class:"row"}, h("a", {class:"btn primary",href:query.track ? `#/create?track=${encodeURIComponent(query.track)}` : "#/create"}, "返回歌词创作"), h("a", {class:"btn",href:"#/settings"}, "查看本机设置"))));
+    return {};
+  }
   const saved = store.get("hum", { style: "", lyrics: "", melody: "continue", adapter: "", hum_influence: 1, offset_s: 0, cfg_scale: "", seed: "", random_seed: true, title: "", preset: (app.settings && app.settings.default_preset) || "quality", precision: "8bit", ode_steps: 16, loras: [], upload_id: "" });
   let upload = null, dirty = false, melody = saved.melody;
   let trackId = null; // ?track=<id>: closure only, never in store("hum")

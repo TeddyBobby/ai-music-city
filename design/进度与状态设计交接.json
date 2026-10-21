@@ -1,0 +1,104 @@
+{
+  "version": "1.2",
+  "scope": "仅Figma设计修订；保留深绿色上一版；未开发、未启动生成或Hermes",
+  "account": "TeddyMo",
+  "fileKey": "jg2KsbcHQCBkAkWnA83f7j",
+  "pageId": "0:1",
+  "figmaUrl": "https://www.figma.com/design/jg2KsbcHQCBkAkWnA83f7j?node-id=2-61",
+  "revisions": [
+    "任务卡以当前阶段、进度条、整体估算值、已用与预计时间为中心",
+    "阶段清单收进详情；暂不可估算使用流动进度",
+    "下一首草稿名晚归，修改不改变当前任务；风格标签同步",
+    "底部播放器标明试听晨光版本1，与正在生成版本2区分",
+    "运行取消等待安全节点；排队操作明确为移出队列",
+    "恢复历史任务记录，包含完成与失败状态",
+    "原参数再生成与修改参数后创作分别标明意图"
+  ],
+  "frames": {
+    "queue": "2:61",
+    "generating": "2:57",
+    "details": "28:959",
+    "cancelling": "28:996",
+    "states": "29:971",
+    "history": "30:985"
+  },
+  "progressComponent": {
+    "createdNodeIds": [
+      "27:963",
+      "27:959",
+      "27:964",
+      "27:960",
+      "27:965",
+      "27:966",
+      "27:961",
+      "27:967",
+      "27:962",
+      "27:968"
+    ],
+    "mutatedNodeIds": [
+      "2:67"
+    ],
+    "progressVariants": {
+      "可估算": "27:959",
+      "不定进度": "27:960",
+      "已完成": "27:961",
+      "正在取消": "27:962"
+    },
+    "componentSetId": "27:963",
+    "discovery": "SDS search returned bar charts only; local semantic progress component reuses existing dark green tokens."
+  },
+  "sourceEvidence": {
+    "weights": {
+      "load": 0.04,
+      "plan": 0.18,
+      "semantic": 0.42,
+      "synthesize": 0.26,
+      "decode": 0.03,
+      "save": 0.01
+    },
+    "example": {
+      "stage": "synthesize",
+      "completed": 2,
+      "total": 8,
+      "elapsedSeconds": 43,
+      "fraction": "(0.04+0.18+0.42+0.26*2/8)/0.94=0.75",
+      "eta": "43*(1-0.75)/0.75≈14秒"
+    },
+    "notes": [
+      "前端已提供进度条与预计时间，上一版设计遗漏",
+      "plan/semantic无总量；synthesize与decode提供真实数量",
+      "低内存模式可能重复准备模型，不应把整体估算包装成严格线性进度",
+      "界面所有任务与数值是设计样例，未接实际流式数据"
+    ]
+  },
+  "validation": {
+    "barRatio": [
+      {
+        "width": 1104,
+        "fill": 828
+      },
+      {
+        "width": 336,
+        "fill": 252
+      },
+      {
+        "width": 576,
+        "fill": 432
+      }
+    ],
+    "checkedScreens": [
+      "任务队列",
+      "正在生成",
+      "关键状态",
+      "作品详情",
+      "总览",
+      "进度详情",
+      "正在取消",
+      "生成反馈",
+      "历史记录"
+    ],
+    "nativeEditable": true,
+    "globalPlayersUpdated": 11
+  },
+  "prototypeLimit": "点击用于评审，不触发本机任务；移除5秒自动完成跳转。其他作品与任务按钮仍复用已有详情/状态演示。"
+}

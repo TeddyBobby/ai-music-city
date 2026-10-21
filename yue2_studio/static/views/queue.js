@@ -1,30 +1,10 @@
-import { api } from "../api.js";
-import { fill, h, toastError } from "../ui.js";
-import { liveCard } from "./jobcard.js";
-
-export async function queueView({ el }) {
-  const cards = new Map(); // id -> liveCard
-  const list = h("div", { class: "stack" });
-  const empty = h("div", { class: "empty" }, "Nothing queued. ", h("a", { href: "#/create" }, "Create a song"), " or ", h("a", { href: "#/cover" }, "make a cover"), ".");
-  fill(el, h("div", { class: "view-head" }, h("h1", {}, "Queue"), h("span", { class: "sub" }, "Jobs run one at a time on the GPU.")), list, empty);
-
-  function drop(c) { c.close(); cards.delete(c.job.id); c.el.remove(); empty.hidden = cards.size > 0; }
-
-  async function refresh() {
-    try {
-      const { jobs } = await api.jobs({ status: "queued,running", limit: 100 });
-      const seen = new Set();
-      for (const job of jobs.slice().reverse()) {
-        seen.add(job.id);
-        const c = cards.get(job.id);
-        if (!c) { const n = liveCard(job, { onFinish: drop, onGone: () => refresh() }); cards.set(job.id, n); list.append(n.el); }
-        else c.update(job);
-      }
-      for (const [id, c] of cards) if (!seen.has(id)) drop(c);
-      empty.hidden = cards.size > 0;
-    } catch (e) { if (e.code === "network_error") return; toastError(e); }
-  }
-  await refresh();
-  const poll = setInterval(refresh, 5000), tick = setInterval(() => cards.forEach((c) => c.paint()), 1000);
-  return { unmount() { clearInterval(poll); clearInterval(tick); cards.forEach((c) => c.close()); } };
+import {api} from "../api.js";
+import {fill,h,toastError} from "../ui.js";
+import {liveCard,resultCard} from "./jobcard.js";
+export async function queueView({el,app}){
+ const cards=new Map(),list=h("div",{class:"queue-groups"}),stats=h("div",{class:"queue-stats"}),historyList=h("div",{class:"stack"}),history=h("details",{class:"queue-history"},h("summary",{},"历史任务"),historyList),recent=h("div",{class:"stack",style:"margin-top:24px"}),empty=h("div",{class:"empty"},h("h2",{},"当前没有生成任务"),h("p",{},"写下新的灵感，开始下一首歌。"),h("a",{href:"#/create",class:"btn primary",style:"margin-top:16px"},"开始创作"));let closed=false,loading=false;
+ fill(el,h("div",{class:"view-head"},h("h1",{},"任务队列"),h("span",{class:"sub"},"查看实时进度，按提交顺序生成。")),stats,list,empty,recent,history);
+ function drop(c){c.close();cards.delete(c.job.id);c.el.remove();refresh();app?.refreshStatus?.();}
+ async function refresh(){if(loading||closed)return;loading=true;try{const[active,done,failed]=await Promise.all([api.jobs({status:"queued,running",limit:100}),api.jobs({status:"done",limit:20}),api.jobs({status:"failed,cancelled",limit:20})]);if(closed)return;const sorted=active.jobs.slice().sort((a,b)=>a.status===b.status?(a.seq||0)-(b.seq||0):a.status==="running"?-1:1),ids=new Set(sorted.map(j=>j.id));for(const[id,c]of cards)if(!ids.has(id)){c.close();c.el.remove();cards.delete(id);}for(const job of sorted){let c=cards.get(job.id);if(c)c.update(job);else{c=liveCard(job,{scoreCollapsed:true,onFinish:drop,onGone:refresh});cards.set(job.id,c);}list.append(c.el);}empty.hidden=cards.size>0;fill(stats,[[active.jobs.filter(j=>j.status==="running").length,"正在生成"],[active.jobs.filter(j=>j.status==="queued").length,"排队等待"],[done.total,"已完成"]].map(([n,label])=>h("div",{class:"queue-stat"},h("b",{},n),h("span",{},label))));fill(recent,done.jobs[0]?h("div",{},h("h3",{style:"margin-bottom:12px"},"最近完成"),resultCard(done.jobs[0])):null);fill(historyList,[...done.jobs.slice(1),...failed.jobs].sort((a,b)=>(b.finished_at||b.created_at).localeCompare(a.finished_at||a.created_at)).map(j=>resultCard(j)));history.querySelector("summary").textContent=`历史任务 · 已完成 ${done.total} · 未完成 ${failed.total}`;}catch(e){if(!closed)toastError(e);}finally{loading=false;}}
+ await refresh();const poll=setInterval(refresh,5000),tick=setInterval(()=>cards.forEach(c=>c.paint()),1000);return{unmount(){closed=true;clearInterval(poll);clearInterval(tick);cards.forEach(c=>c.close());}};
 }

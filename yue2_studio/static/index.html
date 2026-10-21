@@ -1,40 +1,6 @@
 <!doctype html>
-<html lang="en">
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>YuE2 Studio</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 viewBox=%270 0 32 32%27%3E%3Crect width=%2732%27 height=%2732%27 rx=%276%27 fill=%27%23e3a33a%27/%3E%3Cpath d=%27M9 22V10l6 8 6-8v12%27 fill=%27none%27 stroke=%27%231b1305%27 stroke-width=%273%27 stroke-linejoin=%27round%27/%3E%3C/svg%3E">
-  <link rel="stylesheet" href="/static/styles.css">
-  <script>
-    // Apply a remembered explicit theme before first paint (system = no stamp).
-    try { var t = JSON.parse(localStorage.getItem("yue2.theme")); if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; } catch (e) {}
-  </script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js" defer></script>
-</head>
-<body>
-  <header class="top">
-    <div class="top-inner">
-      <a class="brand" href="#/create"><span class="brand-mark" aria-hidden="true"></span>YuE2 Studio</a>
-      <nav class="main" aria-label="Main">
-        <details class="menu" id="nav-generate">
-          <summary>Generate<span class="caret" aria-hidden="true">▾</span></summary>
-          <div class="menu-list">
-            <a href="#/create">Create</a>
-            <a href="#/cover">Cover</a>
-            <a href="#/hum">Hum</a>
-          </div>
-        </details>
-        <a href="#/projects">Projects</a>
-        <a href="#/library">Library</a>
-        <a href="#/settings">Settings</a>
-        <a href="#/queue" class="nav-queue">Queue<span id="queue-count" class="badge-count" hidden></span></a>
-      </nav>
-      <span id="engine-pill" class="pill" data-state="cold" title="Engine state"><span class="dot"></span><span class="txt">connecting…</span></span>
-    </div>
-  </header>
-  <main id="view" aria-live="polite"></main>
-  <div id="toasts" role="status"></div>
-  <script type="module" src="/static/app.js"></script>
-</body>
-</html>
+<html lang="zh-CN" data-theme="dark"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>听见 · 本地音乐工作台</title><link rel="icon" href="/static/assets/3232c.svg"><link rel="stylesheet" href="/static/styles.css"><link rel="stylesheet" href="/static/assistant.css"><link rel="stylesheet" href="/static/workspace-views.css"><script src="https://cdnjs.cloudflare.com/ajax/libs/abcjs/6.7.0/abcjs-basic-min.js" defer></script></head>
+<body><aside class="sidebar"><a class="brand" href="#/create"><img src="/static/assets/3a066.svg" alt="">听见</a><p class="brand-sub">本地音乐工作台</p><nav class="main" aria-label="主导航">
+<a href="#/create"><img src="/static/assets/3232c.svg" alt="">开始创作</a><a href="#/library"><img src="/static/assets/eb1f5.svg" alt="">我的作品</a><a href="#/projects"><img src="/static/assets/39c5a.svg" alt="">我的项目</a><a href="#/queue"><img src="/static/assets/63211.svg" alt="">任务队列<span id="queue-count" class="badge-count" hidden></span></a><a href="#/assistant"><img src="/static/assets/6fd6c.svg" alt="">AI 助手</a>
+</nav><div class="nav-more"><p class="hint">更多创作方式</p><a href="#/cover" data-capability="cover" aria-disabled="true"><img src="/static/assets/78f83.svg" alt="">音频改编<span>未启用</span></a><a href="#/hum" data-capability="hum" aria-disabled="true"><img src="/static/assets/78f83.svg" alt="">哼唱成歌<span>未启用</span></a></div><div class="sidebar-bottom"><nav class="main"><a href="#/settings"><img src="/static/assets/36541.svg" alt="">设置</a></nav><div class="machine-card"><span id="engine-pill" class="pill" data-state="cold"><span class="dot"></span><span class="txt">正在连接本机…</span></span><span id="machine-info">正在读取本机配置</span><span class="hint">作品保存在这台电脑</span></div></div></aside>
+<div class="workspace"><header class="workspace-header"><span id="breadcrumb">工作台 / 开始创作</span><span class="spacer"></span><span>YuE2 本地引擎</span><span id="header-state" class="tag">连接中</span></header><main id="view" aria-live="polite"></main></div><div id="toasts" role="status"></div><script type="module" src="/static/app.js"></script></body></html>

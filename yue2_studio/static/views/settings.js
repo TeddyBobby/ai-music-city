@@ -1,132 +1,80 @@
-import { api } from "../api.js";
-import { applyTheme, confirmDialog, fill, fmt, h, loraLabel, store, toast, toastError } from "../ui.js";
+import { api } from '../api.js';
+import { applyTheme, fill, fmt, h, toast, toastError } from '../ui.js';
 
 export async function settingsView({ el, app }) {
   let s;
   try { s = await api.settings(); app.settings = s; }
-  catch (e) { toastError(e); s = { default_preset: "quality", memory_budget_gib: 24, require_ac: false, fast_numerics: true, low_memory: "auto", theme: store.get("theme", "system"), prune_uploads_days: null }; }
-  // The budget range is the machine's: mlx-Yue refuses more than total RAM − 4 GiB (older servers: 6–44).
-  const memMin = s.min_memory_budget_gib ?? 6, memMax = s.max_memory_budget_gib ?? 44;
+  catch (e) { fill(el, h('div', { class: 'errbox' }, '设置读取失败，请刷新重试。')); toastError(e); return {}; }
+  let disposed = false;
+  const min = s.min_memory_budget_gib ?? 6, max = s.max_memory_budget_gib ?? 12;
+  const select = (id, value, opts) => h('select', { id }, opts.map(([v, text]) => h('option', { value: v, selected: v === value }, text)));
   const f = {
-    preset: h("select", { id: "st-preset" }, ["quality", "fast", "custom"].map((p) => h("option", { value: p, selected: p === s.default_preset }, p))),
-    mem: h("input", { id: "st-mem", type: "number", min: memMin, max: memMax, step: 1, value: s.memory_budget_gib }),
-    lowMem: h("select", { id: "st-lowmem" }, [["auto", autoLabel(s)], ["on", "On"], ["off", "Off"]].map(([v, l]) => h("option", { value: v, selected: v === (s.low_memory || "auto") }, l))),
-    ac: h("input", { id: "st-ac", type: "checkbox", checked: !!s.require_ac }),
-    fast: h("input", { id: "st-fast", type: "checkbox", checked: s.fast_numerics !== false }),
-    prune: h("input", { id: "st-prune", type: "number", min: 1, max: 365, step: 1, value: s.prune_uploads_days === null || s.prune_uploads_days === undefined ? "" : s.prune_uploads_days, placeholder: "never", style: "width:120px" }),
-    theme: h("select", { id: "st-theme", onchange: (e) => applyTheme(e.target.value) }, [["system", "Follow system"], ["light", "Light"], ["dark", "Dark"]].map(([v, l]) => h("option", { value: v, selected: v === (s.theme || "system") }, l))),
-    assistProvider: h("select", { id: "st-assist-provider" }, [["auto", "Auto — CLI if installed, else API key"], ["cli", "Claude CLI"], ["api", "API key"], ["off", "Off — hide the Ask Claude box"]].map(([v, l]) => h("option", { value: v, selected: v === (s.assist_provider || "auto") }, l))),
-    assistModel: h("input", { id: "st-assist-model", type: "text", maxlength: 80, value: s.assist_model || "", placeholder: "provider default — e.g. sonnet, claude-opus-5", autocomplete: "off" }),
-    // The key never comes back from the server: the field is blank and only sent when the user typed one.
-    apiKey: h("input", { id: "st-assist-key", type: "password", autocomplete: "new-password", placeholder: keyPlaceholder(s), "aria-label": "Anthropic API key" }),
+    preset: select('st-preset', s.default_preset, [['fast', '快速 · 8bit（推荐）'], ['quality', '高质量 · bf16'], ['custom', '自定义']]),
+    low: select('st-lowmem', s.low_memory || 'auto', [['on', '开启（推荐）'], ['auto', '根据电脑内存自动选择'], ['off', '关闭']]),
+    mem: h('input', { id: 'st-mem', type: 'range', min, max, step: 1, value: s.memory_budget_gib, 'aria-label': '内存预算' }),
+    ac: h('input', { type: 'checkbox', id: 'st-ac', checked: s.require_ac }),
+    fast: h('input', { type: 'checkbox', id: 'st-fast', checked: s.fast_numerics !== false }),
+    prune: h('input', { id: 'st-prune', type: 'number', min: 1, max: 365, value: s.prune_uploads_days ?? '', placeholder: '留空则保留' }),
+    theme: select('st-theme', s.theme || 'system', [['system', '跟随系统'], ['dark', '深色'], ['light', '浅色']]),
   };
-  function keyPlaceholder(st) { return st.has_api_key ? "•••••• key saved" : "sk-ant-…"; }
-  /** "Auto" plus what it resolves to on this Mac with the saved budget (unknown on an older server). */
-  function autoLabel(st) { return typeof st.low_memory_effective === "boolean" && (st.low_memory || "auto") === "auto" ? `Auto — ${st.low_memory_effective ? "on" : "off"} for this Mac` : "Auto"; }
-  function memHint(st) {
-    const ram = st.machine_ram_gib;
-    const cap = ram ? ` This Mac has ${Math.round(ram)} GiB of RAM, so the most allowed is ${memMax} GiB (4 GiB stays free for macOS); a larger saved budget is lowered to that.` : "";
-    return `MLX watchdog limit; a change rebuilds the pipeline on the next job. Peak use is ≈10 GiB, ≈5.5 GiB in low-memory mode.${cap}`;
-  }
-  /** The whole settings object from the form (validated; null + toast when a field is out of range). */
-  function body() {
-    const mem = Number(f.mem.value);
-    if (!(mem >= memMin && mem <= memMax)) { toast(`Memory budget must be between ${memMin} and ${memMax} GiB on this Mac`, "err"); return null; }
-    const prune = f.prune.value.trim() === "" ? null : Number(f.prune.value);
-    if (prune !== null && !(Number.isInteger(prune) && prune >= 1 && prune <= 365)) { toast("Auto-delete uploads must be 1–365 days (or blank for never)", "err"); return null; }
-    const b = { default_preset: f.preset.value, memory_budget_gib: mem, low_memory: f.lowMem.value, require_ac: f.ac.checked, fast_numerics: f.fast.checked, theme: f.theme.value, prune_uploads_days: prune, assist_provider: f.assistProvider.value, assist_model: f.assistModel.value.trim() };
-    if (f.apiKey.value) b.anthropic_api_key = f.apiKey.value;
-    return b;
-  }
-  async function put(b, msg) {
-    s = await api.saveSettings(b); app.settings = s; applyTheme(s.theme);
-    f.apiKey.value = ""; f.apiKey.placeholder = keyPlaceholder(s);
-    f.lowMem.options[0].textContent = autoLabel(s); f.mem.value = s.memory_budget_gib;
-    if (msg) toast(msg, "ok");
-    if (app.refreshStatus) await app.refreshStatus(); // provider/key changes show up now, not on the next 5 s poll
-  }
-  const save = h("button", { type: "submit", class: "primary" }, "Save settings");
-  const clearKey = h("button", { type: "button", class: "ghost sm", onclick: async () => {
-    if (!s.has_api_key && !f.apiKey.value) return toast("No API key is saved", "info");
-    if (!confirmDialog("Remove the saved Anthropic API key?")) return;
-    const b = body(); if (!b) return;
-    clearKey.disabled = true;
-    try { await put({ ...b, anthropic_api_key: "" }, "API key removed"); } catch (err) { toastError(err); }
-    clearKey.disabled = false;
-  } }, "Clear key");
-  const test = h("button", { type: "button", class: "sm", onclick: async () => {
-    const b = body(); if (!b) return;
-    test.disabled = true; test.textContent = "Testing…";
-    try { await put(b, null); const r = await api.testAssist(); toast(`Claude answered via ${r.provider}${r.model ? ` (${r.model})` : ""} in ${Number(r.seconds).toFixed(1)}s`, "ok"); }
-    catch (err) { toastError(err); }
-    test.disabled = false; test.textContent = "Test";
-  } }, "Test");
-  const assistStatus = h("span", { class: "hint" });
-  const form = h("form", { class: "panel stack", onsubmit: async (e) => {
+  const memValue = h('strong', { class: 'num' }, `${s.memory_budget_gib} GiB`);
+  f.mem.addEventListener('input', () => { memValue.textContent = `${f.mem.value} GiB`; });
+  const field = (label, input, hint) => h('label', { class: 'field' }, h('span', { class: 'lbl' }, label), input, hint ? h('span', { class: 'hint' }, hint) : null);
+  const recommend = h('div', { class: 'panel settings-recommend' });
+  const paintRecommend = () => fill(recommend, h('div', { class: 'row between' }, h('h3', {}, '为这台 Mac 推荐'),
+    h('span', { class: 'tag ok' }, s.default_preset === 'fast' && s.low_memory === 'on' ? '已采用推荐设置' : '可切换到推荐设置')),
+    h('p', {}, `Apple Silicon${s.machine_ram_gib ? ` · ${Math.round(s.machine_ram_gib)} GB 统一内存` : ''}`),
+    h('p', { class: 'hint' }, '快速预设 + 低内存模式。首次生成需要加载模型，进度会显示在任务队列中。'));
+  paintRecommend();
+  const save = h('button', { class: 'primary', type: 'submit' }, '保存设置');
+  const form = h('form', { class: 'stack', onsubmit: async (e) => {
     e.preventDefault();
-    const b = body(); if (!b) return;
+    const prune = f.prune.value.trim() ? Number(f.prune.value) : null;
+    if (prune !== null && (!Number.isInteger(prune) || prune < 1 || prune > 365)) return toast('自动清理天数需为 1–365，或留空保留。', 'err');
     save.disabled = true;
-    try { await put(b, "Settings saved"); } catch (err) { toastError(err); }
-    save.disabled = false;
-  } },
-    h("h3", {}, "Generation"),
-    h("label", { class: "field" }, h("span", { class: "lbl" }, "Default preset"), f.preset),
-    h("label", { class: "field" }, h("span", { class: "lbl" }, `Memory budget (GiB, ${memMin}–${memMax})`), f.mem, h("span", { class: "hint" }, memHint(s))),
-    h("label", { class: "field" }, h("span", { class: "lbl" }, "Low-memory mode"), f.lowMem,
-      h("span", { class: "hint" }, "Loads the models one at a time so a song fits in ~5.5 GiB; costs a second or two per Quality song. Auto turns it on for Macs with 24 GB or less.")),
-    h("label", { class: "check" }, f.ac, "Require AC power before running jobs"),
-    h("label", { class: "check" }, f.fast, "Fast numerics"),
-    h("span", { class: "hint" }, "Runs both CFG branches in one pass and uses native BF16 attention for synthesis (about 2.5× faster synthesis on M5). Songs differ very slightly from exact mode, so a seed only reproduces a song made in the same mode."),
-    h("h3", {}, "Storage"),
-    h("label", { class: "field" }, h("span", { class: "lbl" }, "Auto-delete unused uploads after N days (blank = never)"), f.prune,
-      h("span", { class: "hint" }, "Uploads no job references are removed from data/uploads at startup and after each job; uploads a queued or running job needs are never touched. Manage them under Library → Uploads.")),
-    h("h3", {}, "Appearance"),
-    h("label", { class: "field" }, h("span", { class: "lbl" }, "Theme"), f.theme),
-    h("h3", {}, "Claude assist"),
-    h("label", { class: "field" }, h("span", { class: "lbl" }, "Provider"), f.assistProvider,
-      h("span", { class: "hint" }, "Fills the Create / Cover / Hum forms from a prompt. The CLI uses your Claude login; the API key is stored in data/app.db.")),
-    h("div", { class: "grid2" },
-      h("label", { class: "field" }, h("span", { class: "lbl" }, "Model"), f.assistModel),
-      h("label", { class: "field" }, h("span", { class: "lbl" }, "API key"), f.apiKey)),
-    h("div", { class: "row" }, test, clearKey, assistStatus),
-    h("div", {}, save));
-
-  const statusBox = h("dl", { class: "kv" });
-  const modelsBox = h("dl", { class: "kv" });
-  function assistLine(st) {
-    const a = st && st.assist;
-    if (!a) return st ? "" : "offline";
-    const bits = [a.cli ? "CLI found" : "no CLI", a.api_key ? (s.has_api_key ? "key set" : "key set (env)") : "no key"]; // has_api_key = stored key only
-    if (a.provider) return [`via ${a.provider.toUpperCase()}${a.model ? ` (${a.model})` : ""}`, ...bits].join(" · ");
-    return (a.reasons && a.reasons.length ? a.reasons : ["unavailable", ...bits]).join(" · ");
-  }
+    try {
+      s = await api.saveSettings({ default_preset: f.preset.value, low_memory: f.low.value, memory_budget_gib: Number(f.mem.value), require_ac: f.ac.checked, fast_numerics: f.fast.checked, prune_uploads_days: prune, theme: f.theme.value });
+      app.settings = s; applyTheme(s.theme); paintRecommend(); toast('设置已保存，下次生成时生效。', 'ok');
+      await app.refreshStatus?.();
+    } catch (err) { toastError(err); } finally { save.disabled = false; }
+  } }, h('div', { class: 'panel stack settings-form' },
+    h('h3', {}, '生成与外观'),
+    field('默认生成方式', f.preset, '这台电脑已验证快速 8bit 模式；其他预设可能需要更多内存。'),
+    field('低内存模式', f.low, '依次加载模型，降低生成时的内存占用。'),
+    h('label', { class: 'field' }, h('span', { class: 'lbl' }, '内存预算', memValue), f.mem,
+      h('span', { class: 'setting-range' }, h('span', {}, `${min} GiB`), h('span', {}, `${max} GiB`)),
+      h('span', { class: 'hint' }, '为 macOS 和其他应用预留内存。')), field('界面主题', f.theme),
+    h('label', { class: 'check' }, f.ac, '仅在连接电源时开始生成'),
+    h('details', { class: 'settings-advanced' }, h('summary', {}, '高级设置'), h('div', { class: 'stack' },
+      h('label', { class: 'check' }, f.fast, '使用快速计算'), h('p', { class: 'hint' }, '相同随机种子需使用相同计算模式，才能复现结果。'),
+      field('自动清理闲置上传文件（天）', f.prune, '只清理没有任务引用的上传文件，不会清理已生成作品。')))),
+    h('div', { class: 'row between' }, h('span', { class: 'hint' }, '保存后对下一次生成生效'), save));
+  const engine = h('div', { class: 'panel stack' });
+  const capabilities = h('div', { class: 'panel settings-extension' });
+  const helper = h('div', { class: 'panel stack' }, h('h3', {}, 'AI 助手'), h('p', { class: 'hint' }, '正在检测本机 Hermes…'));
+  const cap = (title, available, detail) => h('div', { class: 'capability' }, h('div', { class: 'row between' }, h('span', {}, title), h('span', { class: `tag ${available ? 'ok' : ''}` }, available ? '可用' : '未配置')), h('p', { class: 'hint' }, detail));
   function paint(st) {
-    assistStatus.textContent = assistLine(st);
-    if (!st) { fill(statusBox, h("dt", {}, "Server"), h("dd", { class: "muted" }, "offline")); return; }
-    const e = st.engine, q = st.queue;
-    fill(statusBox, 
-      h("dt", {}, "Engine"), h("dd", {}, h("span", { class: `tag ${e.state === "ready" ? "ok" : e.state === "busy" ? "accent" : ""}` }, e.state)),
-      h("dt", {}, "Precision"), h("dd", {}, e.precision || "—"), h("dt", {}, "Memory"), h("dd", {}, fmt.gib(e.memory_gib)),
-      h("dt", {}, "Low-memory"), h("dd", {}, e.low_memory === true ? h("span", { class: "tag accent" }, "on") : e.low_memory === false ? "off" : "—"),
-      h("dt", {}, "LoRA"), h("dd", {}, e.loras && e.loras.length ? loraLabel(e.loras) : "—"),
-      h("dt", {}, "Current job"), h("dd", {}, e.current_job_id ? h("a", { href: "#/queue", class: "mono" }, e.current_job_id.slice(0, 8)) : "—"),
-      h("dt", {}, "Queued"), h("dd", {}, q.queued), h("dt", {}, "Version"), h("dd", {}, st.version));
-    fill(modelsBox, 
-      h("dt", {}, "Weights"), h("dd", {}, h("span", { class: `tag ${st.models.present ? "ok" : "err"}` }, st.models.present ? "present" : "missing")),
-      h("dt", {}, "Converted"), h("dd", { class: "mono small" }, st.models.converted_dir), h("dt", {}, "VAE"), h("dd", { class: "mono small" }, st.models.vae_dir),
-      h("dt", {}, "ffmpeg"), h("dd", {}, st.ffmpeg ? "found" : "missing"),
-      h("dt", {}, "Cover"), h("dd", {}, st.cover.available ? "available" : ["unavailable", st.cover.reasons.length ? h("ul", { style: "margin:2px 0 0 16px" }, st.cover.reasons.map((r) => h("li", { class: "small" }, r))) : null]),
-      h("dt", {}, "Presets"), h("dd", {}, h("ul", { style: "margin:0;padding-left:16px" }, st.presets.map((p) => h("li", { class: "small" }, h("b", {}, p.name), ` — ${p.description}`)))),
-      h("dt", {}, "LoRA"), h("dd", {}, h("div", { class: "mono small" }, st.loras.dir),
-        st.loras.adapters.length ? h("ul", { style: "margin:4px 0 0 16px" }, st.loras.adapters.map((a) => h("li", { class: "small", title: a.valid ? "" : a.error },
-          h("b", {}, a.name), a.valid ? ` — ${a.parts.map((p) => p.toUpperCase()).join("+")}${a.rank ? `, rank ${a.rank}` : ""}${a.replaced.length ? `, replaces ${a.replaced.join("/")}` : ""}${a.metadata && a.metadata.intended_cot ? `, cot ${a.metadata.intended_cot}` : ""}` : [" ", h("span", { class: "tag err" }, "unusable"), ` ${a.error}`])))
-          : h("div", { class: "hint" }, "No adapters — drop .safetensors files (or PEFT folders) into this directory; rescanned every 5 s.")));
+    if (disposed) return;
+    if (!st) { fill(engine, h('h3', {}, '音乐模型'), h('p', { class: 'hint' }, '服务暂时未连接')); return; }
+    const e = st.engine, detailsOpen = engine.querySelector("details")?.open;
+    fill(engine, h('div', { class: 'row between' }, h('h3', {}, '音乐模型'), h('span', { class: `tag ${st.models.present ? 'ok' : 'err'}` }, st.models.present ? '本机已安装' : '缺少模型')),
+      h('strong', {}, st.models.name || 'YuE2-3B'), h('p', { class: 'hint' }, `${st.models.runtime || 'MLX / Apple GPU'} · 当前精度 ${e.precision || '尚未加载'}`),
+      h('p', { class: 'hint' }, '快速模式使用 AR 8bit 量化；音频合成部分仍使用 bf16。'),
+      h('dl', { class: 'kv' }, h('dt', {}, '运行状态'), h('dd', {}, ({ ready: '就绪', busy: '生成中', cold: '等待创作', idle: '待加载', error: '异常', loading: '加载中' })[e.state] || e.state), h('dt', {}, '模型内存'), h('dd', {}, fmt.gib(e.memory_gib)), h('dt', {}, '等待任务'), h('dd', {}, st.queue.queued)),
+      h('details', { class: 'settings-advanced' }, h('summary', {}, '模型文件与版本'), h('dl', { class: 'kv' },
+        h('dt', {}, '权重目录'), h('dd', { class: 'mono small' }, st.models.converted_dir), h('dt', {}, '音频解码器'), h('dd', { class: 'mono small' }, st.models.vae_dir), h('dt', {}, '应用版本'), h('dd', {}, st.version))));
+    if (detailsOpen) engine.querySelector('details').open = true;
+    fill(capabilities, h('h3', {}, '扩展功能'), cap('音频改编 / 哼唱', st.cover.available, st.cover.available ? '从参考音频中提取旋律。' : '尚未安装所需附加模型，当前可使用歌词创作。'),
+      cap('LoRA 风格适配', st.loras.adapters.some(a => a.valid), `${st.loras.adapters.filter(a => a.valid).length} 个可用适配器`),
+      cap('MP3 导出', st.ffmpeg, st.ffmpeg ? '已安装音频转换工具。' : '当前仍可下载原始音频。'));
   }
-  paint(app.status);
-  app.listeners.add(paint);
-  fill(el, h("div", { class: "view-head" }, h("h1", {}, "Settings")),
-    h("div", { class: "cols even" }, form, h("div", { class: "stack" },
-      h("div", { class: "panel stack" }, h("h3", {}, "Engine status"), statusBox, h("p", { class: "hint" }, "Refreshes every 5 s.")),
-      h("div", { class: "panel stack" }, h("h3", {}, "Models"), modelsBox))));
-  return { unmount: () => app.listeners.delete(paint) };
+  paint(app.status); app.listeners.add(paint);
+  fill(el, h('div', { class: 'view-head' }, h('h1', {}, '设置'), h('span', { class: 'sub' }, '适合这台 Mac 的生成方式、模型和连接。')),
+    h('div', { class: 'cols settings-layout' }, h('div', { class: 'stack' }, recommend, form), h('div', { class: 'stack' }, engine, helper, capabilities)));
+  fetch('/api/assistant/status').then(r => { if (!r.ok) throw new Error(); return r.json(); }).then(st => {
+    if (disposed) return;
+    fill(helper, h('h3', {}, 'AI 助手'), cap('Hermes 对话', st.chat.available, st.chat.model), cap('封面生成', st.image.verified, st.image.model + ' · ' + st.image.message),
+      h('p', { class: 'hint' }, '音乐在本机生成；对话和封面使用 Hermes 已连接的在线模型。'), h('a', { class: 'btn', href: '#/assistant?mode=settings' }, '管理助手连接'));
+  }).catch(() => { if (!disposed) fill(helper, h('h3', {}, 'AI 助手'), h('p', { class: 'hint' }, '连接状态暂时无法读取'), h('a', { href: '#/assistant?mode=settings' }, '检查助手连接')); });
+  return { unmount() { disposed = true; app.listeners.delete(paint); } };
 }

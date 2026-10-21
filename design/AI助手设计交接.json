@@ -1,0 +1,91 @@
+{
+  "version": "1.1",
+  "date": "2026-10-21",
+  "scope": "设计更新，尚未开发接入",
+  "figmaUrl": "https://www.figma.com/design/jg2KsbcHQCBkAkWnA83f7j?node-id=15-562",
+  "newFrames": [
+    {
+      "key": "assistant",
+      "nodeId": "15:562"
+    },
+    {
+      "key": "cover",
+      "nodeId": "15:831"
+    },
+    {
+      "key": "connect",
+      "nodeId": "16:1039"
+    },
+    {
+      "key": "aiStates",
+      "nodeId": "16:1286"
+    },
+    {
+      "key": "applyDraft",
+      "nodeId": "16:1344"
+    },
+    {
+      "key": "coverApplied",
+      "nodeId": "16:1364"
+    },
+    {
+      "key": "coverZoom",
+      "nodeId": "16:1383"
+    },
+    {
+      "key": "connectGuide",
+      "nodeId": "16:1401"
+    },
+    {
+      "key": "draftApplied",
+      "nodeId": "17:867"
+    },
+    {
+      "key": "restoreCover",
+      "nodeId": "17:1141"
+    }
+  ],
+  "features": [
+    "中文多轮对话、新建会话、停止回复",
+    "关联当前作品的标题、歌词与曲风；切换作品时明确会话归属",
+    "歌词与曲风建议；预览后填入创作，保留原稿与撤销操作",
+    "根据作品构思封面描述，生成方形封面候选，预览后显式应用",
+    "原封面保留，可恢复；图片失败保留描述和现有封面",
+    "分别检测 Hermes 对话连接与图片生成能力",
+    "本机服务连接配置、鉴权和清晰错误状态"
+  ],
+  "verifiedLocalReadiness": {
+    "hermesInstalled": true,
+    "apiBaseUrl": "http://127.0.0.1:8642",
+    "apiServerListening": false,
+    "apiProtocol": [
+      "Chat Completions",
+      "Responses",
+      "Runs 流式事件、停止和审批"
+    ],
+    "apiAuthentication": "Bearer 凭证，实际接入时由本机服务保管",
+    "imageToolCodeAvailable": true,
+    "imageBackendConfigured": false,
+    "imageGenerationTested": false,
+    "offlineClarification": "本地 Hermes 是代理；对话和图片是否联网取决于模型服务。",
+    "inspection": "只读检查。未启动服务，未修改 Hermes 配置，未调用付费 API，未下载模型。"
+  },
+  "sources": [
+    "~/.hermes/hermes-agent/website/docs/developer-guide/programmatic-integration.md",
+    "~/.hermes/hermes-agent/website/docs/user-guide/features/api-server.md",
+    "~/.hermes/hermes-agent/gateway/platforms/api_server.py",
+    "~/.hermes/hermes-agent/tools/image_generation_tool.py",
+    "~/.hermes/hermes-agent/website/docs/user-guide/features/image-generation.md"
+  ],
+  "designBoundaries": [
+    "所有助手回复和封面均为设计示例",
+    "AI 接入、会话存储、封面管理均为待开发功能",
+    "不将聊天连接成功等同图片能力就绪",
+    "参考图、图片编辑及精确分辨率按实际后端能力开放"
+  ],
+  "validation": [
+    "新增与修改页面已检查原生图层、字体和自动布局边界",
+    "截图逐页检查通过",
+    "已连接歌词预览、填入、撤销以及封面应用、恢复的演示流程"
+  ]
+}

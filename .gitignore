@@ -14,3 +14,32 @@ __pycache__/
 # os / editors
 .DS_Store
 .orchestrate-fix/
+
+# React frontend tooling
+frontend/node_modules/
+frontend/*.tsbuildinfo
+
+# Local credentials, diagnostic output and release archives
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+*.p12
+*.pfx
+logs/
+releases/
+*.log
+*.db
+*.db-shm
+*.db-wal
+*.sqlite
+*.sqlite3
+.coverage
+htmlcov/
+
+# Model weights are installed separately, never distributed through Git
+*.safetensors
+*.ckpt
+*.pt
+*.pth

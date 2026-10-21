@@ -2,7 +2,7 @@
 
 ## Context
 
-The user wants an application that generates music with [m-a-p/YuE2-3B](https://huggingface.co/m-a-p/YuE2-3B) and makes full use of an M5 Max (48 GB). The repo `/Users/ianiv/Code/YuE2` is empty (git initialised, no commits).
+The user wants an application that generates music with [m-a-p/YuE2-3B](https://huggingface.co/m-a-p/YuE2-3B) and makes full use of an M5 Max (48 GB). The upstream repository is empty (git initialised, no commits).
 
 Research findings that shape the design:
 
