@@ -1,16 +1,11 @@
 import { useRef, useState, type PointerEvent } from "react";
 import { Link } from "react-router-dom";
 import { UnstyledButton } from "@mantine/core";
-import {
-  ChevronLeft,
-  ChevronRight,
-  Copy,
-  ImagePlus,
-  Music2,
-} from "lucide-react";
-import type { Job } from "../lib/types";
-import { lyricLines, swipeTarget } from "../lib/playerMedia";
-import { useApp } from "../state/app";
+import { useMediaQuery } from "@mantine/hooks";
+import { ChevronLeft, ChevronRight, ImagePlus } from "lucide-react";
+import type { Job, LyricsAlignment } from "../lib/types";
+import { swipeTarget } from "../lib/playerMedia";
+import { SyncedLyrics } from "./SyncedLyrics";
 import { Artwork, IconButton } from "./ui";
 import "./PlayerMedia.css";
 
@@ -26,18 +21,31 @@ export function PlayerMedia({
   job,
   playing,
   onClose,
+  time,
+  duration,
+  seekable,
+  onSeek,
+  active,
+  alignment,
+  onAlign,
 }: {
   job: Job;
   playing: boolean;
   onClose: () => void;
+  time: number;
+  duration: number;
+  seekable: boolean;
+  onSeek: (seconds: number) => void;
+  active: boolean;
+  alignment?: LyricsAlignment | null;
+  onAlign?: () => void;
 }) {
   const [view, setView] = useState<MediaView>("cover");
   const [drag, setDrag] = useState(0);
   const viewport = useRef<HTMLDivElement>(null);
   const gesture = useRef<Gesture | null>(null);
   const suppressClick = useRef(false);
-  const toast = useApp((s) => s.toast);
-  const lines = lyricLines(job.params?.lyrics || "");
+  const mobile = useMediaQuery("(max-width: 760px)");
 
   function show(next: MediaView) {
     if (next === view) return;
@@ -62,7 +70,7 @@ export function PlayerMedia({
       (e.pointerType === "mouse" && view === "lyrics") ||
       (e.target instanceof Element &&
         e.target.closest(
-          "a,button:not(.player-media-cover-button),input,textarea,select,[role=slider]",
+          "a,button:not(.player-media-cover-button):not(.synced-lyric-line),input,textarea,select,[role=slider]",
         ))
     )
       return;
@@ -109,6 +117,24 @@ export function PlayerMedia({
     if (e.currentTarget.hasPointerCapture(e.pointerId))
       e.currentTarget.releasePointerCapture(e.pointerId);
   }
+
+  if (!mobile)
+    return (
+      <div className="player-media player-media-desktop">
+        <div className="player-media-viewport player-media-cover">
+          <Artwork job={job} />
+          <Link
+            to={`/assistant?mode=cover&song=${job.id}`}
+            onClick={onClose}
+            className="record-cover-edit"
+            aria-label="生成或更换封面"
+          >
+            <ImagePlus size={15} />
+            更换封面
+          </Link>
+        </div>
+      </div>
+    );
 
   return (
     <div className="player-media" data-media-view={view}>
@@ -188,59 +214,18 @@ export function PlayerMedia({
             aria-hidden={view !== "lyrics"}
             inert={view !== "lyrics"}
           >
-            <header className="player-lyrics-header">
-              <span>歌词</span>
-              {lines.length > 0 && (
-                <IconButton
-                  label="复制歌词"
-                  onClick={async () => {
-                    try {
-                      await navigator.clipboard.writeText(
-                        job.params?.lyrics || "",
-                      );
-                      toast("歌词已复制。", "ok");
-                    } catch {
-                      toast("复制失败，可手动选择歌词。", "err");
-                    }
-                  }}
-                >
-                  <Copy size={14} />
-                </IconButton>
-              )}
-            </header>
-            <div
-              className="player-lyrics-scroll"
-              tabIndex={lines.length ? 0 : undefined}
-              role="region"
-              aria-label="歌词正文"
-            >
-              {lines.length ? (
-                <div className="player-lyrics-lines">
-                  {lines.map((line, i) =>
-                    line.kind === "section" ? (
-                      <div className="lyric-section" key={i}>
-                        {line.text}
-                      </div>
-                    ) : (
-                      <p
-                        key={i}
-                        className={
-                          line.kind === "space" ? "lyric-space" : undefined
-                        }
-                      >
-                        {line.text || "\u00a0"}
-                      </p>
-                    ),
-                  )}
-                </div>
-              ) : (
-                <div className="player-lyrics-empty">
-                  <Music2 size={26} strokeWidth={1.3} />
-                  <p>暂无歌词</p>
-                  <span>让旋律继续</span>
-                </div>
-              )}
-            </div>
+            {mobile && (
+              <SyncedLyrics
+                lyrics={job.params?.lyrics || ""}
+                time={time}
+                duration={duration}
+                seekable={seekable}
+                onSeek={onSeek}
+                active={active && view === "lyrics"}
+                alignment={alignment}
+                onAlign={onAlign}
+              />
+            )}
           </div>
         </div>
       </div>

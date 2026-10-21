@@ -48,6 +48,21 @@ uv run yue2-studio --open
 
 `--with-cover` 指音频改编，不是图片封面生成。图片封面与对话需要在「创作助手 → 连接设置」中另行配置；Hermes 需先在本机安装并启动。模型下载与外部助手 / 图片服务会访问网络，所用服务可能需要自己的账号和额度。
 
+### 可选：本地歌词校准
+
+歌词高亮需要从实际演唱中识别时间，不能用歌曲总时长平均分配。安装以下可选依赖后，带歌词作品会自动进入本地校准队列；识别成功的歌词可随播放高亮，滑动仅浏览，点击歌词才跳转。无法可靠识别的句子保留为静态歌词，不编造时间戳。伴奏、口音、漏唱和重复段落仍可能影响识别结果。
+
+```sh
+# 仅首次需要；安装脚本不会自动运行 Homebrew
+brew install whisper-cpp ffmpeg
+uv run python scripts/setup_lyrics.py
+
+# 只检查已安装依赖和模型，不下载
+uv run python scripts/setup_lyrics.py --check
+```
+
+校准在本机运行，不上传歌曲。可选模型为 `ggerganov/whisper.cpp` 的多语言 `ggml-small-q5_1.bin`（约 190 MB），保存到 `models/whisper/`。下载固定版本并核验大小与 SHA-256 后才替换文件；已有有效模型不会重复下载。下载沿用 `HF_ENDPOINT` 环境变量；设置了 `YUE2_STUDIO_HOME` 时，模型保存到该目录下的 `models/whisper/`。模型和歌词校准结果属于本机运行数据，不提交到 Git。
+
 ## 开发
 
 ```sh

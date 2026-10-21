@@ -20,6 +20,8 @@ dependencies = [
   "psutil",
   "librosa",
   "httpx",
+  "opencc-python-reimplemented==0.1.7",
+  "pypinyin==0.55.0",
 ]
 
 [project.scripts]

@@ -22,3 +22,20 @@ export interface Job {
 }
 export type Settings = Record<string, any>;
 export type Status = Record<string, any>;
+
+export interface LyricAlignmentLine {
+  text: string;
+  at: number | null;
+  end?: number;
+  section?: string;
+}
+
+export interface LyricsAlignment {
+  status: "idle" | "queued" | "running" | "ready" | "failed" | "unavailable";
+  source: "audio";
+  lines: LyricAlignmentLine[];
+  message?: string;
+  progress?: number;
+  matched_lines?: number;
+  total_lines?: number;
+}

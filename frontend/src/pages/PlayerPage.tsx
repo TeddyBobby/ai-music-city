@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Menu, Slider, Tabs, UnstyledButton } from "@mantine/core";
+import { Drawer, Menu, Slider, Tabs, UnstyledButton } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import {
   ChevronDown,
   Play,
@@ -19,18 +20,16 @@ import {
   Pencil,
   Trash2,
   Send,
+  MessageSquare,
+  ListMusic,
+  Info,
 } from "lucide-react";
 import { api, songUrl } from "../lib/api";
 import type { Job } from "../lib/types";
-import {
-  duration,
-  titleOf,
-  when,
-  presetLabel,
-  errorMessage,
-} from "../lib/utils";
+import { duration, titleOf, presetLabel, errorMessage } from "../lib/utils";
 import { useApp } from "../state/app";
 import { usePlayer } from "../state/player";
+import { usePlayerOverlay } from "../state/playerOverlay";
 import {
   Artwork,
   Button,
@@ -44,8 +43,10 @@ import {
 import { ThemeToggle } from "../components/ThemeToggle";
 import { ProjectPicker } from "../components/ProjectPicker";
 import { PlayerMedia } from "../components/PlayerMedia";
+import { SyncedLyrics } from "../components/SyncedLyrics";
 import { SongReviews } from "../components/SongReviews";
 import { PublishDialog } from "../components/PublishDialog";
+import { useLyricsAlignment } from "../hooks/useLyricsAlignment";
 import "./Player.css";
 export function PlayerPage({
   jobId,
@@ -67,22 +68,18 @@ export function PlayerPage({
   const [job, setJob] = useState<Job | null>(null),
     [error, setError] = useState(""),
     [tab, setTab] = useState<string>("reviews"),
+    [detailsOpen, setDetailsOpen] = useState(false),
     [modal, setModal] = useState(""),
     [name, setName] = useState(""),
     [target, setTarget] = useState<any>(null),
     [busy, setBusy] = useState(false);
-  const reviewPanel = useRef<HTMLElement>(null);
-  useEffect(() => setTab("reviews"), [jobId, initialView]);
+  const mobile = useMediaQuery("(max-width: 760px)");
+  const detailsTrigger = useRef<HTMLButtonElement | null>(null);
+  const { alignment, requestAlignment } = useLyricsAlignment(job);
   useEffect(() => {
-    if (
-      entered &&
-      job?.id &&
-      initialView === "reviews" &&
-      window.matchMedia("(max-width: 760px)").matches
-    ) {
-      reviewPanel.current?.scrollIntoView({ block: "start" });
-    }
-  }, [job?.id, initialView, entered]);
+    setTab("reviews");
+    setDetailsOpen(initialView === "reviews" && entered);
+  }, [jobId, initialView, entered]);
   useEffect(() => {
     let live = true;
     setJob(null);
@@ -103,9 +100,9 @@ export function PlayerPage({
     };
   }, [jobId]);
   useEffect(() => {
-    onDialogChange?.(Boolean(modal));
+    onDialogChange?.(Boolean(modal) || detailsOpen);
     return () => onDialogChange?.(false);
-  }, [modal, onDialogChange]);
+  }, [modal, detailsOpen, onDialogChange]);
   useEffect(() => {
     function key(e: KeyboardEvent) {
       if (
@@ -115,7 +112,12 @@ export function PlayerPage({
         )
       )
         return;
-      if (e.code === "Space" && job?.artifacts.audio && !modal) {
+      if (
+        e.code === "Space" &&
+        job?.artifacts.audio &&
+        !modal &&
+        !detailsOpen
+      ) {
         e.preventDefault();
         if (p.current?.id === job.id) p.toggle();
         else p.play([job]);
@@ -123,7 +125,7 @@ export function PlayerPage({
     }
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
-  }, [job, p.current, modal]);
+  }, [job, p.current, modal, detailsOpen]);
   if (error)
     return (
       <EmptyState title="作品暂时无法读取" description={error}>
@@ -142,8 +144,14 @@ export function PlayerPage({
   const current = p.current?.id === job.id,
     playing = current && p.playing,
     time = current ? p.time : 0,
-    length = current ? p.duration : job.timing?.audio_seconds || 0,
+    length = (current ? p.duration : 0) || job.timing?.audio_seconds || 0,
     canPlay = job.status === "done" && job.artifacts.audio;
+  const seekTo = (seconds: number) => p.seekTo(job, seconds);
+  function showDetails(value: string, trigger: HTMLButtonElement) {
+    detailsTrigger.current = trigger;
+    setTab(value);
+    setDetailsOpen(true);
+  }
   async function action(fn: () => Promise<any>) {
     setBusy(true);
     try {
@@ -212,14 +220,23 @@ export function PlayerPage({
       <div className="listening-layout">
         <section className="listening-record">
           <PlayerMedia
+            alignment={alignment}
+            onAlign={requestAlignment}
             key={job.id}
             job={job}
             playing={playing}
             onClose={onClose}
+            time={time}
+            duration={length}
+            seekable={canPlay}
+            onSeek={seekTo}
+            active={entered && !detailsOpen && !modal}
           />
           <div className="record-info">
             <div className="row between">
-              <span className="section-label">原创作品</span>
+              <span className="section-label">
+                {job.take?.project_name || "AI乐之城 · 原创作品"}
+              </span>
               <div className="row">
                 <IconButton
                   label="收录到项目"
@@ -234,6 +251,19 @@ export function PlayerPage({
                     </IconButton>
                   </Menu.Target>
                   <Menu.Dropdown>
+                    {canPlay && (
+                      <Menu.Item
+                        component="a"
+                        href={songUrl(
+                          job.id,
+                          status?.ffmpeg ? "audio.mp3" : "audio.flac",
+                        )}
+                        download
+                        leftSection={<Download size={14} />}
+                      >
+                        下载 {status?.ffmpeg ? "MP3" : "FLAC"}
+                      </Menu.Item>
+                    )}
                     <Menu.Item
                       leftSection={<Send size={14} />}
                       disabled={!canPlay}
@@ -278,11 +308,6 @@ export function PlayerPage({
               </div>
             </div>
             <h1>{titleOf(job)}</h1>
-            <p className="record-description">
-              {job.take?.project_name || "AI乐之城 · 独立创作"}
-              <span>·</span>
-              {when(job.created_at)}
-            </p>
           </div>
           <div className="record-progress">
             <Slider
@@ -290,10 +315,10 @@ export function PlayerPage({
               max={length || 1}
               step={0.1}
               value={Math.min(time, length || 0)}
-              disabled={!current}
+              disabled={!canPlay}
               label={duration}
               thumbLabel="歌曲播放进度"
-              onChange={p.seek}
+              onChange={seekTo}
               size={3}
               thumbSize={10}
             />
@@ -363,27 +388,65 @@ export function PlayerPage({
               thumbSize={9}
             />
           </div>
-          <div className="record-bottom">
-            <span>
-              {presetLabel(job.preset)}
-              <span className="record-separator">/</span>
-              {length ? duration(length) : "—"}
-            </span>
-            {canPlay && (
-              <a
-                href={songUrl(
-                  job.id,
-                  status?.ffmpeg ? "audio.mp3" : "audio.flac",
-                )}
-                download
-              >
-                <Download size={13} />
-                下载 {status?.ffmpeg ? "MP3" : "FLAC"}
-              </a>
-            )}
+          <div className="record-secondary-actions" aria-label="更多聆听功能">
+            <UnstyledButton
+              onClick={(event) => showDetails("reviews", event.currentTarget)}
+            >
+              <MessageSquare size={15} />
+              乐评
+            </UnstyledButton>
+            <UnstyledButton
+              onClick={(event) => showDetails("queue", event.currentTarget)}
+            >
+              <ListMusic size={16} />
+              队列{p.queue.length ? ` · ${p.queue.length}` : ""}
+            </UnstyledButton>
+            <UnstyledButton
+              onClick={(event) => showDetails("info", event.currentTarget)}
+            >
+              <Info size={15} />
+              信息
+            </UnstyledButton>
           </div>
         </section>
-        <section className="listening-content" ref={reviewPanel}>
+        {!mobile && (
+          <section className="listening-lyrics" aria-label="歌曲歌词">
+            <SyncedLyrics
+              alignment={alignment}
+              onAlign={requestAlignment}
+              key={job.id}
+              lyrics={job.params?.lyrics || ""}
+              time={time}
+              duration={length}
+              seekable={canPlay}
+              onSeek={seekTo}
+              active={entered && !detailsOpen && !modal}
+            />
+          </section>
+        )}
+      </div>
+      <Drawer
+        opened={detailsOpen}
+        onClose={() => setDetailsOpen(false)}
+        title={titleOf(job)}
+        position="right"
+        size={mobile ? "100%" : 620}
+        zIndex={400}
+        trapFocus={!modal}
+        closeOnEscape={!modal}
+        onExitTransitionEnd={() => {
+          if (!detailsOpen && !modal && detailsTrigger.current?.isConnected)
+            detailsTrigger.current.focus({ preventScroll: true });
+        }}
+        closeButtonProps={{ "aria-label": "返回封面与歌词" }}
+        overlayProps={{ backgroundOpacity: 0.22, blur: 3 }}
+        classNames={{
+          content: "listening-drawer",
+          header: "listening-drawer-header",
+          body: "listening-drawer-body",
+        }}
+      >
+        <section className="listening-content">
           <Tabs
             value={tab}
             onChange={(value) => setTab(value || "reviews")}
@@ -412,7 +475,11 @@ export function PlayerPage({
                   <UnstyledButton
                     key={track.id}
                     className={`listening-queue-track ${track.id === p.current?.id ? "active" : ""}`}
-                    onClick={() => p.play(p.queue, index)}
+                    onClick={() => {
+                      p.play(p.queue, index);
+                      setDetailsOpen(false);
+                      usePlayerOverlay.getState().open(track.id);
+                    }}
                   >
                     <span className="queue-number">
                       {String(index + 1).padStart(2, "0")}
@@ -505,7 +572,7 @@ export function PlayerPage({
             </Tabs.Panel>
           </Tabs>
         </section>
-      </div>
+      </Drawer>
       {modal === "publish" && (
         <PublishDialog
           job={job}

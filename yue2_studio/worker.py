@@ -10,6 +10,7 @@
 from __future__ import annotations
 
 import asyncio
+import itertools
 import json
 import logging
 import queue
@@ -270,7 +271,12 @@ class Worker:
         self.paths = paths
         self.bus = bus or EventBus()
         self.fake = fake
-        self._queue: queue.Queue[str | None] = queue.Queue()
+        # Heavy maintenance (e.g. lyric alignment) shares this worker, so it cannot
+        # overlap generation. Already queued generation always takes priority.
+        self._queue: queue.PriorityQueue[tuple[int, int, str | None, Any]] = queue.PriorityQueue()
+        self._task_sequence = itertools.count()
+        self._maintenance: dict[str, threading.Event] = {}
+        self.current_maintenance_key: str | None = None
         self._cancels: dict[str, threading.Event] = {}
         self._lock = threading.Lock()
         self._thread: threading.Thread | None = None
@@ -306,9 +312,11 @@ class Worker:
         with self._lock:
             current = self.current_job_id
             event = self._cancels.get(current) if current is not None else None
+            for maintenance_event in self._maintenance.values():
+                maintenance_event.set()
         if event is not None:
             event.set()
-        self._queue.put(None)
+        self._queue.put((-1, next(self._task_sequence), None, None))
         thread.join(timeout)
         if not thread.is_alive():
             self._thread = None
@@ -322,7 +330,26 @@ class Worker:
     def submit(self, job_id: str) -> None:
         with self._lock:
             self._cancels.setdefault(job_id, threading.Event())
-        self._queue.put(job_id)
+        self._queue.put((0, next(self._task_sequence), job_id, None))
+
+    def submit_maintenance(self, key: str, callback: Callable[[Callable[[], bool]], None]) -> bool:
+        """Run a cancellable CPU subprocess after generation, with the GPU model released.
+
+        The callback runs on the engine-owning worker thread. It must poll the
+        supplied cancellation callable and must not enqueue another blocking job.
+        """
+        with self._lock:
+            if self._stopping or key in self._maintenance:
+                return False
+            self._maintenance[key] = threading.Event()
+            self._queue.put((1, next(self._task_sequence), key, callback))
+        return True
+
+    def cancel_maintenance(self, key: str) -> None:
+        with self._lock:
+            event = self._maintenance.get(key)
+            if event is not None:
+                event.set()
 
     def cancel(self, job_id: str) -> str | None:
         """Returns ``"cancelled"`` (was queued), ``"requested"`` (running) or ``None`` (terminal)."""
@@ -378,9 +405,20 @@ class Worker:
     def _run(self) -> None:
         try:
             while True:
-                job_id = self._queue.get()
+                _, _, job_id, maintenance = self._queue.get()
                 if job_id is None or self._stopping:
                     break
+                if maintenance is not None:
+                    # The API persists jobs before submitting them. Cover that
+                    # short gap too; duplicate ids are harmless (status is CAS'd).
+                    waiting = self.store.queued_ids()
+                    if waiting:
+                        for waiting_id in waiting:
+                            self.submit(waiting_id)
+                        self._queue.put((1, next(self._task_sequence), job_id, maintenance))
+                        continue
+                    self._run_maintenance(job_id, maintenance)
+                    continue
                 job = self.store.find(job_id)
                 if job is None or job.status != "queued":
                     with self._lock:
@@ -395,6 +433,31 @@ class Worker:
                 self.engine.unload()
             except Exception:  # pragma: no cover
                 log.exception("worker: engine unload failed")
+
+    def _run_maintenance(self, key: str, callback: Callable[[Callable[[], bool]], None]) -> None:
+        with self._lock:
+            cancelled = self._maintenance.get(key)
+            if cancelled is None:
+                return
+            self.current_maintenance_key = key
+        try:
+            if not cancelled.is_set() and not self._stopping:
+                try:
+                    self.engine.unload()
+                except Exception:
+                    # Give the owner a chance to clear its queued state, without
+                    # starting a second workload when release failed.
+                    cancelled.set()
+                    callback(cancelled.is_set)
+                    raise
+                self._sample_memory(force=True)
+                callback(cancelled.is_set)
+        except Exception:
+            log.exception("worker: maintenance task failed")
+        finally:
+            with self._lock:
+                self._maintenance.pop(key, None)
+                self.current_maintenance_key = None
 
     def _publish(self, job_id: str, event: dict) -> None:
         self.bus.publish(job_id, event)

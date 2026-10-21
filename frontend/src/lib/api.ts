@@ -1,3 +1,5 @@
+import type { LyricsAlignment } from "./types";
+
 export class ApiError extends Error {
   status: number;
   code: string;
@@ -60,6 +62,10 @@ export const api = {
   submit: (body: any) => request("POST", "/api/jobs", body),
   jobs: (q: any = {}) => request("GET", "/api/jobs?" + qs(q)),
   job: (id: string) => request("GET", `/api/jobs/${id}`),
+  lyricsAlignment: (id: string): Promise<LyricsAlignment> =>
+    request("GET", `/api/jobs/${id}/lyrics-alignment`),
+  alignLyrics: (id: string): Promise<LyricsAlignment> =>
+    request("POST", `/api/jobs/${id}/lyrics-alignment`),
   remove: (id: string) => request("DELETE", `/api/jobs/${id}`),
   cancel: (id: string) =>
     request("POST", `/api/jobs/${id}/cancel`, undefined, { withStatus: true }),

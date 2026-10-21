@@ -20,7 +20,16 @@ from pathlib import Path  # noqa: E402
 
 from fastapi import FastAPI  # noqa: E402
 
-from yue2_studio import __version__, api, assistant_api, plaza_api, projects, review_api, uploads  # noqa: E402
+from yue2_studio import (  # noqa: E402
+    __version__,
+    api,
+    assistant_api,
+    lyric_alignment_api,
+    plaza_api,
+    projects,
+    review_api,
+    uploads,
+)
 from yue2_studio.jobs import JobStore  # noqa: E402
 from yue2_studio.worker import EventBus, Worker  # noqa: E402
 
@@ -49,7 +58,6 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
     store = JobStore(paths.db_path, paths.songs_dir)
     bus = EventBus()
     worker = Worker(store, engine, paths, bus, fake=is_fake)
-    worker.after_job = lambda job: uploads.auto_prune(paths, store)  # ``prune_uploads_days`` setting
 
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -59,6 +67,7 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
         try:
             yield
         finally:
+            await asyncio.to_thread(app.state.lyric_alignment.close)
             await app.state.reviews.close()
             await app.state.assistant.close()
             await asyncio.to_thread(worker.stop)
@@ -80,6 +89,14 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
     assistant_api.install(app)
     review_api.install(app)
     plaza_api.install(app)
+    lyric_alignment_api.install(app)
+
+    def after_job(job):
+        uploads.auto_prune(paths, store)
+        if not is_fake:
+            app.state.lyric_alignment.after_job(job)
+
+    worker.after_job = after_job
     api.install_static(app, static_dir or STATIC_DIR)
     return app
 

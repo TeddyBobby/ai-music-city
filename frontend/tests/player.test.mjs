@@ -25,7 +25,7 @@ const job = (id, status = "done") => ({
   params: {},
   title: id,
 });
-async function setup(saved) {
+async function setup(saved, { deferMetadata = false } = {}) {
   const data = new Map(
     saved ? [["yue2.player.v2", JSON.stringify(saved)]] : [],
   );
@@ -44,7 +44,9 @@ async function setup(saved) {
       super();
       audio = this;
       this.currentTime = 0;
-      this.duration = 42;
+      this.duration = NaN;
+      this.readyState = 0;
+      this.currentSrc = "";
       this.paused = true;
       this.ended = false;
       this.volume = 0.8;
@@ -53,6 +55,15 @@ async function setup(saved) {
       this.url = v;
       this.currentTime = 0;
       this.ended = false;
+      this.readyState = deferMetadata ? 0 : 1;
+      this.duration = deferMetadata ? NaN : 42;
+      this.currentSrc = deferMetadata ? "" : v;
+    }
+    metadata(duration = 42, source = this.src) {
+      this.currentSrc = source;
+      this.duration = duration;
+      this.readyState = 1;
+      this.dispatchEvent(new Event("loadedmetadata"));
     }
     get src() {
       return this.url;
@@ -69,6 +80,9 @@ async function setup(saved) {
     }
     removeAttribute() {
       this.url = "";
+      this.currentSrc = "";
+      this.readyState = 0;
+      this.duration = NaN;
     }
     load() {}
     finish() {
@@ -190,4 +204,154 @@ test("viewing another song in fullscreen does not replace the playing queue", as
   assert.equal(usePlayerOverlay.getState().jobId, "b");
   assert.equal(usePlayer.getState().current.id, "a");
   assert.equal(audio.paused, false);
+});
+
+test("lyric seeking the current track preserves both pause and play states", async () => {
+  const { usePlayer, audio } = await setup();
+  usePlayer.getState().play([job("a")]);
+  usePlayer.getState().seekTo(job("a"), 12);
+  assert.equal(audio.currentTime, 12);
+  assert.equal(audio.paused, false);
+  usePlayer.getState().pause();
+  usePlayer.getState().seekTo(job("a"), 24);
+  assert.equal(audio.currentTime, 24);
+  assert.equal(audio.paused, true);
+  assert.equal(usePlayer.getState().playing, false);
+});
+
+test("lyric seeking another track reuses the queue and applies after its metadata", async () => {
+  const { usePlayer, audio } = await setup(undefined, { deferMetadata: true });
+  usePlayer.getState().play([job("a"), job("b"), job("c")]);
+  audio.metadata();
+  usePlayer.getState().seekTo(job("b"), 27);
+  assert.equal(usePlayer.getState().current.id, "b");
+  assert.equal(usePlayer.getState().index, 1);
+  assert.deepEqual(
+    usePlayer.getState().queue.map((j) => j.id),
+    ["a", "b", "c"],
+  );
+  assert.equal(audio.paused, false);
+  assert.equal(audio.currentTime, 0);
+  assert.equal(usePlayer.getState().time, 27);
+  audio.metadata(60);
+  assert.equal(audio.currentTime, 27);
+  assert.equal(usePlayer.getState().duration, 60);
+});
+
+test("seeking outside the queue selects only that track and clamps to loaded duration", async () => {
+  const { usePlayer, audio } = await setup(undefined, { deferMetadata: true });
+  usePlayer.getState().play([job("a"), job("b")]);
+  usePlayer.getState().seekTo(job("c"), 100);
+  assert.deepEqual(
+    usePlayer.getState().queue.map((j) => j.id),
+    ["c"],
+  );
+  audio.metadata(35);
+  assert.equal(audio.currentTime, 35);
+  assert.equal(usePlayer.getState().time, 35);
+  usePlayer.getState().seekTo(job("c"), -2);
+  assert.equal(audio.currentTime, 0);
+});
+
+test("current track seeks before metadata retain only the latest position without resuming", async () => {
+  const { usePlayer, audio, data } = await setup(undefined, {
+    deferMetadata: true,
+  });
+  usePlayer.getState().play([job("a")]);
+  usePlayer.getState().pause();
+  usePlayer.getState().seek(10);
+  usePlayer.getState().seekTo(job("a"), 18);
+  audio.dispatchEvent(new Event("timeupdate"));
+  assert.equal(usePlayer.getState().time, 18);
+  assert.equal(JSON.parse(data.get("yue2.player.v2")).time, 18);
+  audio.metadata();
+  assert.equal(audio.currentTime, 18);
+  assert.equal(audio.paused, true);
+  assert.equal(usePlayer.getState().playing, false);
+});
+
+test("non-finite positions and unplayable songs cannot change playback or pending seek", async () => {
+  const { usePlayer, audio } = await setup(undefined, { deferMetadata: true });
+  usePlayer.getState().seekTo(job("a"), 13);
+  for (const position of [NaN, Infinity, -Infinity]) {
+    usePlayer.getState().seekTo(job("b"), position);
+    usePlayer.getState().seek(position);
+  }
+  usePlayer.getState().seekTo(job("invalid", "failed"), 20);
+  assert.equal(usePlayer.getState().current.id, "a");
+  audio.metadata();
+  assert.equal(audio.currentTime, 13);
+});
+
+test("old metadata cannot apply an outdated or current seek to the wrong source", async () => {
+  const { usePlayer, audio } = await setup(undefined, { deferMetadata: true });
+  usePlayer.getState().seekTo(job("a"), 30);
+  const oldSource = audio.src;
+  usePlayer.getState().seekTo(job("b"), 14);
+  audio.metadata(90, oldSource);
+  assert.equal(audio.currentTime, 0);
+  assert.equal(usePlayer.getState().time, 14);
+  audio.metadata(50);
+  assert.equal(audio.currentTime, 14);
+  assert.equal(usePlayer.getState().current.id, "b");
+});
+
+test("explicit play cancels an older pending seek even when reselecting the same song", async () => {
+  const { usePlayer, audio } = await setup(undefined, { deferMetadata: true });
+  usePlayer.getState().seekTo(job("a"), 30);
+  usePlayer.getState().play([job("a")]);
+  audio.metadata();
+  assert.equal(audio.currentTime, 0);
+  assert.equal(usePlayer.getState().time, 0);
+  usePlayer.getState().seekTo(job("b"), 25);
+  usePlayer.getState().play([job("a")]);
+  audio.metadata();
+  assert.equal(audio.currentTime, 0);
+});
+
+test("removing the current song cancels pending positioning and late metadata", async () => {
+  const { usePlayer, audio } = await setup(undefined, { deferMetadata: true });
+  usePlayer.getState().seekTo(job("a"), 25);
+  const oldSource = audio.src;
+  usePlayer.getState().remove("a");
+  audio.metadata(42, oldSource);
+  assert.equal(usePlayer.getState().current, null);
+  assert.equal(usePlayer.getState().time, 0);
+  assert.equal(usePlayer.getState().duration, 0);
+  usePlayer.getState().play([job("b")]);
+  audio.metadata();
+  assert.equal(audio.currentTime, 0);
+});
+
+test("restored position cannot override a newer lyric seek on the same song", async () => {
+  const { usePlayer, restorePlayer, audio } = await setup(
+    { ids: ["a"], index: 0, time: 30 },
+    { deferMetadata: true },
+  );
+  globalThis.fetch = async () => Response.json({ job: job("a") });
+  await restorePlayer();
+  usePlayer.getState().seekTo(job("a"), 9);
+  audio.metadata();
+  assert.equal(audio.currentTime, 9);
+  assert.equal(audio.paused, true);
+});
+
+test("in-flight restore cannot resurrect a queue after a new song was selected and removed", async () => {
+  const { usePlayer, restorePlayer } = await setup({
+    ids: ["a"],
+    index: 0,
+    time: 30,
+  });
+  let resolveFetch;
+  globalThis.fetch = () =>
+    new Promise((resolve) => {
+      resolveFetch = resolve;
+    });
+  const restoring = restorePlayer();
+  usePlayer.getState().seekTo(job("b"), 12);
+  usePlayer.getState().remove("b");
+  resolveFetch(Response.json({ job: job("a") }));
+  await restoring;
+  assert.equal(usePlayer.getState().current, null);
+  assert.deepEqual(usePlayer.getState().queue, []);
 });

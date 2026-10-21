@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import threading
 
 import pytest
 
@@ -20,6 +21,58 @@ from yue2_studio.worker import (
 )
 
 BASE = {"style": "dreamy indie pop", "lyrics": "[verse]\nla la", "seed": 5}
+
+
+async def test_maintenance_yields_to_queued_generation_and_never_overlaps(tmp_path):
+    h = Harness(tmp_path, FakeEngine(delay=0))
+    started, release = threading.Event(), threading.Event()
+    observed = []
+
+    def maintenance(cancelled):
+        observed.append((h.engine.state, h.store.get(first.id).status, h.worker.current_job_id))
+        started.set()
+        while not release.wait(.01):
+            if cancelled():
+                return
+
+    assert h.worker.submit_maintenance("alignment", maintenance)
+    assert not h.worker.submit_maintenance("alignment", maintenance)
+    first = h.submit({"kind": "create", "preset": "fast", "params": BASE})
+    h.worker.start(asyncio.get_running_loop())
+    try:
+        assert await asyncio.to_thread(started.wait, 3)
+        assert observed == [("cold", "done", None)]
+        second = h.submit({"kind": "create", "preset": "fast", "params": BASE})
+        await asyncio.sleep(.03)
+        assert h.store.get(second.id).status == "queued"
+        release.set()
+        _, result = await h.collect(second.id)
+        assert result["status"] == "done"
+    finally:
+        release.set()
+        await asyncio.to_thread(h.worker.stop)
+        h.store.close()
+
+
+async def test_worker_stop_cancels_running_maintenance(tmp_path):
+    h = Harness(tmp_path, FakeEngine(delay=0))
+    started, stopped = threading.Event(), threading.Event()
+
+    def maintenance(cancelled):
+        started.set()
+        while not cancelled():
+            stopped.wait(.01)
+        stopped.set()
+
+    h.worker.submit_maintenance("alignment", maintenance)
+    h.worker.start(asyncio.get_running_loop())
+    try:
+        assert await asyncio.to_thread(started.wait, 3)
+        await asyncio.to_thread(h.worker.stop)
+        assert stopped.is_set() and not h.worker.alive
+    finally:
+        await asyncio.to_thread(h.worker.stop)
+        h.store.close()
 
 
 class Harness:
