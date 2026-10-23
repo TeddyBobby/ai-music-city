@@ -119,7 +119,12 @@ function Shell() {
   useEffect(() => {
     void useApp.getState().refresh();
     restorePlayer();
-    const timer = setInterval(() => void useApp.getState().refresh(), 5000);
+    // 5 秒轮询在游客态暂停：未登录时引擎/设置状态不会变化，避免公网链路慢时反复请求
+    const tick = () => {
+      if (useAuth.getState().user === null) return;
+      void useApp.getState().refresh();
+    };
+    const timer = setInterval(tick, 5000);
     return () => clearInterval(timer);
   }, []);
   useEffect(() => {
@@ -380,7 +385,12 @@ function AuthGate() {
       leaveAccount(user, false);
     };
     const revalidate = () => {
-      if (!document.hidden) void refresh();
+      // 游客态不需要在每次聚焦时重拉登录状态（公网链路慢，会造成页面反复“加载中”）；
+      // 登录态也仅在会话较旧时刷新。
+      if (document.hidden) return;
+      const known = useAuth.getState();
+      if (known.user === null && !known.loading) return;
+      void refresh();
     };
     window.addEventListener("storage", accountChanged);
     window.addEventListener("focus", revalidate);
@@ -396,13 +406,21 @@ function AuthGate() {
   if (loading)
     return (
       <div className="auth-loading" role="status">
-        <Loader size={24} />
-        <span>加载中…</span>
+        <div className="auth-loading-brand">
+          <span className="auth-loading-note" aria-hidden="true">
+            <i /><i /><i /><i /><i />
+          </span>
+          <strong>AI乐之城</strong>
+        </div>
+        <span className="auth-loading-text">正在加载…</span>
       </div>
     );
   if (!user && error)
     return (
       <div className="auth-loading" role="alert">
+        <div className="auth-loading-brand">
+          <strong>AI乐之城</strong>
+        </div>
         <p>{error}</p>
         <button className="btn" onClick={() => void refresh()}>
           重新连接

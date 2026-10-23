@@ -432,3 +432,45 @@
     display: none;
   }
 }
+
+/* branded boot screen */
+.auth-loading {
+  background: var(--bg, #0b0e14);
+}
+.auth-loading-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+}
+.auth-loading-brand strong {
+  font-size: 1.45rem;
+  letter-spacing: 0.14em;
+  color: var(--accent, #38bdf8);
+}
+.auth-loading-note {
+  display: flex;
+  gap: 5px;
+  align-items: flex-end;
+  height: 26px;
+}
+.auth-loading-note i {
+  width: 3.5px;
+  border-radius: 2px;
+  background: var(--accent, #38bdf8);
+  animation: auth-note 1.05s ease-in-out infinite;
+}
+.auth-loading-note i:nth-child(1) { height: 30%; animation-delay: 0s; }
+.auth-loading-note i:nth-child(2) { height: 62%; animation-delay: 0.12s; }
+.auth-loading-note i:nth-child(3) { height: 100%; animation-delay: 0.24s; }
+.auth-loading-note i:nth-child(4) { height: 55%; animation-delay: 0.36s; }
+.auth-loading-note i:nth-child(5) { height: 82%; animation-delay: 0.48s; }
+@keyframes auth-note {
+  0%, 100% { transform: scaleY(0.35); opacity: 0.5; }
+  50% { transform: scaleY(1); opacity: 1; }
+}
+.auth-loading-text {
+  font-size: 0.88rem;
+  opacity: 0.65;
+  letter-spacing: 0.08em;
+}
