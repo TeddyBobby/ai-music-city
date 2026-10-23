@@ -666,6 +666,18 @@ class Worker:
                 self._publish(job.id, normalise({
                     "type": "stage", "stage": "AI writing lyrics", "completed": 0, "total": None,
                     "status": "running", "ts": time.time()}, job.id))
+                # 写词期间每 5 秒发心跳事件，保证前端 SSE 有持续反馈
+                heartbeat = threading.Event()
+                def _beat() -> None:
+                    n = 0
+                    while not heartbeat.wait(5.0):
+                        n += 1
+                        self._publish(job.id, normalise({
+                            "type": "stage", "stage": "AI writing lyrics", "completed": None,
+                            "total": None, "status": "running",
+                            "seconds": n * 5.0, "ts": time.time()}, job.id))
+                beat_thread = threading.Thread(target=_beat, daemon=True)
+                beat_thread.start()
                 _desc = params["description"] or ""
                 _kind = "instrumental" if (
                     params.get("music_kind") == "instrumental"
@@ -674,6 +686,7 @@ class Worker:
                     or "无人声" in _desc
                 ) else "vocal"
                 draft = _ai_complete_draft(_desc, _kind)
+                heartbeat.set()
                 params.update({"style": draft["style"], "lyrics": draft["lyrics"]})
                 if params.get("title") is None:
                     params["title"] = draft["title"]
@@ -683,8 +696,10 @@ class Worker:
                     "type": "stage", "stage": "AI writing lyrics", "completed": 1, "total": 1,
                     "status": "completed", "ts": time.time()}, job.id))
             except (InterruptedError, asyncio.CancelledError):
+                heartbeat.set()
                 raise
             except Exception as exc:  # noqa: BLE001
+                heartbeat.set()
                 log.warning("job %s lyric-writing failed: %s", job.id, exc)
                 terminal = status_event(job.id, "failed", f"AI 写词失败：{exc}")
                 self.store.update_status(job.id, "failed", error=str(exc), progress=terminal)

@@ -931,3 +931,13 @@
     animation: none;
   }
 }
+
+/* AI writing stage: breathing hint so the wait feels alive */
+.generation-writing-hint {
+  display: block;
+  animation: writing-breathe 2.4s ease-in-out infinite;
+}
+@keyframes writing-breathe {
+  0%, 100% { opacity: 0.55; }
+  50% { opacity: 1; }
+}

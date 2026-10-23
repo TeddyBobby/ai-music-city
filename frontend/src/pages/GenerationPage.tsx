@@ -409,6 +409,13 @@ function GenerationWorkspace({ id }: { id: string }) {
                     {step.state === "current" && progress.stageDetail && (
                       <span>{progress.stageDetail}</span>
                     )}
+                    {step.state === "current" &&
+                      step.id === "write" &&
+                      !progress.stageDetail && (
+                        <span className="generation-writing-hint">
+                          AI 正在构思歌名、曲风与歌词，约需 20 秒…
+                        </span>
+                      )}
                     {step.state === "failed" && <span>生成失败</span>}
                   </div>
                 </li>
