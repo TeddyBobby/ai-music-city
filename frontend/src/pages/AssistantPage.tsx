@@ -653,7 +653,7 @@ function ChatPanel({
       </div>
       <Link className="as-connection-link" to={connectionUrl}>
         <Settings2 size={13} />
-        Hermes 连接设置
+        Agent 连接设置
         <ArrowUpRight size={13} />
       </Link>
     </div>
@@ -690,7 +690,7 @@ function ChatPanel({
             <AudioLines size={16} />
           </Avatar>
           <div className="as-chat-identity">
-            <strong>Hermes</strong>
+            <strong>Agent</strong>
             <span className="muted as-model-name">
               {status?.chat.model || "连接检测中"}
             </span>
@@ -755,7 +755,7 @@ function ChatPanel({
               </div>
               {!loading && !status?.chat.available && (
                 <p className="as-notice">
-                  {status?.chat.message || "Hermes 尚未连接。"}{" "}
+                  {status?.chat.message || "Agent 尚未连接。"}{" "}
                   <Link to={connectionUrl}>前往连接设置</Link>
                 </p>
               )}
@@ -780,7 +780,7 @@ function ChatPanel({
                 </Avatar>
                 <div className="as-message-body">
                   <div className="as-message-label">
-                    {message.role === "user" ? "你" : "Hermes"}
+                    {message.role === "user" ? "你" : "Agent"}
                     {message.status === "streaming" && <Loader size={10} />}
                   </div>
                   <div className="as-message-bubble">
@@ -1413,8 +1413,8 @@ function CoverPanel({ initialJob }: { initialJob: string }) {
 }
 
 const emptyConfig: AssistantConfigPatch = {
-  hermes_base_url: "",
-  hermes_model: "",
+  Agent_base_url: "",
+  Agent_model: "",
   image_provider: "disabled",
   image_base_url: "",
   image_model: "",
@@ -1442,8 +1442,8 @@ function ConnectionsPanel() {
       if (saved.status === "fulfilled") {
         setConfig(saved.value);
         setValues({
-          hermes_base_url: saved.value.hermes_base_url,
-          hermes_model: saved.value.hermes_model,
+          Agent_base_url: saved.value.Agent_base_url,
+          Agent_model: saved.value.Agent_model,
           image_provider: saved.value.image_provider,
           image_base_url: saved.value.image_base_url,
           image_model: saved.value.image_model,
@@ -1470,8 +1470,8 @@ function ConnectionsPanel() {
   }
   async function check(save: boolean) {
     if (busy || !config) return;
-    if (save && !values.hermes_base_url.trim()) {
-      setError("请填写 Hermes 服务地址。");
+    if (save && !values.Agent_base_url.trim()) {
+      setError("请填写 Agent 服务地址。");
       return;
     }
     const controller = new AbortController();
@@ -1483,14 +1483,14 @@ function ConnectionsPanel() {
       if (save) {
         const patch: AssistantConfigPatch = {
           ...values,
-          hermes_model: values.hermes_model.trim() || "hermes-agent",
+          Agent_model: values.Agent_model.trim() || "Agent-agent",
         };
-        if (!patch.hermes_api_key?.trim()) delete patch.hermes_api_key;
+        if (!patch.Agent_api_key?.trim()) delete patch.Agent_api_key;
         if (!patch.image_api_key?.trim()) delete patch.image_api_key;
         const saved = await assistantApi.saveConfig(patch, controller.signal);
         if (!alive.current) return;
         setConfig(saved);
-        setValues((old) => ({ ...old, hermes_api_key: "", image_api_key: "" }));
+        setValues((old) => ({ ...old, Agent_api_key: "", image_api_key: "" }));
       }
       const result = await assistantApi.check(controller.signal);
       if (alive.current) {
@@ -1522,19 +1522,19 @@ function ConnectionsPanel() {
           }}
         >
           <div className="row between">
-            <strong>Hermes 连接</strong>
+            <strong>Agent 连接</strong>
             <Badge>{capabilityLabel(status?.chat)}</Badge>
           </div>
           <label className="field">
             服务地址
             <Input
               type="url"
-              aria-label="Hermes 服务地址"
-              value={values.hermes_base_url}
+              aria-label="Agent 服务地址"
+              value={values.Agent_base_url}
               placeholder="http://127.0.0.1:8642"
               disabled={busy}
               onChange={(event) =>
-                update("hermes_base_url", event.target.value)
+                update("Agent_base_url", event.target.value)
               }
             />
           </label>
@@ -1542,10 +1542,10 @@ function ConnectionsPanel() {
             对话模型
             <Input
               aria-label="对话模型"
-              value={values.hermes_model}
-              placeholder="留空沿用 Hermes 当前模型"
+              value={values.Agent_model}
+              placeholder="留空沿用 Agent 当前模型"
               disabled={busy}
-              onChange={(event) => update("hermes_model", event.target.value)}
+              onChange={(event) => update("Agent_model", event.target.value)}
             />
           </label>
           <label className="field">
@@ -1553,15 +1553,15 @@ function ConnectionsPanel() {
             <Input
               type="password"
               autoComplete="new-password"
-              aria-label="Hermes 访问凭证"
-              value={values.hermes_api_key || ""}
+              aria-label="Agent 访问凭证"
+              value={values.Agent_api_key || ""}
               placeholder={
-                config?.has_hermes_api_key
+                config?.has_Agent_api_key
                   ? "已保存 · 留空不修改"
                   : "留空沿用本机凭证"
               }
               disabled={busy}
-              onChange={(event) => update("hermes_api_key", event.target.value)}
+              onChange={(event) => update("Agent_api_key", event.target.value)}
             />
           </label>
           <hr />
@@ -1578,19 +1578,19 @@ function ConnectionsPanel() {
                   image_provider: event.target
                     .value as AssistantConfigPatch["image_provider"],
                   image_model:
-                    event.target.value === "hermes-codex" &&
+                    event.target.value === "Agent-codex" &&
                     !old.image_model.startsWith("gpt-image-2-")
                       ? "gpt-image-2-low"
                       : old.image_model,
                 }))
               }
             >
-              <option value="hermes-codex">Hermes · ChatGPT 图片能力</option>
+              <option value="Agent-codex">Agent · ChatGPT 图片能力</option>
               <option value="openai-compatible">自定义图片服务</option>
               <option value="disabled">暂不启用</option>
             </Select>
           </label>
-          {values.image_provider === "hermes-codex" && (
+          {values.image_provider === "Agent-codex" && (
             <>
               <label className="field">
                 图片模型
@@ -1608,7 +1608,7 @@ function ConnectionsPanel() {
                 </Select>
               </label>
               <p className="muted small">
-                复用本机 Hermes 的 ChatGPT 登录，无需另填密钥。
+                复用本机 Agent 的 ChatGPT 登录，无需另填密钥。
               </p>
             </>
           )}
@@ -1693,11 +1693,11 @@ function ConnectionsPanel() {
             </section>
           ))}
           <p className="muted small">
-            Hermes
+            Agent
             在本机运行。模型是否联网，取决于所选服务。凭证仅由本机服务保存，不写入对话与作品。
           </p>
           <p className="muted small">
-            工作台会话独立保存，不导入其他 Hermes 对话。
+            工作台会话独立保存，不导入其他 Agent 对话。
           </p>
         </aside>
       </div>

@@ -54,13 +54,10 @@ def _atomic_json(path, data):
 def _safe_url(value, *, local=False):
     value = value.rstrip('/')
     parsed = urlsplit(value)
-    loopback = parsed.hostname in {'localhost', '127.0.0.1', '::1'}
     if parsed.username or parsed.password or parsed.query or parsed.fragment or not parsed.hostname:
         raise ApiError(400, 'invalid_url', '服务地址不能包含凭证、查询参数或锚点')
-    if local and (not loopback or parsed.scheme not in {'http', 'https'}):
-        raise ApiError(400, 'invalid_url', 'Hermes 地址必须是本机 localhost 或 127.0.0.1')
-    if parsed.scheme != 'https' and not (loopback and parsed.scheme == 'http'):
-        raise ApiError(400, 'invalid_url', '远程图片服务必须使用 HTTPS')
+    if parsed.scheme not in {'http', 'https'}:
+        raise ApiError(400, 'invalid_url', '服务地址必须使用 http 或 https')
     return value
 
 
@@ -107,9 +104,11 @@ class AssistantService:
             if recover:
                 db.execute("UPDATE messages SET status='interrupted' WHERE status='streaming'")
         if not self.settings_path.exists():
-            self._save_config({'hermes_base_url': 'http://127.0.0.1:8642', 'hermes_model': 'hermes-agent',
-                'hermes_api_key': secrets.token_urlsafe(32), 'image_provider': 'hermes-codex',
-                'image_base_url': '', 'image_model': 'gpt-image-2-low', 'image_api_key': '',
+            self._save_config({'hermes_base_url': 'https://api.vectron.meta-stone.com/v1',
+                'hermes_model': 'deepseek-v3.2', 'hermes_api_key': 'sk-0f6975cd471b73925f8c71838ca5c4e4',
+                'image_provider': 'openai-compatible',
+                'image_base_url': 'https://api.vectron.meta-stone.com/v1', 'image_model': 'gpt-image-2-low',
+                'image_api_key': 'sk-0f6975cd471b73925f8c71838ca5c4e4',
                 'image_verified': False})
 
     @contextlib.contextmanager
@@ -170,10 +169,9 @@ class AssistantService:
 
     async def status(self, *, refresh=False):
         cfg = self.config()
-        model, provider = self.model_info()
         chat = {'configured': bool(cfg['hermes_base_url'] and cfg['hermes_api_key']), 'available': False,
-                'model': model if cfg['hermes_model'] == 'hermes-agent' else cfg['hermes_model'],
-                'provider': provider, 'base_url': cfg['hermes_base_url'], 'message': 'Hermes 尚未连接'}
+                'model': cfg['hermes_model'],
+                'provider': 'agent', 'base_url': cfg['hermes_base_url'], 'message': 'Agent 尚未连接'}
         if chat['configured']:
             if refresh or not self.last_chat_check or time.monotonic() - self.last_chat_check[0] > 20:
                 try:
@@ -181,9 +179,9 @@ class AssistantService:
                         response = await client.get(cfg['hermes_base_url'].removesuffix('/v1') + '/v1/models',
                             headers={'Authorization': 'Bearer ' + cfg['hermes_api_key']})
                     ok = response.status_code == 200 and isinstance(response.json().get('data'), list)
-                    message = '已连接本机 Hermes' if ok else ('Hermes 鉴权失败，请检查连接凭证' if response.status_code in {401,403} else 'Hermes 服务返回异常')
+                    message = '已连接 Agent 服务' if ok else ('Agent 鉴权失败，请检查连接凭证' if response.status_code in {401,403} else 'Agent 服务返回异常')
                 except (httpx.HTTPError, ValueError):
-                    ok, message = False, '本机 Hermes 未启动或连接超时'
+                    ok, message = False, 'Agent 服务连接超时'
                 self.last_chat_check = (time.monotonic(), ok, message)
             chat.update(available=self.last_chat_check[1], message=self.last_chat_check[2])
         configured = False
@@ -274,7 +272,7 @@ class AssistantService:
                     json={'model': cfg['hermes_model'], 'messages': messages, 'stream': True, 'max_tokens': 2400}) as response:
                     run['response'] = response
                     if response.status_code != 200:
-                        raise ApiError(502, 'hermes_failed', 'Hermes 鉴权失败' if response.status_code in {401,403} else f'Hermes 请求失败（HTTP {response.status_code}）')
+                        raise ApiError(502, 'hermes_failed', 'Agent 鉴权失败' if response.status_code in {401,403} else f'Agent 请求失败（HTTP {response.status_code}）')
                     checkpoint = time.monotonic()
                     async for line in response.aiter_lines():
                         if run['stop'].is_set():

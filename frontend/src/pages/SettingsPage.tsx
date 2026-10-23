@@ -401,7 +401,7 @@ export function SettingsPage() {
             {assistant ? (
               <>
                 <Capability
-                  title="Hermes 对话"
+                  title="Agent 对话"
                   available={!!assistant.chat?.available}
                   stateLabel={
                     assistant.chat?.available
@@ -429,7 +429,7 @@ export function SettingsPage() {
               </>
             ) : (
               <p className="muted small">
-                {assistantError || "正在检测本机 Hermes…"}
+                {assistantError || "正在检测本机 Agent…"}
               </p>
             )}
             {assistantError && assistant && (
