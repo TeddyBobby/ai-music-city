@@ -59,6 +59,10 @@ export const useAuth = create<AuthState>((set, get) => ({
   },
   logout: async () => {
     // A failed logout must not pretend the HttpOnly session was revoked.
+    // 先落好登出后的落点（登录页），再请求登出并整页重载——避免重载后短暂闪回需登录的页面。
+    try {
+      window.location.hash = "#/login";
+    } catch {}
     await api.post("/api/auth/logout", {});
     leaveAccount(null);
   },

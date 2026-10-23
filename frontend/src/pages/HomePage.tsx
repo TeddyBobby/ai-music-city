@@ -16,6 +16,7 @@ import { MusicKindToggle } from "../components/MusicKindToggle";
 import { generateFromPrompt, type MusicKind } from "../lib/musicCreation";
 import type { Job } from "../lib/types";
 import { useApp } from "../state/app";
+import { useAuth } from "../state/auth";
 import "./Home.css";
 
 const inspirations = [
@@ -105,6 +106,14 @@ export function HomePage() {
     controller.current = current;
     setError("");
     setPhase("checking");
+    // 未登录（游客）：直接跳登录页，不带提示语
+    const user = useAuth.getState().user;
+    if (!user) {
+      controller.current = null;
+      setPhase(null);
+      void navigate("/login");
+      return;
+    }
     try {
       const job = await generateFromPrompt(prompt, {
         signal: current.signal,
@@ -273,10 +282,12 @@ export function HomePage() {
                       )}
                       <span role="status">
                         {phase === "writing"
-                          ? "正在写歌"
-                          : phase
-                            ? "准备生成"
-                            : "生成音乐"}
+                          ? "AI 正在创作歌词…"
+                          : phase === "checking"
+                            ? "正在检查引擎…"
+                            : phase
+                              ? "正在提交任务…"
+                              : "生成音乐"}
                       </span>
                       {!phase && <ArrowRight size={17} />}
                     </button>

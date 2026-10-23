@@ -823,7 +823,14 @@ class _LenientStaticFiles:
                 if not Path(directory).is_dir():
                     raise StarletteHTTPException(status_code=404)
                 response = await super().get_response(path, scope)
-                response.headers["Cache-Control"] = "no-cache"
+                # Vite 产物带内容 hash（index-Ab12Cd.js）：文件名即指纹，可永久缓存。
+                # 入口 HTML 由 spa_response 下发 no-cache，保证发版后 hash 更新立刻可见。
+                if "/assets/" in path:
+                    response.headers["Cache-Control"] = (
+                        "public, max-age=31536000, immutable"
+                    )
+                else:
+                    response.headers["Cache-Control"] = "no-cache"
                 return response
 
         return Lenient(directory=str(directory), check_dir=False)
