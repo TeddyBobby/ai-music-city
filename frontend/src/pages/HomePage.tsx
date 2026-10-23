@@ -108,37 +108,13 @@ export function HomePage() {
       void navigate("/login");
       return;
     }
-    const current = new AbortController();
-    controller.current = current;
-    setError("");
-    // 立即跳到生成页（占位任务）：生命周期展示从点击那一刻开始
+    // 点击即跳生成页：prompt 存入 sessionStorage，由 /generation/composing 页面
+    // 自己发起写词与提交（HomePage 卸载时的 abort 清理不会再杀掉生成流程）
     try {
       sessionStorage.setItem("music.composing", prompt);
+      sessionStorage.setItem("music.composing.kind", musicKind);
     } catch {}
-    navigate("/generation/composing");
-    try {
-      const job = await generateFromPrompt(prompt, {
-        signal: current.signal,
-        musicKind,
-      });
-      if (!current.signal.aborted) {
-        sessionStorage.removeItem("music.composing");
-        created(job);
-      }
-    } catch (failure) {
-      if (!current.signal.aborted)
-        setError(
-          failure instanceof Error ? failure.message : "生成失败，请重试。",
-        );
-      sessionStorage.removeItem("music.composing");
-      // 失败时把人带回创作页，展示错误
-      void navigate("/home");
-    } finally {
-      if (controller.current === current) {
-        controller.current = null;
-        setPhase(null);
-      }
-    }
+    void navigate("/generation/composing");
   }
 
   return (
