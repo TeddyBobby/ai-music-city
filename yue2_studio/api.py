@@ -795,7 +795,10 @@ def spa_response(static_dir: Path) -> HTMLResponse:
     if not index.is_file():
         index = Path(static_dir) / "index.html"
     if index.is_file():
-        return HTMLResponse(index.read_text(encoding="utf-8"))
+        # 入口 HTML 禁止缓存：JS/CSS 文件名带 hash 可以长缓存，但 HTML 必须每次
+        # 与源站校验，否则发新版后边缘缓存的旧 HTML 会引用已删除的旧 bundle（404 白屏）。
+        return HTMLResponse(index.read_text(encoding="utf-8"),
+                            headers={"Cache-Control": "no-cache, must-revalidate"})
     return HTMLResponse(PLACEHOLDER_HTML)
 
 

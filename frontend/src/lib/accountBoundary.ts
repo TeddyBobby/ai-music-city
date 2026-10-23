@@ -96,7 +96,11 @@ export function leaveAccount(userId: string | null, announce = true) {
 }
 
 export function handleUnauthorized(status: number, path: string) {
-  if (status === 401 && !path.startsWith("/api/auth/")) leaveAccount(null);
+  if (status !== 401 || path.startsWith("/api/auth/")) return;
+  // 游客（从未登录）收到 401 是预期：不整页刷新，让调用方自己引导去登录。
+  // 只有"已登录用户的会话失效"才需要清空本地状态并重载。
+  const wasBound = boundAccountId !== null;
+  if (wasBound) leaveAccount(null);
 }
 
 export async function accountFetch(path: string, init?: RequestInit) {
