@@ -409,7 +409,8 @@ function AuthGate() {
         </button>
       </div>
     );
-  return user ? <Shell /> : <LoginPage />;
+  // 游客可浏览：未登录也进入主界面，需要登录的操作（生成等）由后端 401 引导跳转登录。
+  return <Shell />;
 }
 
 function LegacyPlayer() {

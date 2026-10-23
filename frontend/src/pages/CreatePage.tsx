@@ -1,7 +1,7 @@
 import { UnstyledButton, FileButton, SegmentedControl } from "@mantine/core";
 import { Input, Textarea, Select, Checkbox } from "../components/ui";
 import { FormEvent, useEffect, useMemo, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ArrowRight,
   AudioLines,
@@ -96,6 +96,7 @@ export function CreatePage() {
   const [draft, setDraft] = useState<Draft>(DEFAULTS),
     [ready, setReady] = useState(false),
     [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
   const [track, setTrack] = useState<any>(null),
     [savedSettings, setSavedSettings] = useState<any>(settings);
   const [undo, setUndo] = useState<Partial<Draft> | null>(null),
@@ -453,6 +454,12 @@ export function CreatePage() {
       await Promise.all([jobs.reload(), refresh()]);
     } catch (err) {
       const message = errorMessage(err);
+      const code = (err as any)?.code;
+      if (code === "authentication_required") {
+        toast("登录后即可生成音乐", "ok");
+        void navigate("/login");
+        return;
+      }
       setFormError(message);
       toast(message, "err");
     } finally {
