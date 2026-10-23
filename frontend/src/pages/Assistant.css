@@ -78,7 +78,9 @@
   max-height: none;
   overflow: visible;
   margin-block: 0;
-  padding-block: clamp(20px, 5vh, 52px) 32px;
+  /* 输入区贴底：空会话时欢迎语在输入框正上方，输入框沉到页面底部 */
+  margin-top: auto;
+  padding-block: 0 clamp(16px, 4vh, 32px);
 }
 .as-welcome {
   display: flex;
@@ -662,7 +664,9 @@ button.as-connect-notice {
     max-height: 68%;
   }
   .as-workspace.is-empty .as-compose-wrap {
-    padding-block: 14px 24px;
+    /* 移动端空会话：输入区整体贴底（配合桌面版的 margin-top:auto） */
+    margin-top: auto;
+    padding-block: 0 16px;
   }
   .as-welcome {
     gap: 12px;
@@ -738,12 +742,8 @@ button.as-connect-notice {
     justify-content: flex-start;
   }
   .as-starters {
-    margin-top: 12px;
-    gap: 6px 18px;
-  }
-  .as-starters button {
-    min-height: 44px;
-    font-size: 12px;
+    /* 移动端：输入框下方的快捷灵感说明不再显示，输入框直接贴底 */
+    display: none;
   }
   .as-message {
     gap: 8px;
