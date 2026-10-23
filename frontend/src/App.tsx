@@ -1,6 +1,6 @@
 import { useEffect, useState, type CSSProperties } from "react";
 import { useMediaQuery } from "@mantine/hooks";
-import { Menu, Loader } from "@mantine/core";
+import { Menu, Loader, ActionIcon } from "@mantine/core";
 import {
   HashRouter,
   NavLink,
@@ -22,6 +22,7 @@ import {
   ChevronDown,
   Crown,
   ArrowLeft,
+  Github,
 } from "lucide-react";
 import { useApp } from "./state/app";
 import {
@@ -175,6 +176,20 @@ function Shell() {
                 {taskCount} 首正在生成
               </Link>
             )}
+            <ActionIcon
+              component="a"
+              href="https://github.com/TeddyBobby"
+              target="_blank"
+              rel="noopener noreferrer"
+              variant="subtle"
+              color="gray"
+              size={44}
+              className="topbar-github"
+              aria-label="TeddyBobby 的 GitHub 主页（新标签页）"
+              title="GitHub · TeddyBobby"
+            >
+              <Github size={19} strokeWidth={1.7} aria-hidden="true" />
+            </ActionIcon>
             <ThemeToggle />
             <AccountMenu showName={desktop} />
           </div>

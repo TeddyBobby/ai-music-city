@@ -164,6 +164,15 @@ button.danger {
 .workspace-topbar .topbar-right {
   margin-left: auto;
 }
+.workspace-topbar .topbar-github {
+  flex: none;
+  border-radius: 12px;
+  color: var(--muted);
+}
+.workspace-topbar .topbar-github:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
 .workspace-topbar .account-menu-trigger {
   display: flex;
   align-items: center;
@@ -213,6 +222,7 @@ button.danger {
 .workspace-topbar .theme-toggle {
   width: 40px;
   height: 40px;
+  margin-left: 0;
 }
 .workspace-content {
   padding: 32px var(--page-gutter);
@@ -281,6 +291,9 @@ button.danger {
   .workspace-topbar .theme-toggle {
     width: 44px;
     height: 44px;
+  }
+  .workspace-topbar .topbar-right {
+    gap: 4px;
   }
   .workspace-content {
     padding: 16px var(--page-gutter);
