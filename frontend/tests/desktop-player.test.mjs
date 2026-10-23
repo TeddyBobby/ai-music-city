@@ -22,7 +22,6 @@ function setup({ desktop = true, fullscreen = false, current = true } = {}) {
   const listeners = new Map(),
     cleanups = [];
   let toggles = 0,
-    autoHide,
     dialog = false;
   class Element {
     constructor(interactive = false) {
@@ -64,8 +63,6 @@ function setup({ desktop = true, fullscreen = false, current = true } = {}) {
           jsx: (type, props) => ({ type, props }),
           jsxs: (type, props) => ({ type, props }),
         };
-      if (name === "react-router-dom")
-        return { useLocation: () => ({ key: "home" }) };
       if (name === "@mantine/hooks") return { useMediaQuery: () => desktop };
       if (name === "@mantine/core")
         return {
@@ -83,13 +80,6 @@ function setup({ desktop = true, fullscreen = false, current = true } = {}) {
         };
       if (name === "../lib/utils")
         return { duration: String, titleOf: (song) => song.title };
-      if (name === "../hooks/useAutoHidePlayerBar")
-        return {
-          useAutoHidePlayerBar: (options) => {
-            autoHide = options;
-            return { hidden: false, reveal: () => {} };
-          },
-        };
       if (name === "./ui")
         return { Artwork: "Artwork", IconButton: "IconButton" };
       if (name.endsWith(".css")) return {};
@@ -97,9 +87,9 @@ function setup({ desktop = true, fullscreen = false, current = true } = {}) {
     },
   };
   vm.runInNewContext(compiled, context);
-  context.exports.PlayerBar();
+  const tree = context.exports.PlayerBar();
   return {
-    autoHide,
+    tree,
     get toggles() {
       return toggles;
     },
@@ -123,9 +113,14 @@ function setup({ desktop = true, fullscreen = false, current = true } = {}) {
   };
 }
 
-test("desktop dock stays visible while mobile retains scroll hiding", () => {
-  assert.equal(setup().autoHide.locked, true);
-  assert.equal(setup({ desktop: false }).autoHide.locked, false);
+test("desktop and mobile expose the selected song's playback controls", () => {
+  for (const desktop of [true, false]) {
+    const { tree } = setup({ desktop });
+    assert.equal(tree.props["aria-label"], "全局播放器");
+    assert.notEqual(tree.props["aria-hidden"], true);
+    assert.notEqual(tree.props.inert, true);
+  }
+  assert.equal(setup({ current: false }).tree, null);
 });
 
 test("desktop space toggles the selected music and prevents page scrolling", () => {

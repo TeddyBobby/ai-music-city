@@ -157,7 +157,6 @@ export function ImageComposer({ musicKind, onCreated, onBusyChange }: Props) {
               <ImagePlus size={30} strokeWidth={1.4} />
             </span>
             <strong>上传一张图片</strong>
-            <span>让音乐营造画面的氛围</span>
             <small>JPG、PNG、WebP · 最大 8 MB</small>
           </button>
         )}
@@ -165,7 +164,7 @@ export function ImageComposer({ musicKind, onCreated, onBusyChange }: Props) {
           className="image-music-description"
           value={description}
           onChange={(event) => setDescription(event.target.value)}
-          placeholder="想营造什么感觉？（选填）"
+          placeholder="音乐氛围（选填）"
           aria-label="图片音乐补充描述"
           disabled={!!phase}
           maxLength={1000}
@@ -183,13 +182,6 @@ export function ImageComposer({ musicKind, onCreated, onBusyChange }: Props) {
         </p>
       )}
       <div className="image-composer-footer">
-        <span className="image-creation-status" role="status">
-          {phase === "analyzing"
-            ? "正在识别场景与氛围"
-            : phase === "writing"
-              ? "正在把画面写成歌"
-              : ""}
-        </span>
         {phase && phase !== "submitting" && (
           <button
             className="image-cancel"
@@ -209,13 +201,15 @@ export function ImageComposer({ musicKind, onCreated, onBusyChange }: Props) {
           ) : (
             <AudioLines size={18} />
           )}
-          {phase === "analyzing"
-            ? "正在读图"
-            : phase === "writing"
-              ? "正在写歌"
-              : phase === "submitting"
-                ? "准备生成"
-                : "生成音乐"}
+          <span role="status">
+            {phase === "analyzing"
+              ? "正在读图"
+              : phase === "writing"
+                ? "正在写歌"
+                : phase === "submitting"
+                  ? "准备生成"
+                  : "生成音乐"}
+          </span>
         </button>
       </div>
     </form>

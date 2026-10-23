@@ -252,9 +252,7 @@ function GenerationWorkspace({ id }: { id: string }) {
         </Link>
         <div className="generation-heading-main">
           <div>
-            <span className="generation-eyebrow">
-              你的音乐创作 · 第 {versionNumber} 版
-            </span>
+            <span className="generation-eyebrow">第 {versionNumber} 版</span>
             <h1>{titleOf(job)}</h1>
           </div>
           <span className={`generation-status is-${job.status}`}>
@@ -282,15 +280,8 @@ function GenerationWorkspace({ id }: { id: string }) {
               )}
             </div>
             <div className="generation-result-copy">
-              <span className="generation-eyebrow">
-                {playable
-                  ? "这一版，听听看"
-                  : active
-                    ? "从灵感到音乐"
-                    : "灵感还在，调整后再试"}
-              </span>
               <h2 role="status">{progress.title}</h2>
-              <p>{progress.description}</p>
+              {job.status === "failed" && <p>{progress.description}</p>}
               {active && (
                 <div className="generation-live-meta">
                   <Clock3 size={14} />
@@ -355,7 +346,7 @@ function GenerationWorkspace({ id }: { id: string }) {
                 <div className="generation-result-actions">
                   <a href={download.url} download={download.name}>
                     <Download size={17} />
-                    下载音乐
+                    下载
                   </a>
                   <button onClick={() => setSharing(true)}>
                     <Share2 size={17} />
@@ -414,12 +405,11 @@ function GenerationWorkspace({ id }: { id: string }) {
                   </span>
                   <div>
                     <strong>{step.label}</strong>
-                    {step.state === "current" && (
-                      <span>{progress.stageDetail || "正在进行"}</span>
+                    {step.state === "current" && progress.stageDetail && (
+                      <span>{progress.stageDetail}</span>
                     )}
-                    {step.state === "failed" && <span>在这一步暂停</span>}
+                    {step.state === "failed" && <span>生成失败</span>}
                   </div>
-                  {step.state === "complete" && <small>完成</small>}
                 </li>
               ))}
             </ol>
@@ -438,7 +428,6 @@ function GenerationWorkspace({ id }: { id: string }) {
             )}
             {active && (
               <div className="generation-process-footer">
-                <span>离开页面后，生成仍会继续</span>
                 <button disabled={canceling} onClick={cancel}>
                   {canceling ? "正在停止…" : "停止生成"}
                 </button>
@@ -458,8 +447,7 @@ function GenerationWorkspace({ id }: { id: string }) {
               aria-label="当前版本歌词"
             >
               <div className="generation-section-heading">
-                <h2>这一版的歌词</h2>
-                <span>试听对照</span>
+                <h2>歌词</h2>
               </div>
               <div className="generation-original-lyrics-text">
                 {original.lyrics}
@@ -516,10 +504,7 @@ function GenerationWorkspace({ id }: { id: string }) {
             <span>
               <SlidersHorizontal size={18} />
             </span>
-            <div>
-              <h2>再调一调</h2>
-              <p>让下一版，更接近你的想法。</p>
-            </div>
+            <h2>微调</h2>
           </div>
           <div className="generation-editor-fields">
             <fieldset disabled={busy}>
@@ -576,15 +561,14 @@ function GenerationWorkspace({ id }: { id: string }) {
                     rows={8}
                     maxLength={10000}
                     onChange={(e) => edit({ lyrics: e.target.value })}
-                    placeholder="修改想唱的词，留空则根据描述重新写词。"
+                    placeholder="留空则重新生成歌词"
                   />
-                  <small>可直接改词；留空会重新创作歌词。</small>
                 </label>
               )}
               {job.kind === "hum" && (
                 <p className="generation-source-note">
                   <AudioLines size={15} />
-                  继续使用这次哼唱的旋律
+                  沿用哼唱旋律
                 </p>
               )}
             </fieldset>
@@ -613,11 +597,6 @@ function GenerationWorkspace({ id }: { id: string }) {
                   : "生成新版本"}
             <ArrowRight size={17} />
           </button>
-          <p className="generation-editor-note">
-            {active
-              ? "可以先修改想法，完成后再生成新版本。"
-              : "每次调整都会生成新版本，原版会保留。"}
-          </p>
         </form>
       </div>
       {sharing && (

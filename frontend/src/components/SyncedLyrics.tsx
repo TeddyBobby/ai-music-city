@@ -305,8 +305,7 @@ export function SyncedLyrics({
     return (
       <div className="synced-lyrics synced-lyrics-empty">
         <Music2 size={28} strokeWidth={1.3} />
-        <p>让旋律继续</p>
-        <span>这首作品暂无歌词</span>
+        <p>暂无歌词</p>
       </div>
     );
 
@@ -316,6 +315,8 @@ export function SyncedLyrics({
     alignment?.status === "queued" || alignment?.status === "running";
   const alignmentFailed =
     alignment?.status === "failed" || alignment?.status === "unavailable";
+  const showNote =
+    aligning || alignmentFailed || !hasTimes || (canSeek && Boolean(preview));
   return (
     <section
       className="synced-lyrics"
@@ -479,31 +480,35 @@ export function SyncedLyrics({
           </div>
         )}
       </div>
-      <div className="synced-lyrics-note">
-        {aligning ? (
-          <span role="status">正在校准歌词…</span>
-        ) : alignmentFailed ? (
-          <>
-            <span title={alignment?.message}>歌词暂未校准</span>
-            {onAlign && (
-              <UnstyledButton className="lyric-follow-button" onClick={onAlign}>
-                重试校准
-              </UnstyledButton>
-            )}
-          </>
-        ) : !hasTimes ? (
-          <>
-            <span>歌词尚未匹配到演唱时间</span>
-            {onAlign && alignment && (
-              <UnstyledButton className="lyric-follow-button" onClick={onAlign}>
-                校准歌词
-              </UnstyledButton>
-            )}
-          </>
-        ) : duration <= 0 ? (
-          <span>等待音频时长</span>
-        ) : canSeek ? (
-          preview ? (
+      {showNote && (
+        <div className="synced-lyrics-note">
+          {aligning ? (
+            <span role="status">正在校准歌词…</span>
+          ) : alignmentFailed ? (
+            <>
+              <span title={alignment?.message}>歌词暂未校准</span>
+              {onAlign && (
+                <UnstyledButton
+                  className="lyric-follow-button"
+                  onClick={onAlign}
+                >
+                  重试校准
+                </UnstyledButton>
+              )}
+            </>
+          ) : !hasTimes ? (
+            <>
+              <span>歌词未同步</span>
+              {onAlign && alignment && (
+                <UnstyledButton
+                  className="lyric-follow-button"
+                  onClick={onAlign}
+                >
+                  校准歌词
+                </UnstyledButton>
+              )}
+            </>
+          ) : canSeek && preview ? (
             <>
               {previewTime === null && <span>此句暂未校准</span>}
               <UnstyledButton
@@ -516,13 +521,9 @@ export function SyncedLyrics({
                 回到当前
               </UnstyledButton>
             </>
-          ) : (
-            <span>滑动浏览 · 点击跳转</span>
-          )
-        ) : (
-          <span>播放这首作品后同步歌词</span>
-        )}
-      </div>
+          ) : null}
+        </div>
+      )}
     </section>
   );
 }

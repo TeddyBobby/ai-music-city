@@ -63,8 +63,13 @@ async def finish(svc):
 
 
 def upstream(monkeypatch, handler):
+    def route(request):
+        if request.url.path.endswith('/models'):
+            return httpx.Response(200, json={'data': [{'id': 'test-music-model'},
+                                                     {'id': 'configured-text-model'}]})
+        return handler(request)
     monkeypatch.setattr('yue2_studio.review_service.httpx.AsyncClient',
-                        lambda **kwargs: HTTP_CLIENT(transport=httpx.MockTransport(handler), timeout=30))
+                        lambda **kwargs: HTTP_CLIENT(transport=httpx.MockTransport(route), timeout=30))
 
 
 async def test_manual_zero_comment_persistence_and_clear(setup):

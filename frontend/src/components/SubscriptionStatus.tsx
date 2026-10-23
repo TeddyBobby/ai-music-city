@@ -15,14 +15,17 @@ export function SubscriptionStatus() {
       className="sidebar-subscription"
       aria-label={`订阅与定价：${plan.name}，演示方案`}
     >
-      <div className="subscription-heading">
-        <Crown size={18} strokeWidth={1.7} aria-hidden="true" />
-        <span>演示</span>
-      </div>
+      <Crown
+        className="subscription-icon"
+        size={18}
+        strokeWidth={1.7}
+        aria-hidden="true"
+      />
       <div className="subscription-copy">
         <strong>{plan.name}</strong>
-        <small>每月 {plan.monthlySongs} 首 · 查看套餐</small>
+        <small>{plan.monthlySongs} 首 / 月</small>
       </div>
+      <span className="subscription-demo">演示</span>
       <ChevronRight
         className="subscription-chevron"
         size={16}

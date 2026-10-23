@@ -21,21 +21,24 @@ import "./Home.css";
 const inspirations = [
   {
     title: "林间民谣",
-    mood: "木吉他 · 自然 · 治愈",
+    sound: "木吉他",
+    mood: "自然 · 治愈",
     image: "discover-landscape.jpg",
     prompt:
       "写一首温暖的中文民谣，木吉他伴奏，像走在雨后的森林里，轻松而治愈。",
   },
   {
     title: "日落公路",
-    mood: "合成器 · 自由 · 远方",
+    sound: "合成器",
+    mood: "自由 · 远方",
     image: "night-drive.jpg",
     prompt:
       "写一首适合日落时开车听的中文歌，复古合成器、轻快鼓点，关于自由和远方。",
   },
   {
     title: "夏日心动",
-    mood: "流行 · 明亮 · 轻快",
+    sound: "流行",
+    mood: "明亮 · 轻快",
     image: "color-pop.jpg",
     prompt:
       "写一首轻快的中文流行歌，关于夏天里第一次心动，旋律明亮、俏皮、朗朗上口。",
@@ -174,7 +177,6 @@ export function HomePage() {
               </button>
             </div>
             <div className="home-music-kind">
-              <span>音乐类型</span>
               <MusicKindToggle
                 value={musicKind}
                 onChange={setMusicKind}
@@ -238,21 +240,6 @@ export function HomePage() {
                     disabled={!!phase}
                     rows={4}
                   />
-                  {phase && phase !== "submitting" && (
-                    <div className="music-prompt-status" role="status">
-                      <span>
-                        {phase === "checking"
-                          ? "正在准备音乐创作"
-                          : "AI 正在准备歌词与旋律风格"}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() => controller.current?.abort()}
-                      >
-                        取消
-                      </button>
-                    </div>
-                  )}
                 </div>
                 {error && (
                   <p className="music-inline-error" role="alert">
@@ -265,9 +252,15 @@ export function HomePage() {
                     <span>AI 帮我想</span>
                   </Link>
                   <div className="home-generate-action">
-                    <span className="home-keyboard-hint" aria-hidden="true">
-                      <kbd>⌘ / Ctrl</kbd> + <kbd>Enter</kbd>
-                    </span>
+                    {phase && phase !== "submitting" && (
+                      <button
+                        className="music-cancel"
+                        type="button"
+                        onClick={() => controller.current?.abort()}
+                      >
+                        取消
+                      </button>
+                    )}
                     <button
                       className="generate-music-button"
                       type="submit"
@@ -278,11 +271,13 @@ export function HomePage() {
                       ) : (
                         <AudioLines size={18} />
                       )}
-                      {phase === "writing"
-                        ? "正在写歌"
-                        : phase
-                          ? "准备生成"
-                          : "生成音乐"}
+                      <span role="status">
+                        {phase === "writing"
+                          ? "正在写歌"
+                          : phase
+                            ? "准备生成"
+                            : "生成音乐"}
+                      </span>
                       {!phase && <ArrowRight size={17} />}
                     </button>
                   </div>
@@ -293,7 +288,6 @@ export function HomePage() {
         </div>
       </section>
       <section className="home-inspiration" aria-label="创作灵感">
-        <h2>试试这些灵感</h2>
         <div className="home-inspiration-options">
           {inspirations.map((idea) => (
             <button
@@ -316,7 +310,10 @@ export function HomePage() {
               <span>
                 <span className="home-inspiration-copy">
                   <strong>{idea.title}</strong>
-                  <small>{idea.mood}</small>
+                  <small>
+                    <span>{idea.sound}</span>
+                    <span>{idea.mood}</span>
+                  </small>
                 </span>
                 <ArrowRight size={14} aria-hidden="true" />
               </span>

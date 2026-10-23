@@ -411,7 +411,7 @@ export function HumComposer({
         <input
           className="hum-idea"
           aria-label="想要的音乐风格"
-          placeholder="想要什么风格？（选填）"
+          placeholder="音乐风格（选填）"
           maxLength={300}
           value={idea}
           disabled={busy}

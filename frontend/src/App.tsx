@@ -19,7 +19,6 @@ import {
   Sparkles,
   MessageCircle,
   Music2,
-  ChevronRight,
   ChevronDown,
   Crown,
   ArrowLeft,
@@ -150,8 +149,6 @@ function Shell() {
             </Link>
           ) : desktop ? (
             <div className="desktop-page-path" aria-label="当前位置">
-              <span>我的空间</span>
-              <ChevronRight size={14} aria-hidden="true" />
               <strong>{pageTitle}</strong>
             </div>
           ) : (
@@ -383,7 +380,7 @@ function AuthGate() {
     return (
       <div className="auth-loading" role="status">
         <Loader size={24} />
-        <span>正在打开你的音乐空间…</span>
+        <span>加载中…</span>
       </div>
     );
   if (!user && error)

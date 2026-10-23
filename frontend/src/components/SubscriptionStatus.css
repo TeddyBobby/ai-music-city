@@ -1,7 +1,9 @@
 .sidebar-subscription {
-  position: relative;
-  display: block;
-  padding: 15px;
+  display: grid;
+  grid-template-columns: 18px minmax(0, 1fr) auto 14px;
+  align-items: center;
+  gap: 9px;
+  padding: 12px;
   border-radius: 15px;
   background: color-mix(in srgb, var(--accent) 8%, var(--bg));
   color: var(--text);
@@ -11,23 +13,11 @@
 .sidebar-subscription.active {
   background: color-mix(in srgb, var(--accent) 14%, var(--bg));
 }
-.subscription-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 12px;
-  color: var(--accent);
-}
-.subscription-heading > span {
-  font-size: 10px;
-  color: var(--muted);
-  letter-spacing: 0.05em;
-}
 .subscription-copy {
   display: flex;
   flex-direction: column;
-  gap: 5px;
-  padding-right: 12px;
+  min-width: 0;
+  gap: 3px;
 }
 .subscription-copy strong {
   font-size: 14px;
@@ -38,11 +28,13 @@
   font-size: 11px;
   line-height: 1.6;
 }
+.subscription-icon,
 .subscription-chevron {
-  position: absolute;
-  top: 48px;
-  right: 12px;
   color: var(--accent);
+}
+.subscription-demo {
+  color: var(--muted);
+  font-size: 10px;
 }
 .sidebar-subscription:focus-visible {
   outline: 2px solid var(--accent);

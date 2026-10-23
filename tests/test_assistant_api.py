@@ -45,11 +45,13 @@ async def test_credentials_private_and_config_validation(setup):
     secret = svc.config()['hermes_api_key']
     response = await client.get('/api/assistant/config')
     assert secret not in response.text
-    assert response.json()['has_hermes_api_key']
+    assert not response.json()['has_hermes_api_key']
+    assert response.json()['source'] == 'default'
     assert svc.settings_path.stat().st_mode & 0o777 == 0o600
     response = await client.put('/api/assistant/config', json={'hermes_base_url': 'http://example.com'})
     assert response.status_code == 400
-    response = await client.put('/api/assistant/config', json={'hermes_api_key': 'new-secret'})
+    response = await client.put('/api/assistant/config', json={
+        'hermes_base_url': 'https://assistant.example.test/v1', 'hermes_api_key': 'new-secret'})
     assert response.status_code == 200 and 'new-secret' not in response.text
     assert svc.config()['hermes_api_key'] == 'new-secret'
     response = await client.put('/api/assistant/config', json={'image_base_url': 'https://example.com', 'image_provider': 'openai-compatible'})
@@ -344,7 +346,7 @@ async def test_model_connection_failure_does_not_use_stale_cache(setup, monkeypa
     assert (await client.get('/api/assistant/models')).json()['default_model'] == 'recovered'
 
 
-async def test_shared_model_catalog_invalidates_when_admin_changes_connection(setup, monkeypatch, tmp_path):
+async def test_personal_model_catalog_isolated_from_other_accounts_and_server_fallback(setup, monkeypatch, tmp_path):
     svc, _ = setup
     tenant = AssistantService(tmp_path / 'tenant', config_source=svc)
     calls = []
@@ -357,13 +359,14 @@ async def test_shared_model_catalog_invalidates_when_admin_changes_connection(se
     upstream(monkeypatch, lambda request: pytest.fail('No generation should be requested'), model_handler=models)
     assert await tenant.request_model(None) == {'model': 'old-model'}
     assert await svc.request_model(None) == {'model': 'old-model'}
-    assert len(calls) == 1
-    svc.update_config({'hermes_base_url': 'https://new.example.test/v1'})
-    assert await tenant.request_model(None) == {'model': 'new-model'}
-    with pytest.raises(ApiError) as exc:
-        await tenant.request_model('old-model')
-    assert exc.value.code == 'invalid_model'
     assert len(calls) == 2
+    svc.update_config({'hermes_base_url': 'https://new.example.test/v1'})
+    assert await svc.request_model(None) == {'model': 'new-model'}
+    assert await tenant.request_model(None) == {'model': 'old-model'}
+    with pytest.raises(ApiError) as exc:
+        await svc.request_model('old-model')
+    assert exc.value.code == 'invalid_model'
+    assert len(calls) == 3
 
 
 async def test_unconfigured_models_do_not_probe_any_provider(setup, monkeypatch):

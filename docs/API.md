@@ -47,13 +47,18 @@ loopback hostname, without forwarding headers. It becomes the sole administrator
 owns the existing local workspace. Other accounts receive separate job databases,
 song/upload directories, assistant histories/audio/artwork, reviews, project data,
 and settings under `data/users/<id>/`. Existing demo sessions are revoked on upgrade.
-Shared AI connection configuration (`GET/PUT /api/assistant/config`) requires the
-administrator. Model execution is serialized across accounts; logout does not cancel jobs.
+AI connection configuration (`GET/PUT /api/assistant/config`) belongs to the signed-in
+account. Accounts without a personal override use the server default; the owner's
+personal override never becomes another account's fallback. Model execution is serialized
+across accounts; logout does not cancel jobs.
 Plaza endpoints are still a private workspace feature, not a public cross-account feed.
 
 ### Assistant conversations and proposals
 
-- `GET /api/assistant/models` returns only models advertised by the configured service's `/v1/models`; unavailable or empty catalogs never fall back to a static model list.
+- `GET /api/assistant/config` returns `{hermes_base_url, has_hermes_api_key, source: "default" | "custom", default_configured}`. Default credentials and their URL are not exposed by this endpoint; no API key is returned.
+- `PUT /api/assistant/config` accepts `{hermes_base_url, hermes_api_key?}` and saves only the current account's connection. An empty URL restores the server default. Empty/omitted keys preserve only the user's existing key for the exact same normalized Base URL; a changed URL never inherits the previous or server-default key.
+- `POST /api/assistant/check` with no body checks the saved connection. An optional config-shaped body tests a draft without saving it or changing the saved model cache. The response remains `{chat, image}`; `chat` includes `available`, `message`, `model_count` and an optional `error_code`. This checks authentication and the models catalog, not chat generation. Provider errors are sanitized and credentials are never echoed.
+- `GET /api/assistant/models` returns only models advertised by the configured service's `/models`; API prefixes such as `/v1` are preserved as part of Base URL. Unavailable or empty catalogs never fall back to a static model list.
 - `POST /api/assistant/images` accepts multipart `file` (static JPEG/PNG/WebP, at most 8 MB) and returns 201 `{id, url, mime_type, filename, width, height}`. Pixels are normalized to JPEG, stripped of metadata and limited to 1536px. `GET /api/assistant/images/{id}` requires the owning account; another account receives 404.
 - `POST /api/assistant/audio` accepts multipart `file`, returning an account-private playback attachment with `transcript` and `transcription_status: "transcribed" | "no_speech"`. Empty successful transcription preserves the audio but explicitly does not imply melody analysis. Failed transcription remains an error.
 - `POST /api/assistant/sessions/{id}/messages` accepts `{content, mode, model?, audio_id?, image_id?, context?}`. Text may be empty when an attachment is present; images and audio can be combined. `mode: "chat" | "lyrics"` changes conversational focus, not whether a card is mandatory. Current and prior image pixels are sent as actual multimodal content; audio uses the transcript plus user description.

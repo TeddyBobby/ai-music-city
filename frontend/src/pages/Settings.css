@@ -1,23 +1,24 @@
+.app-shell .workspace-content.route-settings {
+  padding-top: 20px;
+  padding-inline: 24px;
+}
+.route-settings .page-container {
+  max-width: none;
+}
 .preferences-page {
-  --settings-padding: 24px;
+  --settings-padding: 18px;
+  --settings-columns: minmax(0, 1fr) minmax(240px, 380px);
   display: flex;
   flex-direction: column;
-  gap: 20px;
+  gap: 12px;
   width: 100%;
-  max-width: 1040px;
   min-width: 0;
-  margin: 0 auto;
-}
-.preferences-page h1 {
-  margin: 0 0 4px;
-  font-size: 24px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: 0;
+  font-size: 14px;
+  line-height: 1.5;
 }
 .preferences-page h2 {
   margin: 0;
-  font-size: 15px;
+  font-size: 14px;
   font-weight: 600;
   line-height: 1.5;
 }
@@ -36,16 +37,16 @@
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  padding: 17px var(--settings-padding);
+  padding: 10px var(--settings-padding);
   border-bottom: 1px solid var(--line);
 }
 .preferences-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 260px;
+  grid-template-columns: var(--settings-columns);
   align-items: center;
-  gap: 12px 32px;
+  gap: 8px 24px;
   min-width: 0;
-  padding: 18px var(--settings-padding);
+  padding: 12px var(--settings-padding);
 }
 .preferences-row + .preferences-row {
   border-top: 1px solid var(--line);
@@ -55,7 +56,7 @@
   display: flex;
   flex-direction: column;
   min-width: 0;
-  gap: 5px;
+  gap: 3px;
 }
 .preferences-label {
   color: var(--text);
@@ -65,17 +66,20 @@
 .preferences-hint {
   color: var(--muted);
   font-size: 12px;
-  line-height: 1.65;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
 .preferences-page .preferences-control {
   width: 100%;
   min-width: 0;
 }
-.preferences-page .preferences-control .mantine-Input-input {
-  min-height: 40px;
+.preferences-page .preferences-section .mantine-Input-input {
+  height: 36px;
+  min-height: 36px;
   border-radius: 7px;
   background: var(--surface);
+  font-size: 14px;
+  font-weight: 400;
 }
 .preferences-account-row,
 .preferences-connection-row {
@@ -84,15 +88,16 @@
 .preferences-email {
   color: var(--text);
   font-size: 14px;
-  font-weight: 500;
-  line-height: 1.6;
+  font-weight: 400;
+  line-height: 1.5;
   overflow-wrap: anywhere;
 }
-.preferences-page .mantine-Button-root.btn {
+.preferences-page .preferences-section .mantine-Button-root.btn {
   flex: none;
-  min-height: 40px;
+  height: 36px;
+  min-height: 36px;
   border-radius: 7px;
-  font-size: 13px;
+  font-size: 14px;
 }
 .preferences-actions {
   display: flex;
@@ -100,11 +105,24 @@
   justify-content: space-between;
   gap: 12px;
   min-width: 0;
-  padding: 14px var(--settings-padding);
+  padding: 10px var(--settings-padding);
   border-top: 1px solid var(--line);
 }
 .preferences-actions > span {
   min-width: 0;
+}
+.preferences-page .assistant-connection-row {
+  grid-template-columns: var(--settings-columns);
+  gap: 8px 24px;
+  padding-block: 12px;
+}
+.preferences-page .assistant-connection p {
+  margin-top: 3px;
+  line-height: 1.5;
+}
+.preferences-page .assistant-connection-footer {
+  gap: 10px;
+  padding-block: 10px;
 }
 .preferences-advanced {
   min-width: 0;
@@ -167,32 +185,39 @@
   color: var(--accent);
   font-size: 14px;
 }
-@media (max-width: 760px) {
-  .preferences-page {
-    --settings-padding: 16px;
-    gap: 16px;
+@media (max-width: 760px), (pointer: coarse) {
+  .preferences-page h2 {
+    font-size: 16px;
   }
-  .preferences-page h1 {
-    margin: 0;
-    font-size: 22px;
+  .preferences-page .preferences-section .mantine-Input-input,
+  .preferences-page .preferences-section .mantine-Button-root.btn {
+    height: 44px;
+    min-height: 44px;
+  }
+}
+@media (max-width: 760px) {
+  .app-shell .workspace-content.route-settings {
+    padding-top: 12px;
+    padding-inline: max(12px, env(safe-area-inset-left, 0px))
+      max(12px, env(safe-area-inset-right, 0px));
+  }
+  .preferences-page {
+    --settings-padding: 14px;
+    --settings-columns: minmax(0, 1fr);
   }
   .preferences-section-heading {
-    padding-block: 14px;
+    padding-block: 10px;
   }
   .preferences-row,
   .preferences-agent-form .preferences-row {
     grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
-    padding-block: 16px;
+    gap: 8px;
+    padding-block: 12px;
   }
   .preferences-account-row,
   .preferences-connection-row {
     grid-template-columns: minmax(0, 1fr) auto;
     gap: 12px;
-  }
-  .preferences-page .preferences-control .mantine-Input-input,
-  .preferences-page .mantine-Button-root.btn {
-    min-height: 44px;
   }
   .preferences-actions {
     padding-block: 12px;

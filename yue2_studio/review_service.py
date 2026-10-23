@@ -16,7 +16,7 @@ import sqlite3
 import httpx
 
 from yue2_studio.api import ApiError
-from yue2_studio.assistant_service import _safe_url, now
+from yue2_studio.assistant_service import endpoint_url, provider_headers, now
 
 BASIS = '音频指标、乐谱与创作信息，未直接听音'
 DIMENSIONS = ('创作表达', '结构设计', '音频技术')
@@ -248,16 +248,15 @@ class ReviewService:
 
     async def _request(self, context, evidence):
         cfg = self.assistant.config()
-        url = _safe_url(cfg['hermes_base_url'], local=True).removesuffix('/v1') + '/v1/chat/completions'
-        model = cfg['hermes_model']
+        url = endpoint_url(cfg['hermes_base_url'], 'chat/completions')
+        model = (await self.assistant.request_model(None))['model']
         model_label = self.assistant.model_info()[0] if model == 'hermes-agent' else model
         payload = {'model': model, 'stream': False, 'max_tokens': 3600,
                    'messages': [{'role': 'system', 'content': SYSTEM_PROMPT},
                                 {'role': 'user', 'content': '待评作品数据：\n' +
                                  json.dumps({'context': context, 'evidence': evidence}, ensure_ascii=False)}]}
         async with httpx.AsyncClient(timeout=httpx.Timeout(240, connect=10), trust_env=False) as client:
-            async with client.stream('POST', url, headers={
-                'Authorization': 'Bearer ' + cfg['hermes_api_key']}, json=payload) as response:
+            async with client.stream('POST', url, headers=provider_headers(cfg), json=payload) as response:
                 if response.status_code != 200:
                     message = 'Hermes 鉴权失败，请检查连接设置' if response.status_code in {401, 403} else 'Hermes 评估服务暂时不可用，请重试'
                     raise ApiError(502, 'review_provider_failed', message)

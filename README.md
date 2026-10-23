@@ -1,34 +1,62 @@
 # AI乐之城
 
-面向个人创作的本地音乐应用。一句话、一段哼唱或一张图片，都可以成为音乐的起点；生成后可以播放、下载和分享。
+**让想象，有回响。**
 
-本项目基于 [ianiv/YuE2](https://github.com/ianiv/YuE2) 的 YuE2 Studio 扩展，保留原有音乐生成引擎和 MIT 许可。原版说明完整保存在 [docs/upstream/README.md](docs/upstream/README.md)，仅调整了迁移后的文档相对链接；其中界面介绍以原版为准。
+一句话、一段哼唱，或一张图片，把脑海里的声音变成自己的音乐。先与 AI 助手聊聊，也可以直接开始创作；生成后试听、微调、下载和分享。
 
-## 已实现
+![AI乐之城桌面创作首页](docs/images/product/home-desktop.jpg)
 
-- **音乐创作**：首页提供「一句话 / 哼一段 / 一张图」三种入口，均可选择纯音乐或带歌词。Apple Silicon 上通过 MLX 运行 YuE2-3B，支持量化模型、LoRA、随机种子和低内存模式。
-- **任务与作品**：真实生成进度、任务取消、失败提示、作品检索、下载、项目与版本管理。
-- **播放体验**：全屏播放器、封面与歌词左右切换、播放队列、循环与随机播放；底部播放条随滚动显示或收起。
-- **创作助手**：连接本机 Hermes，进行对话、写词与曲风构思；封面可通过 Hermes 图片能力或配置的 OpenAI 兼容图片接口生成、应用和恢复。
-- **评分与乐评**：手动 10 分制评分、评论及 Hermes AI 参考评估。AI 使用创作信息、乐谱和本机测得的音频指标，当前不直接听音。
-- **音乐广场**：单曲、专辑、搜索与排行榜；发布和评分记录保存于本机数据库。
-- **响应式界面**：中文页面、深浅主题、可收起侧栏、移动端底部导航、首页声波动画与 AI乐之城字标。
+## 可以做什么
 
-支持邮箱＋密码注册登录，每个账号拥有独立的作品、生成任务、素材、助手对话和设置。首次在运行服务的电脑上直接打开 `http://127.0.0.1:8765/` 创建的账号是管理员，接收原有本机作品与对话；之后注册的账号使用新的空白空间。原数据保留在 `data/`，其他账号数据保存在 `data/users/<用户 ID>/`，账号与会话保存在 `data/auth/auth.db`。演示验证码登录已停用。
+| | |
+| --- | --- |
+| **三种创作方式** | 描述想法、录制哼唱、上传图片，可选择纯音乐或带歌词。图片用于提炼画面的氛围与配器方向。 |
+| **一起构思的 AI 助手** | 用文字、图片或语音交流，支持聊天和写歌词。想法明确后汇总成创作卡片，一键提交生成。 |
+| **看得见的生成过程** | 查看任务阶段与结果，修改曲风、歌词或音乐类型，生成新版本并保留原作。 |
+| **自己的音乐库** | 按类型筛选，试听作品、下载音频，或通过系统文件分享发送给朋友。 |
+| **桌面与手机播放** | 固定播放条、全屏播放器、封面下的歌词预览与完整歌词视图；有可靠时间信息时同步高亮。 |
+| **独立账号与 AI 配置** | 每个账号拥有自己的作品、对话和设置。自定义 Base URL / API Key，从服务的 `/models` 选择模型，并测试连接。 |
 
-密码以随机盐和 scrypt 哈希存储；登录会话使用 HttpOnly Cookie，退出后立即撤销。作品及音频下载接口都需要当前账号的登录会话，分享通过系统分享音频文件或下载后发送完成。账号切换会清空浏览器里的个人草稿与播放状态，已提交的生成任务继续在后台运行。所有账号的音乐生成与歌词校准共用一个串行引擎队列。
+## 界面预览
 
-管理员可配置共用的 AI 服务连接，服务凭证不会复制到其他账号或返回浏览器。新安装可以使用 `AMC_ASSISTANT_BASE_URL`、`AMC_ASSISTANT_MODEL`、`AMC_ASSISTANT_API_KEY` 提供服务端配置；升级保留已有本机配置。当前尚未提供订阅支付或互联网社区。音乐引擎依赖 macOS / Apple Silicon，不能直接当作 Linux GPU 生产服务部署。
+### 聊清楚想法，再生成
 
-## 安装与启动
+模型与聊天模式都在输入框内切换，快捷灵感只填入输入框。助手回复支持 Markdown 排版和快捷复制，切换站内页面后仍会继续回答。
 
-需要 Apple Silicon Mac、原生 arm64 Python 3.12、`uv`、Node.js / npm，以及用于 MP3 导出和音频处理的 `ffmpeg`。建议至少 16 GB 统一内存，并为模型预留约 15 GB 磁盘空间；可选模型另计。实际能否生成及可用时长取决于剩余内存、模型和参数。
+![AI 助手对话](docs/images/product/assistant-desktop.jpg)
 
-引擎要求 macOS 14.2 或更新；M5 需要 macOS 26.2 或更新。安装脚本会检查本机运行条件。
+### 试听，然后调整
 
-在仓库根目录执行：
+生成流程、试听结果和微调放在同一页。确认修改后生成新的版本。
+
+![生成详情与微调](docs/images/product/generation-desktop.jpg)
+
+### 手机上的音乐库与播放器
+
+<table>
+  <tr>
+    <th width="33%">我的音乐</th>
+    <th width="33%">封面与歌词预览</th>
+    <th width="33%">完整歌词</th>
+  </tr>
+  <tr>
+    <td><img src="docs/images/product/library-mobile.jpg" alt="移动端音乐库与固定播放条" width="100%" /></td>
+    <td><img src="docs/images/product/player-mobile.jpg" alt="移动端封面与歌词预览" width="100%" /></td>
+    <td><img src="docs/images/product/lyrics-mobile.jpg" alt="移动端完整歌词" width="100%" /></td>
+  </tr>
+</table>
+
+以上为本地测试账号的实际界面截图，作品与对话为演示数据，静音音轨和预置歌词时间仅用于展示交互，不代表音乐生成效果或速度。
+
+## 快速开始
+
+真实音乐生成使用 **YuE2 / MLX**，需要 Apple Silicon Mac、原生 arm64 Python 3.12、`uv`、Node.js / npm 和 `ffmpeg`。建议至少 16 GB 统一内存，并为基础模型预留约 15 GB 空间。
+
+当前产品开发分支为 `feature/acestep-vectron`：
 
 ```sh
+git clone --branch feature/acestep-vectron https://github.com/TeddyBobby/ai-music-city.git
+cd ai-music-city
 uv sync
 npm ci --prefix frontend
 npm run build --prefix frontend
@@ -36,102 +64,50 @@ uv run python scripts/setup.py
 uv run yue2-studio --open
 ```
 
-浏览器默认打开 <http://127.0.0.1:8765/>。前端构建后由 Python 服务直接提供，日常使用无需额外运行 Vite。
+打开 [127.0.0.1:8765](http://127.0.0.1:8765/)，注册本地账号即可进入。哼唱和纯音乐需额外模型，详见 [安装与使用指南](docs/setup.md)。
 
-完成首次安装后，也可以双击 [启动 AI乐之城.command](scripts/macos/启动%20AI乐之城.command)。
-
-安装脚本选项：
-
-| 命令 | 用途 |
-| --- | --- |
-| `uv run python scripts/setup.py` | 下载固定版本的生成模型与 VAE，并检查运行环境 |
-| `uv run python scripts/setup.py --with-cover` | 额外下载音频改编所需的 SheetSage2 与 MERT 模型 |
-| `uv run python scripts/setup.py --with-hum` | 额外下载改编模型及哼唱适配器 |
-| `uv run python scripts/setup.py --skip-download` | 只运行检查，不下载模型 |
-| `uv run python scripts/setup.py --skip-download --no-verify-hashes` | 跳过较耗时的权重哈希校验，进行快速检查 |
-
-`--with-cover` 指音频改编，不是图片封面生成。图片封面与对话需要在「创作助手 → 连接设置」中另行配置；Hermes 需先在本机安装并启动。模型下载与外部助手 / 图片服务会访问网络，所用服务可能需要自己的账号和额度。
-
-### 三种创作方式
-
-首页可直接描述音乐、录制或上传哼唱，或上传 JPG / PNG / WebP 图片（最大 8 MB）。图片会先经 Hermes 的视觉模型识别场景、光线、情绪，转成节奏与配器方向，再提交音乐生成；可补充一句想营造的感觉。图片识别需要可用的视觉模型，失败时保留图片和描述供重试。
-
-图片在本机校验、缩小并移除元数据后发送给视觉服务，不作为作品封面公开。纯音乐模式不生成歌词，使用配套的无人声 LoRA；带歌词模式先准备歌词。哼唱在两种模式下都会转谱并以录音中的旋律继续创作。
-
-提交音乐任务后会进入独立的生成详情页，显示真实步骤、当前阶段进度、用时和结果。切换页面或刷新不会停止后台任务；失败与取消会保留最后一个实际阶段。成品可在详情页播放、下载、分享。
-
-详情页可修改名称、音乐描述、歌词与音乐类型，再生成关联的新版本；哼唱会保留原录音来源。原作品不变，版本记录可切换对比。快捷微调只填写描述，点击「生成新版本」才提交；尚未提交的编辑草稿会在当前浏览器会话中保存。
-
-### 助手对话与创作方案
-
-助手支持「聊天 / 写歌词」两种交流重点，文字、图片与音频都作为灵感输入。先通过对话理解想法；用户表示可以生成，或方向已足够完整时，助手给出包含标题、曲风、音乐类型和歌词的创作方案卡片。只有点击卡片上的「生成音乐」才提交任务，仍可继续对话修改方案。模式与可选模型均在输入框内切换，快捷灵感只填写输入框。
-
-图片附件支持 JPG / PNG / WebP，最大 8 MB。图片校验、缩小并清除元数据后发送真实像素给所选模型；需要模型支持视觉，失败会给出明确提示。图片与语音可和文字描述同时发送，历史附件仅当前账号可读取。
-
-### 可选：助手语音输入
-
-助手的模型列表只来自当前连接服务的 `/v1/models`，不会混入通用模型目录；服务未返回可用模型或获取失败时不会补入默认模型。支持录音或上传语音，并附上文字描述。安装本地语音识别后，音频在本机转为文字；转写结果和补充描述一起发给所选模型，原始音频留在本机供回放。语音最长 2 分钟、最大 20 MB；哼唱创作请使用首页的「哼一段」。
-
-有效音频没有可转写话语时仍可作为附件继续交流，助手会请用户补充想法，不声称听懂旋律。当前助手输入不执行旋律分析；首页哼唱入口仍使用原有转谱生成流程。
+只想体验界面与任务流程，可完成依赖安装和前端构建后，跳过模型下载：
 
 ```sh
-uv sync --extra assistant-voice
-uv run --extra assistant-voice python scripts/setup_assistant_voice.py
-uv run --extra assistant-voice yue2-studio --open
+YUE2_STUDIO_HOME=/tmp/ai-music-city-preview uv run yue2-studio --fake --port 8766 --open
 ```
 
-模型为多语言 faster-whisper base（约 141 MiB），保存在 `data/assistant/whisper-base/`。自定义数据目录可通过安装脚本的 `--model-dir` 指定对应的 `assistant/whisper-base` 目录。识别采用 CPU int8，每次识别结束即释放模型内存；未安装时可使用已配置的 Hermes 语音识别服务。切换页面不会停止正在生成的助手回复，点击停止按钮才会中断。
+`--fake` 使用模拟音乐引擎，输出静音音频；AI 助手与图片分析仍会调用配置的服务。
 
-### 可选：本地歌词校准
+## 配置 AI 助手
 
-歌词高亮需要从实际演唱中识别时间，不能用歌曲总时长平均分配。安装以下可选依赖后，带歌词作品会自动进入本地校准队列；识别成功的歌词可随播放高亮，滑动仅浏览，点击歌词才跳转。无法可靠识别的句子保留为静态歌词，不编造时间戳。伴奏、口音、漏唱和重复段落仍可能影响识别结果。
+在 **设置 → AI 助手** 填入 Base URL 和 API Key，测试连接后保存。内置 OpenAI、DeepSeek、Kimi 中国内地的快捷地址，也支持其他 OpenAI 兼容服务。
 
-```sh
-# 仅首次需要；安装脚本不会自动运行 Homebrew
-brew install whisper-cpp ffmpeg
-uv run python scripts/setup_lyrics.py
+模型列表只取当前服务的 `/models` 返回，图片输入需要所选模型支持视觉。个人密钥保存在服务端，不通过配置查询接口回传。语音转写、服务器默认连接和歌词校准见 [详细配置](docs/setup.md#ai-助手连接)。
 
-# 只检查已安装依赖和模型，不下载
-uv run python scripts/setup_lyrics.py --check
-```
+## 开发与文档
 
-校准在本机运行，不上传歌曲。可选模型为 `ggerganov/whisper.cpp` 的多语言 `ggml-small-q5_1.bin`（约 190 MB），保存到 `models/whisper/`。下载固定版本并核验大小与 SHA-256 后才替换文件；已有有效模型不会重复下载。下载沿用 `HF_ENDPOINT` 环境变量；设置了 `YUE2_STUDIO_HOME` 时，模型保存到该目录下的 `models/whisper/`。模型和歌词校准结果属于本机运行数据，不提交到 Git。
-
-## 开发
+前端使用 React、TypeScript、Mantine，后端使用 FastAPI，音乐推理通过 MLX 在本机执行。AI 对话与图片理解依赖配置的外部服务。订阅与价格页面目前仅为演示，未接入支付。
 
 ```sh
-# 终端一：后端
+# 后端
 uv run yue2-studio --reload
 
-# 终端二：前端
+# 另开终端启动前端，默认端口 5173
 npm run dev --prefix frontend
-```
 
-Vite 默认使用 5173 端口，将 API 和图片资源代理到本机 8765。更多说明见 [frontend/README.md](frontend/README.md)。
-
-```sh
+# 检查、测试与构建
 npm run check --prefix frontend
 npm test --prefix frontend
 npm run build --prefix frontend
 uv run pytest
 ```
 
-## 目录与数据
+- [安装、模型与使用指南](docs/setup.md)
+- [HTTP API](docs/API.md)
+- [前端开发](frontend/README.md)
+- [上游引擎开发说明](docs/development.md)
+- [截图说明](docs/images/product/README.md)
 
-| 路径 | 内容 |
-| --- | --- |
-| `frontend/` | React + TypeScript + Mantine 前端源码和测试 |
-| `yue2_studio/` | FastAPI、任务队列、模型适配、助手、乐评与广场服务 |
-| `scripts/` | 安装、运行与维护脚本 |
-| `tests/` | 后端测试 |
-| `docs/` | 开发文档、原版使用说明与归档 |
-| `examples/` | 示例生成请求 |
-| `samples/`、`design/` | 可选的精选作品导出和设计素材，不参与程序运行 |
-
-`models/`、`data/`、`logs/`、`node_modules/`、`.venv/` 不进入 Git。`data/` 包含作品、对话、评分、广场记录和本机连接配置，应单独保管；新克隆的仓库不会自动恢复这些记录。模型在目标电脑重新下载，服务凭据在目标电脑重新配置。前端发布文件由构建命令生成。
+作品、模型、日志与个人连接配置不随仓库分发。运行数据位于 `data/`，迁移和备份方式见 [账号与本地数据](docs/setup.md#账号与本地数据)。
 
 ## 许可与来源
 
-代码遵循 [MIT License](LICENSE)，保留 YuE2 Studio 原作者 Ianiv Schweber 的版权声明。MLX 推理由 mlx-Yue 提供，依赖版本固定在 [pyproject.toml](pyproject.toml) 和 [uv.lock](uv.lock)。
+本项目基于 [ianiv/YuE2](https://github.com/ianiv/YuE2) 的 YuE2 Studio 扩展，代码遵循 [MIT License](LICENSE)，保留原作者 Ianiv Schweber 的版权声明。原版说明保存在 [docs/upstream/README.md](docs/upstream/README.md)。
 
-模型权重与代码使用不同许可：上游说明中的 YuE2-3B、MLX 转换权重、VAE 及示例 LoRA 为 **CC BY-NC 4.0（非商业使用）**；mlx-Yue 为 Apache 2.0，abcjs 为 MIT。应用代码的 MIT 许可不覆盖模型授权，商用前应单独核对所选模型、素材与外部服务条款。模型和运行时凭据不随代码仓库分发。
+代码许可不覆盖模型：上游说明中的 YuE2-3B、MLX 转换权重、VAE 及示例 LoRA 为 **CC BY-NC 4.0（非商业使用）**。使用其他适配器、素材或外部服务时，应分别核对其许可与条款。模型权重及凭据不包含在仓库中。

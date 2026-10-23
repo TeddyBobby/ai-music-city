@@ -52,7 +52,7 @@ def main():
     args = parser.parse_args()
     root = Path(args.home).resolve()
     svc = AssistantService(paths_for(root).data_dir)
-    cfg = svc.config()
+    cfg = svc.server_config()
     launcher = Path(__file__).with_name('hermes_launcher.py').resolve()
     pidfile = svc.root / 'hermes-process.json'
     if args.action != 'stop' and cfg['hermes_base_url'].rstrip('/') not in {

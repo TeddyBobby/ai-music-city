@@ -34,10 +34,6 @@
   font-size: 15px;
   font-weight: 550;
 }
-.image-music-upload > span:not(.image-upload-icon) {
-  font-size: 13px;
-  color: var(--muted);
-}
 .image-music-upload small {
   font-size: 11px;
   color: var(--muted);
@@ -116,12 +112,6 @@
   justify-content: flex-end;
   gap: 10px;
 }
-.image-creation-status {
-  flex: 1;
-  min-width: 0;
-  color: var(--muted);
-  font-size: 12px;
-}
 .image-cancel {
   background: none;
   border: 0;
@@ -153,9 +143,6 @@
   }
   .image-music-preview img {
     height: 176px;
-  }
-  .image-creation-status {
-    font-size: 11px;
   }
   .image-composer-footer {
     flex-wrap: wrap;

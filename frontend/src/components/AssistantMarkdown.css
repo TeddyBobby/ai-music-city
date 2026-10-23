@@ -1,0 +1,156 @@
+.as-message-text .as-markdown {
+  width: 100%;
+  max-width: 74ch;
+  min-width: 0;
+  color: var(--text);
+  font-size: 15px;
+  line-height: 1.8;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.as-message-text .as-markdown > * {
+  margin-block: 0 14px;
+}
+.as-message-text .as-markdown > :last-child {
+  margin-bottom: 0;
+}
+.as-message-text .as-markdown p {
+  margin-block: 0 12px;
+}
+.as-message-text .as-markdown strong {
+  color: var(--text);
+  font-weight: 600;
+}
+.as-message-text .as-markdown :is(h1, h2, h3, h4, h5, h6) {
+  margin-block: 22px 10px;
+  color: var(--text);
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: 0;
+}
+.as-message-text .as-markdown h1 {
+  font-size: 19px;
+}
+.as-message-text .as-markdown h2 {
+  font-size: 17px;
+}
+.as-message-text .as-markdown > :first-child {
+  margin-top: 0;
+}
+.as-message-text .as-markdown :is(ul, ol) {
+  padding-inline-start: 1.5em;
+}
+.as-message-text .as-markdown li {
+  padding-inline-start: 3px;
+}
+.as-message-text .as-markdown li + li {
+  margin-top: 8px;
+}
+.as-message-text .as-markdown li::marker {
+  color: var(--muted);
+}
+.as-message-text .as-markdown li :is(ul, ol) {
+  margin-block: 8px 0;
+}
+.as-message-text .as-markdown li > p {
+  margin-bottom: 6px;
+}
+.as-message-text .as-markdown li > :last-child {
+  margin-bottom: 0;
+}
+.as-message-text .as-markdown .contains-task-list {
+  list-style: none;
+  padding-inline-start: 0;
+}
+.as-message-text .as-markdown .task-list-item input {
+  margin-inline: 0 8px;
+  accent-color: var(--accent);
+}
+.as-message-text .as-markdown blockquote {
+  margin-inline: 0;
+  padding: 2px 0 2px 16px;
+  border-inline-start: 2px solid
+    color-mix(in srgb, var(--accent) 35%, var(--line));
+  color: var(--muted);
+}
+.as-message-text .as-markdown blockquote > :last-child {
+  margin-bottom: 0;
+}
+.as-message-text .as-markdown a {
+  color: var(--accent);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 3px;
+}
+.as-message-text .as-markdown a:hover {
+  text-decoration-thickness: 2px;
+}
+.as-message-text .as-markdown :is(a, .as-markdown-table):focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 3px;
+}
+.as-message-text .as-markdown code {
+  padding: 2px 5px;
+  border-radius: 4px;
+  background: var(--surface-2);
+  font-family: ui-monospace, SFMono-Regular, Consolas, monospace;
+  font-size: 0.86em;
+}
+.as-message-text .as-markdown pre {
+  max-width: 100%;
+  overflow-x: auto;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface-2);
+  line-height: 1.65;
+  white-space: pre;
+  overflow-wrap: normal;
+}
+.as-message-text .as-markdown pre code {
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+}
+.as-message-text .as-markdown hr {
+  margin-block: 20px;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+.as-message-text .as-markdown-table {
+  max-width: 100%;
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.as-message-text .as-markdown table {
+  width: 100%;
+  min-width: 340px;
+  border-collapse: collapse;
+  font-size: 13px;
+  line-height: 1.6;
+}
+.as-message-text .as-markdown :is(th, td) {
+  padding: 9px 12px;
+  text-align: start;
+  vertical-align: top;
+}
+.as-message-text .as-markdown th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.as-message-text .as-markdown tr + tr,
+.as-message-text .as-markdown tbody tr:first-child {
+  border-top: 1px solid var(--line);
+}
+@media (max-width: 760px) {
+  .as-message-text .as-markdown {
+    font-size: 15px;
+    line-height: 1.75;
+  }
+  .as-message-text .as-markdown li + li {
+    margin-top: 7px;
+  }
+}

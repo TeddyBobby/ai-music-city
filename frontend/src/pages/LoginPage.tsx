@@ -53,17 +53,11 @@ export function LoginPage() {
             <AudioLines size={23} /> AI乐之城
           </span>
           <div className="auth-story-copy">
-            <span className="auth-eyebrow">A LITTLE IDEA. YOUR OWN MUSIC.</span>
             <h1>
               让想象，
               <br />
               有回响。
             </h1>
-            <p>
-              一句话、一段哼唱、一张照片。
-              <br />
-              下一首喜欢的歌，由你创造。
-            </p>
           </div>
           <div className="auth-sound-art" aria-hidden="true">
             <div className="auth-sound-disc">
@@ -71,14 +65,7 @@ export function LoginPage() {
                 <AudioLines size={32} strokeWidth={1.5} />
               </span>
             </div>
-            <div className="auth-sound-caption">
-              <span>属于你的音乐空间</span>
-              <strong>从一个小小的念头开始。</strong>
-            </div>
           </div>
-          <span className="auth-story-footer">
-            让每个灵感，都有自己的声音。
-          </span>
         </section>
         <div className="auth-form-area">
           <form className="auth-card" onSubmit={submit}>
@@ -86,18 +73,7 @@ export function LoginPage() {
               <span className="auth-logo">
                 <LockKeyhole size={21} />
               </span>
-              <h2>
-                {setupRequired
-                  ? "开启你的音乐空间"
-                  : creating
-                    ? "创建你的账号"
-                    : "欢迎回来"}
-              </h2>
-              <p>
-                {creating
-                  ? "保存每一首作品，继续每一个灵感。"
-                  : "登录后，继续你的创作。"}
-              </p>
+              <h2>{creating ? "创建账号" : "登录"}</h2>
             </div>
             {setupRequired && (
               <p className="auth-setup-note">
@@ -160,11 +136,11 @@ export function LoginPage() {
               loading={busy}
               rightSection={<ArrowRight size={17} />}
             >
-              {creating ? "创建账号，开始创作" : "登录"}
+              {creating ? "创建账号" : "登录"}
             </Button>
             {!setupRequired && (
               <p className="auth-switch">
-                {creating ? "已经有账号？" : "第一次来？"}
+                {creating ? "已有账号？" : "没有账号？"}
                 <button
                   type="button"
                   disabled={busy}
@@ -179,9 +155,6 @@ export function LoginPage() {
                 </button>
               </p>
             )}
-            <p className="auth-privacy">
-              <LockKeyhole size={13} /> 作品、素材与对话仅属于你的账号
-            </p>
           </form>
         </div>
       </div>

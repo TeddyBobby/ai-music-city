@@ -151,7 +151,9 @@ def _atomic_json(path, data):
 
 
 def _safe_url(value, *, local=False):
-    value = value.rstrip('/')
+    value = value.strip().rstrip('/')
+    if any(character.isspace() or ord(character) < 32 or ord(character) == 127 for character in value):
+        raise ApiError(400, 'invalid_url', '服务地址不能包含空格或控制字符')
     try:
         parsed = urlsplit(value)
         parsed.port  # validate malformed/out-of-range ports before persisting
@@ -168,6 +170,24 @@ def _safe_url(value, *, local=False):
     if parsed.scheme == 'http' and not loopback:
         raise ApiError(400, 'invalid_url', '远程服务地址必须使用 HTTPS，本机服务可以使用 HTTP')
     return value
+
+
+def endpoint_url(base_url, endpoint):
+    """Keep provider API prefixes intact; only the legacy local Hermes root implies /v1."""
+    base = base_url.rstrip('/')
+    parsed = urlsplit(base)
+    try:
+        local = ipaddress.ip_address(parsed.hostname or '').is_loopback
+    except ValueError:
+        local = parsed.hostname == 'localhost'
+    if not parsed.path.strip('/') and local and parsed.port == 8642:
+        base += '/v1'
+    return base + '/' + endpoint.lstrip('/')
+
+
+def provider_headers(cfg):
+    key = cfg.get('hermes_api_key') or ''
+    return {'Authorization': 'Bearer ' + key} if key else {}
 
 
 def structured(content):
@@ -195,12 +215,14 @@ class AssistantService:
         self.audio_dir = self.root / 'audio'
         self.audio_dir.mkdir(exist_ok=True, mode=0o700)
         self.settings_path = self.root / 'settings.json'
+        self.chat_settings_path = self.root / 'chat-settings.json'
         self.hermes_home = hermes_home or Path.home() / '.hermes'
         self.db_path = self.root / 'assistant.db'
         self.active = {}
         self.image_busy = False
         self.last_chat_check = None
         self.model_cache = None
+        self.model_cache_key = None
         self.audio_cache = None
         self.chat_tasks = set()
         self.audio_slots = config_source.audio_slots if config_source else asyncio.Semaphore(1)
@@ -243,10 +265,25 @@ class AssistantService:
         finally:
             connection.close()
 
-    def config(self):
+    def server_config(self):
+        """The deployment fallback never includes the legacy owner's personal override."""
         if self.config_source is not None:
-            return self.config_source.config()
+            return self.config_source.server_config()
         return json.loads(self.settings_path.read_text())
+
+    def _chat_override(self):
+        if not self.chat_settings_path.exists():
+            return None
+        try:
+            value = json.loads(self.chat_settings_path.read_text())
+            if not isinstance(value, dict):
+                raise ValueError('invalid personal configuration')
+            return {key: value.get(key, '') for key in ('hermes_base_url', 'hermes_api_key', 'hermes_model')}
+        except (OSError, ValueError):
+            raise ApiError(500, 'config_unavailable', '个人连接配置无法读取，请重新保存') from None
+
+    def config(self):
+        return {**self.server_config(), **(self._chat_override() or {})}
 
     def _save_config(self, cfg):
         if self.config_source is not None:
@@ -256,24 +293,47 @@ class AssistantService:
         self.model_cache = None
 
     def public_config(self):
-        cfg = self.config()
-        return {**{k: cfg[k] for k in ('hermes_base_url',)},
-                'has_hermes_api_key': bool(cfg.get('hermes_api_key'))}
+        personal = self._chat_override()
+        return {'hermes_base_url': (personal or {}).get('hermes_base_url', ''),
+                'has_hermes_api_key': bool((personal or {}).get('hermes_api_key')),
+                'source': 'custom' if personal is not None else 'default',
+                'default_configured': bool(self.server_config().get('hermes_base_url'))}
 
-    def update_config(self, patch):
-        cfg = self.config()
+    def _patched_chat_config(self, patch):
+        """Build a private candidate without ever borrowing fallback credentials."""
         allowed = {'hermes_base_url', 'hermes_api_key'}
         if set(patch) - allowed:
             raise ApiError(400, 'validation_error', '未知配置字段')
         for k, v in patch.items():
             if not isinstance(v, str) or len(v) > 4096:
                 raise ApiError(400, 'validation_error', '配置字段必须为文本')
-        new = {**cfg, **patch}
-        new['hermes_base_url'] = _safe_url(new['hermes_base_url'])
-        new['image_provider'] = 'disabled'
-        self._save_config(new)
+        patch = {key: value.strip() for key, value in patch.items()}
+        key = patch.get('hermes_api_key', '')
+        if any(ord(character) < 32 or ord(character) == 127 for character in key):
+            raise ApiError(400, 'validation_error', 'API Key 格式不正确')
+        personal = self._chat_override() or {}
+        base = patch.get('hermes_base_url', personal.get('hermes_base_url', ''))
+        if not base:
+            if key:
+                raise ApiError(400, 'invalid_url', '请填写与 API Key 对应的服务地址')
+            return self.server_config(), None
+        base = _safe_url(base)
+        # Empty/omitted credentials keep only this user's key for this exact API base.
+        # Even a path change can select a different tenant/provider, so drop it then.
+        if not key and base == personal.get('hermes_base_url'):
+            key = personal.get('hermes_api_key', '')
+        override = {'hermes_base_url': base, 'hermes_api_key': key, 'hermes_model': ''}
+        return {**self.server_config(), **override}, override
+
+    def update_config(self, patch):
+        _, override = self._patched_chat_config(patch)
+        if override is None:
+            self.chat_settings_path.unlink(missing_ok=True)
+        else:
+            _atomic_json(self.chat_settings_path, override)
         self.last_chat_check = None
         self.model_cache = None
+        self.model_cache_key = None
         return self.public_config()
 
     async def hermes_bridge(self, mode, *, path=None):
@@ -343,21 +403,19 @@ class AssistantService:
                 'message': '语音会转成文字，与补充描述一起发送' if available else '语音识别服务尚未连接'})
         return self.audio_cache[1]
 
-    async def _model_catalog(self):
-        # The configured endpoint owns the selectable inventory, including Hermes route aliases.
-        # A provider's general catalog is not evidence that this connection can use a model.
-        if self.config_source is not None:
-            return await self.config_source._model_catalog()
-        cfg = self.config()
+    @staticmethod
+    def _connection_key(cfg):
+        return tuple(cfg.get(key, '') for key in ('hermes_base_url', 'hermes_api_key', 'hermes_model'))
+
+    async def _fetch_model_catalog(self, cfg):
+        # Only the configured endpoint can advertise selectable models. Draft checks call this
+        # pure request path directly, never touching saved settings or either account's cache.
         if not cfg.get('hermes_base_url'):
             raise ApiError(503, 'unconfigured', 'AI 助手尚未连接，请先配置服务地址')
-        if self.model_cache and time.monotonic() - self.model_cache[0] < 60:
-            return self.model_cache[1]
-        self.model_cache = None
+        base = _safe_url(cfg['hermes_base_url'])
         try:
             async with httpx.AsyncClient(timeout=8, trust_env=False) as client:
-                response = await client.get(cfg['hermes_base_url'].removesuffix('/v1') + '/v1/models',
-                    headers={'Authorization': 'Bearer ' + cfg.get('hermes_api_key', '')})
+                response = await client.get(endpoint_url(base, 'models'), headers=provider_headers(cfg))
                 response.raise_for_status()
                 payload = response.json()
             if not isinstance(payload, dict) or not isinstance(payload.get('data'), list):
@@ -381,11 +439,26 @@ class AssistantService:
         default = cfg.get('hermes_model') or ''
         if default not in seen:
             default = options[0]['id'] if options else ''
-        result = {'models': options, 'default_model': default}
-        # Do not install a stale response after the administrator changes the connection.
-        if self.config() != cfg:
+        return {'models': options, 'default_model': default}
+
+    async def _model_catalog(self, *, refresh=False):
+        cfg = self.config()
+        connection = self._connection_key(cfg)
+        if (not refresh and self.model_cache and self.model_cache_key == connection
+                and time.monotonic() - self.model_cache[0] < 60):
+            return self.model_cache[1]
+        self.model_cache = None
+        try:
+            result = await self._fetch_model_catalog(cfg)
+        except ApiError:
+            if self._connection_key(self.config()) != connection:
+                return await self._model_catalog()
+            raise
+        # A response for an old connection must not replace a newer account setting.
+        if self._connection_key(self.config()) != connection:
             return await self._model_catalog()
         self.model_cache = (time.monotonic(), result)
+        self.model_cache_key = connection
         return result
 
     async def models(self):
@@ -463,17 +536,14 @@ class AssistantService:
             await file.close()
 
     async def auto_model(self, cfg):
-        """Auto-pick a chat model from the same validated inventory as the model selector."""
+        """Resolve a default without modifying deployment or personal credentials."""
         try:
             catalog = await self._model_catalog()
         except ApiError:
             return None
-        if not catalog['default_model'] or self.config() != cfg:
+        if self._connection_key(self.config()) != self._connection_key(cfg):
             return None
-        if cfg.get('hermes_model') != catalog['default_model']:
-            cfg['hermes_model'] = catalog['default_model']
-            self._save_config(cfg)
-        return cfg['hermes_model']
+        return catalog['default_model'] or None
 
     def model_info(self):
         try:
@@ -483,29 +553,27 @@ class AssistantService:
         except (ImportError, OSError, ValueError, AttributeError):
             return 'Hermes', 'Hermes'
 
-    async def status(self, *, refresh=False):
-        cfg = self.config()
-        if not cfg.get('hermes_model') or cfg['hermes_model'] == 'hermes-agent':
-            await self.auto_model(cfg)
-        chat = {'configured': bool(cfg['hermes_base_url'] and cfg['hermes_api_key']), 'available': False,
-                'model': cfg.get('hermes_model') or '',
-                'provider': 'agent', 'base_url': cfg['hermes_base_url'], 'message': 'Agent 尚未连接'}
+    async def status(self, *, refresh=False, draft=None):
+        cfg = self._patched_chat_config(draft)[0] if draft is not None else self.config()
+        chat = {'configured': bool(cfg.get('hermes_base_url')), 'available': False,
+                'model': '', 'model_count': 0, 'error_code': None,
+                'provider': 'agent', 'base_url': '', 'message': 'Agent 尚未连接'}
         if chat['configured']:
-            if refresh or not self.last_chat_check or time.monotonic() - self.last_chat_check[0] > 20:
-                try:
-                    async with httpx.AsyncClient(timeout=5, trust_env=False) as client:
-                        response = await client.get(cfg['hermes_base_url'].removesuffix('/v1') + '/v1/models',
-                            headers={'Authorization': 'Bearer ' + cfg['hermes_api_key']})
-                    ok = response.status_code == 200 and isinstance(response.json().get('data'), list)
-                    message = '已连接 Agent 服务' if ok else ('Agent 鉴权失败，请检查连接凭证' if response.status_code in {401,403} else 'Agent 服务返回异常')
-                except (httpx.HTTPError, ValueError):
-                    ok, message = False, 'Agent 服务连接超时'
-                self.last_chat_check = (time.monotonic(), ok, message)
-            chat.update(available=self.last_chat_check[1], message=self.last_chat_check[2])
-        configured = False
+            try:
+                # Deployment files can predate URL validation. Never reflect embedded credentials.
+                chat['base_url'] = _safe_url(cfg['hermes_base_url'])
+                catalog = (await self._fetch_model_catalog(cfg) if draft is not None
+                           else await self._model_catalog(refresh=refresh))
+                if draft is None and self._connection_key(self.config()) != self._connection_key(cfg):
+                    return await self.status(refresh=False)
+                available = bool(catalog['models'])
+                chat.update(available=available, model=catalog['default_model'],
+                            model_count=len(catalog['models']), error_code=None if available else 'no_models',
+                            message='已连接 Agent 服务' if available else '连接成功，但当前服务没有可用模型')
+            except ApiError as exc:
+                chat.update(message=exc.message, error_code=exc.code)
         image = {'configured': False, 'available': False, 'verified': False,
-                 'model': '', 'provider': 'disabled',
-                 'message': '图片生成暂未开放'}
+                 'model': '', 'provider': 'disabled', 'message': '图片生成暂未开放'}
         return {'chat': chat, 'image': image}
 
     def sessions(self):
@@ -635,8 +703,8 @@ class AssistantService:
             if run['stop'].is_set():
                 raise asyncio.CancelledError
             async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
-                async with client.stream('POST', cfg['hermes_base_url'].removesuffix('/v1') + '/v1/chat/completions',
-                    headers={'Authorization': 'Bearer ' + cfg['hermes_api_key'], 'X-Hermes-Session-Key': 'yue2-' + sid},
+                async with client.stream('POST', endpoint_url(cfg['hermes_base_url'], 'chat/completions'),
+                    headers={**provider_headers(cfg), 'X-Hermes-Session-Key': 'yue2-' + sid},
                     json={**(model or {'model': cfg['hermes_model']}), 'messages': messages,
                           'stream': True, 'max_tokens': 2400}) as response:
                     run['response'] = response
@@ -756,7 +824,7 @@ class AssistantService:
                 raise ApiError(503, 'unconfigured', '请先配置图片服务')
             candidate = self.save_cover(raw, prompt, cfg['image_model'], job_id)
             # Re-read settings so a long image request cannot overwrite a concurrent config change.
-            latest = self.config()
+            latest = self.server_config()
             if all(latest[k] == cfg[k] for k in ('image_provider', 'image_model', 'image_base_url', 'image_api_key')):
                 latest['image_verified'] = True
                 self._save_config(latest)

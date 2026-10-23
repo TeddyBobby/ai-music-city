@@ -15,6 +15,7 @@ from fastapi import UploadFile
 from PIL import Image, ImageOps, UnidentifiedImageError
 
 from yue2_studio.api import ApiError
+from yue2_studio.assistant_service import endpoint_url, provider_headers
 
 if TYPE_CHECKING:
     from yue2_studio.assistant_service import AssistantService
@@ -133,8 +134,8 @@ async def _provider_analysis(
         ) as client:
             async with client.stream(
                 "POST",
-                cfg["hermes_base_url"].removesuffix("/v1") + "/v1/chat/completions",
-                headers={"Authorization": "Bearer " + cfg["hermes_api_key"]},
+                endpoint_url(cfg["hermes_base_url"], "chat/completions"),
+                headers=provider_headers(cfg),
                 json=body,
             ) as response:
                 if response.status_code != 200:

@@ -4,7 +4,9 @@ import { Slider, UnstyledButton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
   ChevronDown,
+  Disc3,
   Download,
+  ListMusic,
   Pause,
   Play,
   Share2,
@@ -21,6 +23,7 @@ import { useApp } from "../state/app";
 import { usePlayer } from "../state/player";
 import { Artwork, Button, EmptyState, IconButton } from "../components/ui";
 import { SyncedLyrics } from "../components/SyncedLyrics";
+import { LyricPreview } from "../components/LyricPreview";
 import { ShareSongDialog } from "../components/ShareSongDialog";
 import { useLyricsAlignment } from "../hooks/useLyricsAlignment";
 import "./Player.css";
@@ -138,22 +141,30 @@ export function PlayerPage({
   );
 
   return (
-    <div className="listening-page simple-listening">
+    <div
+      className="listening-page simple-listening"
+      data-view={mobile && showLyrics ? "lyrics" : "cover"}
+    >
       <header className="listening-top">
         <UnstyledButton
           className="player-collapse"
           onClick={onClose}
           aria-label="收起播放器"
+          title={desktop ? "收起（Esc）" : undefined}
+          aria-keyshortcuts={desktop ? "Escape" : undefined}
           data-autofocus
         >
           <ChevronDown size={22} />
           <span>收起</span>
         </UnstyledButton>
-        <span className="simple-listening-caption">正在播放</span>
-        {desktop ? (
-          <span className="listening-key-hint">
-            <kbd>Esc</kbd> 收起
-          </span>
+        {mobile ? (
+          <IconButton
+            className="player-view-toggle"
+            label={showLyrics ? "返回封面" : "切换到歌词"}
+            onClick={() => setShowLyrics((value) => !value)}
+          >
+            {showLyrics ? <Disc3 size={20} /> : <ListMusic size={20} />}
+          </IconButton>
         ) : (
           <span className="simple-listening-top-spacer" aria-hidden="true" />
         )}
@@ -179,31 +190,21 @@ export function PlayerPage({
               <Artwork job={job} className="simple-listening-cover" />
             )}
           </div>
-          {mobile && (
-            <div className="simple-listening-view">
-              <UnstyledButton
-                aria-pressed={!showLyrics}
-                onClick={() => setShowLyrics(false)}
-              >
-                封面
-              </UnstyledButton>
-              <UnstyledButton
-                aria-pressed={showLyrics}
-                onClick={() => setShowLyrics(true)}
-              >
-                歌词
-              </UnstyledButton>
-            </div>
-          )}
           <div className="record-transport">
-            <div className="record-info">
-              <h1>{titleOf(job)}</h1>
-              {desktop && (
-                <span className="listening-key-hint">
-                  <kbd>空格</kbd> 播放 / 暂停
-                </span>
-              )}
-            </div>
+            {(!mobile || !showLyrics) && (
+              <div className="record-info">
+                <h1>{titleOf(job)}</h1>
+              </div>
+            )}
+            {mobile && !showLyrics && (
+              <LyricPreview
+                lyrics={job.params?.lyrics || ""}
+                alignment={alignment}
+                time={time}
+                duration={length}
+                onExpand={() => setShowLyrics(true)}
+              />
+            )}
             <div className="record-progress">
               <Slider
                 min={0}
@@ -229,6 +230,10 @@ export function PlayerPage({
               <IconButton
                 className="record-play"
                 label={playing ? "暂停歌曲" : "播放歌曲"}
+                title={
+                  desktop ? `${playing ? "暂停" : "播放"}（空格）` : undefined
+                }
+                aria-keyshortcuts={desktop ? "Space" : undefined}
                 disabled={!canPlay}
                 onClick={() => (current ? p.toggle() : p.play([job]))}
               >

@@ -6,7 +6,7 @@
   display: flex;
   flex-direction: column;
   justify-content: center;
-  gap: clamp(20px, 4dvh, 36px);
+  gap: clamp(16px, 3dvh, 28px);
 }
 .pricing-toolbar {
   display: flex;
@@ -49,10 +49,6 @@
 .pricing-page .pricing-cycle-indicator {
   background: var(--surface);
   box-shadow: 0 2px 6px #10201808;
-}
-.pricing-yearly-note {
-  color: var(--muted);
-  font-size: 12px;
 }
 .pricing-plans {
   display: grid;
@@ -185,10 +181,6 @@
 .pricing-notes p {
   margin: 0;
 }
-.pricing-common {
-  color: var(--text);
-  font-size: 12px;
-}
 .pricing-page .pricing-details-button {
   display: inline-flex;
   align-items: center;
@@ -218,16 +210,6 @@
   font-size: 13px;
   line-height: 1.8;
 }
-.pricing-demo-label {
-  display: inline-flex;
-  align-items: center;
-  color: var(--accent);
-  background: color-mix(in srgb, var(--accent) 9%, transparent);
-  padding: 5px 10px;
-  border-radius: 20px;
-  font-size: 11px;
-  line-height: 1.5;
-}
 .pricing-order-modal,
 .pricing-order-header {
   background: var(--surface);
@@ -237,7 +219,7 @@
   padding-top: 8px;
 }
 .pricing-order-summary {
-  margin: 22px 0 18px;
+  margin: 8px 0 18px;
 }
 .pricing-order-summary > div {
   display: flex;
@@ -284,9 +266,6 @@
     padding-inline: 18px;
   }
   .pricing-plan-icon {
-    display: none;
-  }
-  .pricing-yearly-note {
     display: none;
   }
 }
@@ -387,10 +366,6 @@
   }
   .pricing-notes {
     gap: 8px;
-  }
-  .pricing-common {
-    max-width: 22em;
-    font-size: 11px;
   }
   .pricing-page .pricing-details-button {
     padding: 0 2px;

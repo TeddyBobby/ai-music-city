@@ -92,6 +92,7 @@
 }
 .simple-composer-actions {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: 12px;
@@ -100,9 +101,7 @@
   display: flex;
   align-items: center;
   gap: 14px;
-}
-.home-keyboard-hint {
-  display: none;
+  margin-left: auto;
 }
 .composer-assistant {
   display: flex;
@@ -135,21 +134,14 @@
 .generate-music-button:disabled {
   opacity: 0.45;
 }
-.music-prompt-status {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-top: 14px;
-  font-size: 12px;
-  color: var(--muted);
-}
-.music-prompt-status button {
+.music-cancel {
   border: 0;
   background: transparent;
   color: var(--muted);
   padding: 8px;
   min-height: 44px;
+  font: inherit;
+  font-size: 13px;
 }
 .music-inline-error {
   color: var(--danger);
@@ -161,13 +153,6 @@
 .home-inspiration {
   width: min(100%, 720px);
   margin: 4px auto 24px;
-}
-.home-inspiration h2 {
-  margin-bottom: 14px;
-  color: var(--muted);
-  font-size: 13px;
-  font-weight: 500;
-  letter-spacing: 0;
 }
 .home-inspiration-options {
   display: grid;
@@ -206,12 +191,27 @@
 .home-inspiration-choice > span svg {
   color: var(--muted);
 }
+.home-inspiration-copy {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+}
 .home-inspiration-copy strong {
   font-size: inherit;
   font-weight: inherit;
 }
 .home-inspiration-copy small {
-  display: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 8px;
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.5;
+}
+.home-inspiration-copy small > span {
+  white-space: nowrap;
 }
 .home-inspiration-choice[aria-pressed="true"] {
   border-color: var(--accent);
@@ -263,6 +263,9 @@
   .simple-composer-actions {
     gap: 8px;
   }
+  .home-generate-action {
+    gap: 8px;
+  }
   .composer-assistant {
     font-size: 12px;
     gap: 5px;
@@ -276,10 +279,6 @@
   }
   .home-inspiration {
     margin-top: 8px;
-  }
-  .home-inspiration h2 {
-    margin-bottom: 12px;
-    font-size: 12px;
   }
   .home-inspiration-options {
     gap: 10px;
@@ -296,6 +295,10 @@
   }
   .home-inspiration-choice > span svg {
     display: none;
+  }
+  .home-inspiration-copy small {
+    flex-direction: column;
+    gap: 0;
   }
   .app-shell[data-keyboard-open="true"] .simple-home .home-hero-grid {
     padding: 8px 0;
@@ -355,7 +358,7 @@
   min-height: 48px;
   margin-top: auto;
 }
-.music-input-panel :is(.music-prompt-status, .music-inline-error) {
+.music-input-panel .music-inline-error {
   margin: 0;
 }
 .music-input-panel > * > [role="alert"] {
@@ -482,15 +485,6 @@
     padding-top: 8px;
     font-size: 18px;
   }
-  .home-keyboard-hint {
-    display: inline;
-    white-space: nowrap;
-    color: var(--muted);
-    font-size: 10px;
-  }
-  .home-keyboard-hint kbd {
-    font-family: inherit;
-  }
   .simple-home .home-soundscape {
     inset: -45px -32px -36px;
     opacity: 0.85;
@@ -511,13 +505,6 @@
     min-height: 0;
     width: 100%;
     margin: 0;
-  }
-  .home-inspiration h2 {
-    position: absolute;
-    bottom: 100%;
-    margin: 0 0 20px;
-    font-size: 13px;
-    color: var(--text);
   }
   .home-inspiration-options {
     flex: 1;
@@ -544,18 +531,10 @@
   .home-inspiration-copy {
     display: flex;
     min-width: 0;
-    flex-direction: column;
-    gap: 10px;
   }
   .home-inspiration-copy strong {
     font-size: 14px;
     font-weight: 550;
-  }
-  .home-inspiration-copy small {
-    display: block;
-    font-size: 11px;
-    color: var(--muted);
-    line-height: 1.6;
   }
   .home-inspiration-choice > span > svg {
     flex: none;
@@ -637,11 +616,6 @@
   gap: 12px;
   flex-shrink: 0;
 }
-.home-music-kind > span {
-  display: none;
-  color: var(--muted);
-  font-size: 12px;
-}
 @media (max-width: 760px) {
   .music-composer-toolbar {
     flex-direction: column;
@@ -659,12 +633,9 @@
     font-size: 13px;
   }
   .home-music-kind {
-    justify-content: space-between;
+    justify-content: flex-end;
     gap: 8px;
     padding: 0 4px;
-  }
-  .home-music-kind > span {
-    display: block;
   }
   .home-music-kind .music-kind-toggle {
     width: auto;

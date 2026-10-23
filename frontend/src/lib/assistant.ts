@@ -12,6 +12,8 @@ export interface AssistantCapability {
   provider: string;
   message: string;
   base_url?: string;
+  model_count?: number;
+  error_code?: string;
 }
 export interface AssistantStatus {
   chat: AssistantCapability;
@@ -51,11 +53,13 @@ export interface AssistantImage {
 export interface AssistantConfig {
   hermes_base_url: string;
   has_hermes_api_key: boolean;
+  source: "default" | "custom";
+  default_configured: boolean;
 }
-export type AssistantConfigPatch = Omit<
-  AssistantConfig,
-  "has_hermes_api_key"
-> & { hermes_api_key?: string };
+export interface AssistantConfigPatch {
+  hermes_base_url: string;
+  hermes_api_key?: string;
+}
 export type AssistantMode = "chat" | "lyrics" | "style" | "cover_prompt";
 export interface Suggestion {
   music_kind?: "vocal" | "instrumental";
@@ -322,6 +326,8 @@ export const assistantApi = {
     request<AssistantConfig>("/config", { method: "PUT", body, signal }),
   check: (signal?: AbortSignal) =>
     request<AssistantStatus>("/check", { method: "POST", signal }),
+  checkConfig: (body: AssistantConfigPatch, signal?: AbortSignal) =>
+    request<AssistantStatus>("/check", { method: "POST", body, signal }),
   sessions: (signal?: AbortSignal) =>
     request<{ sessions: AssistantSession[] }>("/sessions", { signal }),
   newSession: (

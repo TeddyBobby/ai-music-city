@@ -148,10 +148,12 @@ async def test_assistant_messages_voice_and_covers_are_private(client, other, ap
         assert response.status_code == 404, (method, path, response.text)
     assert (await client.get(f"/api/assistant/audio/{aid}")).status_code == 200
     assert (await client.get(f"/api/assistant/covers/{cid}/image")).status_code == 200
-    assert (await other.get("/api/assistant/config")).status_code == 403
-    assert (
-        await other.put("/api/assistant/config", json={"hermes_api_key": "intruder-key"})
-    ).status_code == 403
+    assert (await other.get("/api/assistant/config")).status_code == 200
+    owner_config = (await client.get("/api/assistant/config")).json()
+    assert (await other.put("/api/assistant/config", json={
+        "hermes_base_url": "https://personal.example/v1", "hermes_api_key": "personal-test-key"
+    })).status_code == 200
+    assert (await client.get("/api/assistant/config")).json() == owner_config
     assert (await client.get("/api/assistant/config")).status_code == 200
 
 
@@ -179,12 +181,13 @@ async def test_settings_and_concurrent_jobs_remain_with_each_account(client, oth
     assert (await other.get(f"/api/songs/{second}/audio.flac")).status_code == 200
 
 
-def test_provider_settings_shared_without_copying_credentials_or_user_history(tmp_path, monkeypatch):
+def test_server_fallback_shared_but_personal_overrides_and_history_are_private(tmp_path, monkeypatch):
     for name in ("AMC_ASSISTANT_BASE_URL", "AMC_ASSISTANT_MODEL", "AMC_ASSISTANT_API_KEY"):
         monkeypatch.delenv(name, raising=False)
     owner = AssistantService(tmp_path / "owner")
     assert owner.config()["hermes_api_key"] == ""
-    owner.update_config({"hermes_base_url": "https://provider.example/v1", "hermes_api_key": "server-secret"})
+    owner._save_config({**owner.server_config(), "hermes_base_url": "https://provider.example/v1",
+                        "hermes_api_key": "server-secret"})
     other = AssistantService(tmp_path / "other", config_source=owner)
     assert other.config()["hermes_api_key"] == "server-secret"
     assert not other.settings_path.exists()
@@ -193,5 +196,9 @@ def test_provider_settings_shared_without_copying_credentials_or_user_history(tm
     assert other.audio_dir != owner.audio_dir
     owner.create_session("private")
     assert other.sessions() == []
-    owner.update_config({"hermes_api_key": "rotated-secret"})
+    owner.update_config({"hermes_base_url": "https://personal.example/v1", "hermes_api_key": "owner-secret"})
+    assert other.config()["hermes_api_key"] == "server-secret"
+    assert owner.config()["hermes_api_key"] == "owner-secret"
+    owner._save_config({**owner.server_config(), "hermes_api_key": "rotated-secret"})
     assert other.config()["hermes_api_key"] == "rotated-secret"
+    assert owner.config()["hermes_api_key"] == "owner-secret"

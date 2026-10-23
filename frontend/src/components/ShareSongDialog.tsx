@@ -68,13 +68,13 @@ export function ShareSongDialog({
         <Artwork job={job} size={64} />
         <strong>{titleOf(job)}</strong>
       </div>
-      <p className="song-share-note">
-        {preparing
-          ? "正在准备音频…"
-          : systemShare
-            ? "把这首歌分享给朋友。"
-            : "下载音频后，可发送给微信或其他应用里的朋友。"}
-      </p>
+      {(preparing || (!systemShare && !error)) && (
+        <p className="song-share-note" role="status">
+          {preparing
+            ? "正在准备音频…"
+            : "当前浏览器不支持直接分享，请下载音频。"}
+        </p>
+      )}
       {error && (
         <p className="song-share-error" role="alert">
           {error}

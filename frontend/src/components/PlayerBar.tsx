@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
 import { Popover, Slider, UnstyledButton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
@@ -17,29 +16,14 @@ import { usePlayer } from "../state/player";
 import { usePlayerOverlay } from "../state/playerOverlay";
 import { Artwork, IconButton } from "./ui";
 import { duration, titleOf } from "../lib/utils";
-import { useAutoHidePlayerBar } from "../hooks/useAutoHidePlayerBar";
 import "../pages/Player.css";
 
 export function PlayerBar() {
   const p = usePlayer(),
     expand = usePlayerOverlay((s) => s.open),
     fullscreenOpen = usePlayerOverlay((s) => s.opened),
-    [queueOpen, setQueueOpen] = useState(false),
-    [pointerInside, setPointerInside] = useState(false),
-    [focusInside, setFocusInside] = useState(false),
-    [dragging, setDragging] = useState(false);
-  const location = useLocation();
+    [queueOpen, setQueueOpen] = useState(false);
   const desktop = useMediaQuery("(min-width: 1024px)");
-  const { hidden, reveal } = useAutoHidePlayerBar({
-    locked:
-      desktop ||
-      queueOpen ||
-      fullscreenOpen ||
-      pointerInside ||
-      focusInside ||
-      dragging,
-    resetKey: `${location.key}:${p.current?.id ?? ""}`,
-  });
   useEffect(() => {
     if (!desktop || fullscreenOpen || !p.current) return;
     const key = (event: KeyboardEvent) => {
@@ -65,16 +49,6 @@ export function PlayerBar() {
     window.addEventListener("keydown", key);
     return () => window.removeEventListener("keydown", key);
   }, [desktop, fullscreenOpen, p.current?.id, p.toggle]);
-  useEffect(() => {
-    if (!dragging) return;
-    const release = () => setDragging(false);
-    window.addEventListener("pointerup", release);
-    window.addEventListener("pointercancel", release);
-    return () => {
-      window.removeEventListener("pointerup", release);
-      window.removeEventListener("pointercancel", release);
-    };
-  }, [dragging]);
   // Keep hooks unconditional when the playback queue is restored or cleared.
   if (!p.current && !p.queue.length) return null;
   function openPlayer() {
@@ -82,27 +56,7 @@ export function PlayerBar() {
     expand();
   }
   return (
-    <footer
-      className="player-dock"
-      aria-label="全局播放器"
-      data-hidden={hidden || undefined}
-      aria-hidden={hidden || undefined}
-      inert={hidden || undefined}
-      onPointerEnter={() => {
-        setPointerInside(true);
-        reveal();
-      }}
-      onPointerLeave={() => setPointerInside(false)}
-      onPointerDownCapture={() => setDragging(true)}
-      onFocusCapture={(event) => {
-        setFocusInside((event.target as HTMLElement).matches(":focus-visible"));
-        reveal();
-      }}
-      onBlurCapture={(event) => {
-        if (!event.currentTarget.contains(event.relatedTarget as Node | null))
-          setFocusInside(false);
-      }}
-    >
+    <footer className="player-dock" aria-label="全局播放器">
       <div className="dock-track">
         <UnstyledButton
           className="dock-cover-trigger"
@@ -124,11 +78,8 @@ export function PlayerBar() {
               p.current ? `展开全屏播放器：${titleOf(p.current)}` : undefined
             }
           >
-            {p.current ? titleOf(p.current) : "选一首歌，听听看"}
+            {p.current ? titleOf(p.current) : "未选择歌曲"}
           </UnstyledButton>
-          <span className="muted small">
-            {p.current ? "我的音乐" : "我的音乐"}
-          </span>
         </div>
       </div>
       <div className="dock-main">
@@ -253,7 +204,7 @@ export function PlayerBar() {
                 </UnstyledButton>
               ))
             ) : (
-              <p className="muted">播放歌曲后会显示在这里。</p>
+              <p className="muted">队列为空</p>
             )}
           </Popover.Dropdown>
         </Popover>

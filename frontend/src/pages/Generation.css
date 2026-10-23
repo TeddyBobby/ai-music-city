@@ -5,7 +5,7 @@
   scroll-margin-top: 24px;
 }
 .generation-heading {
-  margin-bottom: 26px;
+  margin-bottom: 20px;
 }
 .generation-back {
   display: inline-flex;
@@ -113,7 +113,7 @@
   min-width: 0;
 }
 .generation-result h2 {
-  margin: 8px 0;
+  margin: 0;
   font-size: 23px;
   line-height: 1.4;
 }
@@ -129,7 +129,7 @@
   flex-wrap: wrap;
   align-items: center;
   gap: 7px;
-  margin-top: 15px;
+  margin-top: 10px;
   font-size: 12px;
   color: var(--muted);
 }
@@ -231,7 +231,7 @@
   gap: 0;
   list-style: none;
   padding: 0;
-  margin: 24px 0 0;
+  margin: 18px 0 0;
 }
 .generation-steps li {
   position: relative;
@@ -281,10 +281,6 @@
   line-height: 1.6;
   margin-top: 4px;
 }
-.generation-steps li > small {
-  font-size: 11px;
-  padding-top: 5px;
-}
 .generation-steps .is-complete .generation-step-icon {
   background: var(--surface-2);
   border-color: transparent;
@@ -292,9 +288,6 @@
 }
 .generation-steps .is-complete {
   color: var(--text);
-}
-.generation-steps .is-complete > small {
-  color: var(--muted);
 }
 .generation-steps .is-current {
   color: var(--accent);
@@ -340,17 +333,12 @@
 }
 .generation-process-footer {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   gap: 14px;
   margin-top: 20px;
   padding-top: 12px;
   border-top: 1px solid var(--line);
-}
-.generation-process-footer span {
-  color: var(--muted);
-  font-size: 11px;
-  line-height: 1.6;
 }
 .generation-process-footer button {
   min-height: 40px;
@@ -432,7 +420,7 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  margin-bottom: 26px;
+  margin-bottom: 18px;
 }
 .generation-editor-heading > span {
   display: grid;
@@ -446,11 +434,6 @@
 .generation-editor h2 {
   margin: 0;
   font-size: 18px;
-}
-.generation-editor-heading p {
-  margin: 5px 0 0;
-  font-size: 12px;
-  color: var(--muted);
 }
 .generation-editor fieldset {
   min-width: 0;
@@ -492,11 +475,6 @@
 .generation-field textarea::placeholder {
   color: var(--muted);
   font-size: 14px;
-}
-.generation-field small {
-  font-size: 11px;
-  color: var(--muted);
-  font-weight: 400;
 }
 .generation-kind {
   display: flex;
@@ -567,13 +545,6 @@
 .generation-submit:disabled {
   opacity: 0.5;
   cursor: default;
-}
-.generation-editor-note {
-  text-align: center;
-  font-size: 11px;
-  line-height: 1.7;
-  margin: 11px 0 0;
-  color: var(--muted);
 }
 .generation-notice,
 .generation-action-error,
@@ -703,8 +674,8 @@
   }
   .generation-editor-heading {
     flex: 0 0 auto;
-    margin-bottom: 22px;
-    padding-bottom: 18px;
+    margin-bottom: 16px;
+    padding-bottom: 14px;
     border-bottom: 1px solid var(--line);
   }
   .generation-editor-heading > span {
@@ -762,11 +733,6 @@
     min-height: 44px;
     border-radius: 10px;
     font-size: 13px;
-  }
-  .generation-editor-note {
-    flex: 0 0 auto;
-    font-size: 10px;
-    margin-bottom: 0;
   }
   .generation-action-error {
     flex: 0 0 auto;
@@ -920,7 +886,7 @@
     margin-top: 21px;
   }
   .generation-editor-heading {
-    margin-bottom: 22px;
+    margin-bottom: 16px;
   }
   .generation-kind .music-kind-option > span {
     padding: 0 13px;

@@ -67,7 +67,7 @@ export function PricingPage() {
     <div className="pricing-page">
       <div className="pricing-toolbar">
         <header className="pricing-heading">
-          <h1>给灵感，多一点可能。</h1>
+          <h1>订阅方案</h1>
         </header>
 
         <div className="pricing-cycle-row">
@@ -89,7 +89,6 @@ export function PricingPage() {
             withItemsBorders={false}
             radius="xl"
           />
-          <span className="pricing-yearly-note">年付更划算</span>
         </div>
       </div>
 
@@ -167,10 +166,7 @@ export function PricingPage() {
       </section>
 
       <footer className="pricing-notes">
-        <div>
-          <p className="pricing-common">均支持文字、哼唱、图片创作与 AI 助手</p>
-          <p>演示套餐，不会扣费</p>
-        </div>
+        <p>演示套餐，不会扣费</p>
         <UnstyledButton
           className="pricing-details-button"
           onClick={() => setDetailsOpen(true)}
@@ -211,7 +207,7 @@ export function PricingPage() {
       <Modal
         opened={Boolean(order)}
         onClose={() => setOrder(null)}
-        title="确认体验方案"
+        title="模拟订阅"
         centered
         size={420}
         padding="lg"
@@ -225,7 +221,6 @@ export function PricingPage() {
       >
         {order && (
           <>
-            <span className="pricing-demo-label">模拟订单</span>
             <dl className="pricing-order-summary">
               <div>
                 <dt>方案</dt>
@@ -240,11 +235,11 @@ export function PricingPage() {
                 </dd>
               </div>
               <div>
-                <dt>展示额度</dt>
+                <dt>月额度</dt>
                 <dd>{order.plan.monthlySongs} 首 / 月</dd>
               </div>
               <div className="pricing-order-total">
-                <dt>模拟订单总额</dt>
+                <dt>总额</dt>
                 <dd>¥{orderAmount(order.plan, order.cycle)}</dd>
               </div>
             </dl>

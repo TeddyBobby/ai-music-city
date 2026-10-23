@@ -53,24 +53,10 @@
 .as-message-user .as-message-body .as-message-content {
   max-width: 100%;
 }
-.as-message-user .as-message-meta {
-  justify-content: flex-end;
-}
 .as-message-tools {
   display: flex;
   align-items: center;
   margin-top: 6px;
-}
-.as-draft-topline {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  width: 100%;
-  min-height: 24px;
-}
-.as-draft-topline .assistant-copy-button {
-  margin-block: -8px;
 }
 @media (max-width: 760px) {
   .as-message-avatar {
@@ -97,9 +83,6 @@
   }
   .as-message-tools {
     margin-top: 0;
-  }
-  .as-draft-topline {
-    gap: 4px;
   }
   .as-message-content .as-song-draft {
     padding: 14px;

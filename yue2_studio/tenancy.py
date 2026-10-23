@@ -47,8 +47,10 @@ class TenantRegistry:
     """Keep user services alive across navigation and HTTP sessions.
 
     The legacy owner's runtime uses the original files in place. Other users
-    receive fresh databases and file namespaces, sharing only server model files
-    and provider configuration. Logging out never interrupts a running job.
+    receive fresh databases and file namespaces, sharing server model files and
+    the deployment's fallback provider. Personal provider overrides stay inside
+    each user's assistant directory, including the legacy owner's override.
+    Logging out never interrupts a running job.
     """
 
     def __init__(self, app, dispatcher: SharedDispatcher):

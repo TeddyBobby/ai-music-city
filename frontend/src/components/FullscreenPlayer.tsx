@@ -11,25 +11,15 @@ function playerOrigin() {
   );
   const rect = button?.getBoundingClientRect();
   if (rect && rect.width > 0 && rect.height > 0) {
-    // getBoundingClientRect includes the dock's hide/show translation. Remove it
-    // so even a cover opened while scrolling expands from the resting control.
-    const dock = button.closest<HTMLElement>(".player-dock");
-    const transform = dock ? getComputedStyle(dock).transform : "none";
-    const translation =
-      transform !== "none" ? new DOMMatrixReadOnly(transform) : null;
-    const x = rect.left + rect.width / 2 - (translation?.m41 || 0);
-    const y = rect.top + rect.height / 2 - (translation?.m42 || 0);
+    const x = rect.left + rect.width / 2;
+    const y = rect.top + rect.height / 2;
     return `${Math.min(window.innerWidth, Math.max(0, x))}px ${Math.min(window.innerHeight, Math.max(0, y))}px`;
   }
-  // Compact layouts hide the expand button. Anchor to the resting playback
-  // bar above mobile navigation, including while the bar is sliding away.
+  // Compact layouts hide the expand button; anchor to the fixed playback bar.
   const dock = document.querySelector<HTMLElement>(".player-dock");
   const dockRect = dock?.getBoundingClientRect();
   if (dock && dockRect && dockRect.height > 0) {
-    const transform = getComputedStyle(dock).transform;
-    const translation =
-      transform !== "none" ? new DOMMatrixReadOnly(transform) : null;
-    return `${Math.max(0, window.innerWidth - 24)}px ${Math.min(window.innerHeight, Math.max(0, dockRect.top + dockRect.height / 2 - (translation?.m42 || 0)))}px`;
+    return `${Math.max(0, window.innerWidth - 24)}px ${Math.min(window.innerHeight, Math.max(0, dockRect.top + dockRect.height / 2))}px`;
   }
   return `${Math.max(0, window.innerWidth - 24)}px ${Math.max(0, window.innerHeight - 32)}px`;
 }
@@ -44,8 +34,7 @@ export function FullscreenPlayer() {
   const [origin, setOrigin] = useState("100% 100%");
 
   // Measure before opening, then retain that point throughout the exit animation.
-  // The dock may slide back into view as the layer closes; it must not move the
-  // animation origin. Only a resize while fully open needs a fresh measurement.
+  // Only a resize while fully open needs a fresh measurement.
   useLayoutEffect(() => {
     if (!opened) return;
     const updateOrigin = () => setOrigin(playerOrigin());

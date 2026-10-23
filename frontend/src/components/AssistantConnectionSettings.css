@@ -1,0 +1,106 @@
+.assistant-connection {
+  width: 100%;
+  min-width: 0;
+  --connection-padding: 0px;
+}
+.preferences-section .assistant-connection {
+  --connection-padding: var(--settings-padding);
+}
+.assistant-connection-row {
+  display: grid;
+  grid-template-columns: minmax(130px, 0.65fr) minmax(0, 1fr);
+  gap: 12px 28px;
+  align-items: center;
+  min-width: 0;
+  padding: 16px var(--connection-padding);
+}
+.assistant-connection-row + .assistant-connection-row,
+.assistant-connection-footer {
+  border-top: 1px solid var(--line);
+}
+.assistant-connection label {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.assistant-connection-label {
+  min-width: 0;
+}
+.assistant-connection p {
+  margin: 4px 0 0;
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.assistant-connection .assistant-connection-control {
+  width: 100%;
+  min-width: 0;
+}
+.assistant-connection .mantine-Input-input {
+  border-radius: 7px;
+  min-height: 40px;
+  background: var(--surface);
+}
+.assistant-connection-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 14px;
+  padding: 16px var(--connection-padding);
+}
+.assistant-connection-status {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.assistant-connection .is-error {
+  color: var(--danger);
+}
+.assistant-connection .is-success {
+  color: var(--accent);
+}
+.assistant-connection-actions {
+  display: flex;
+  margin-left: auto;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.assistant-connection .mantine-Button-root.btn {
+  min-height: 40px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+.assistant-connection-loading {
+  padding: 16px var(--settings-padding, 0px);
+  font-size: 13px;
+  color: var(--muted);
+}
+.assistant-connection-loading p {
+  margin-bottom: 12px;
+}
+.ui-dialog .assistant-connection-row {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 8px;
+}
+.ui-dialog .assistant-connection-status {
+  flex-basis: 100%;
+}
+@media (max-width: 760px) {
+  .assistant-connection-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+  }
+  .assistant-connection .mantine-Input-input,
+  .assistant-connection .mantine-Button-root.btn {
+    min-height: 44px;
+  }
+  .assistant-connection-actions {
+    width: 100%;
+  }
+  .assistant-connection-actions .btn {
+    flex: 1 1 auto;
+    padding-inline: 10px;
+  }
+}

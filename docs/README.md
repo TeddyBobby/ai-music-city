@@ -1,3 +1,5 @@
+> 当前 AI乐之城的产品介绍见 [项目 README](../README.md)，安装与使用见 [中文指南](setup.md)。以下保留 YuE2 Studio 上游文档，页面与部分入口以原版为准。
+
 # YuE2 Studio documentation
 
 YuE2 Studio is a local web app for making full songs with [YuE2-3B](https://huggingface.co/m-a-p/YuE2-3B)

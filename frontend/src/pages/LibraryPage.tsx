@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { SegmentedControl, UnstyledButton } from "@mantine/core";
+import { Menu, SegmentedControl, UnstyledButton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
   Download,
   LoaderCircle,
   Maximize2,
+  MoreHorizontal,
   Music2,
   Pause,
   Play,
@@ -350,7 +351,7 @@ export function LibraryPage() {
         </div>
       ) : songs.length === 0 && !error ? (
         pending.length ? null : musicKind === "all" ? (
-          <EmptyState title="第一首歌，从你开始">
+          <EmptyState title="暂无音乐">
             <Link className="btn primary" to="/home">
               创作音乐
             </Link>
@@ -426,44 +427,93 @@ export function LibraryPage() {
                 >
                   {when(job.created_at)}
                 </time>
-                <div className="simple-song-actions">
-                  <Link
-                    className="simple-song-action simple-song-edit"
-                    to={`/generation/${encodeURIComponent(job.id)}`}
-                    aria-label={`微调 ${titleOf(job)}`}
-                    title="微调"
+                {desktop ? (
+                  <div className="simple-song-actions">
+                    <Link
+                      className="simple-song-action simple-song-edit"
+                      to={`/generation/${encodeURIComponent(job.id)}`}
+                      aria-label={`微调 ${titleOf(job)}`}
+                      title="微调"
+                    >
+                      <SlidersHorizontal size={18} />
+                      <span>微调</span>
+                    </Link>
+                    <a
+                      className="simple-song-action"
+                      href={download.url}
+                      download={download.name}
+                      aria-label={`下载 ${titleOf(job)}`}
+                      title="下载"
+                    >
+                      <Download size={19} />
+                      <span>下载</span>
+                    </a>
+                    <button
+                      className="simple-song-action"
+                      onClick={() => setSharing(job)}
+                      aria-label={`分享 ${titleOf(job)}`}
+                      title="分享"
+                    >
+                      <Share2 size={19} />
+                      <span>分享</span>
+                    </button>
+                    <button
+                      className="simple-song-action simple-song-open"
+                      onClick={() => openPlayer(job.id)}
+                      aria-label={`打开 ${titleOf(job)} 的播放页`}
+                      title="打开播放页"
+                    >
+                      <Maximize2 size={17} />
+                    </button>
+                  </div>
+                ) : (
+                  <Menu
+                    position="bottom-end"
+                    width={180}
+                    withinPortal
+                    returnFocus
+                    zIndex={600}
                   >
-                    <SlidersHorizontal size={18} />
-                    <span>微调</span>
-                  </Link>
-                  <a
-                    className="simple-song-action"
-                    href={download.url}
-                    download={download.name}
-                    aria-label={`下载 ${titleOf(job)}`}
-                    title="下载"
-                  >
-                    <Download size={19} />
-                    <span>下载</span>
-                  </a>
-                  <button
-                    className="simple-song-action"
-                    onClick={() => setSharing(job)}
-                    aria-label={`分享 ${titleOf(job)}`}
-                    title="分享"
-                  >
-                    <Share2 size={19} />
-                    <span>分享</span>
-                  </button>
-                  <button
-                    className="simple-song-action simple-song-open"
-                    onClick={() => openPlayer(job.id)}
-                    aria-label={`打开 ${titleOf(job)} 的播放页`}
-                    title="打开播放页"
-                  >
-                    <Maximize2 size={17} />
-                  </button>
-                </div>
+                    <Menu.Target>
+                      <IconButton
+                        className="simple-song-more"
+                        label={`更多操作 ${titleOf(job)}`}
+                        style={{ width: 44, height: 44 }}
+                      >
+                        <MoreHorizontal size={21} />
+                      </IconButton>
+                    </Menu.Target>
+                    <Menu.Dropdown className="simple-song-menu">
+                      <Menu.Item
+                        leftSection={<Maximize2 size={17} />}
+                        onClick={() => openPlayer(job.id)}
+                      >
+                        打开播放页
+                      </Menu.Item>
+                      <Menu.Item
+                        component={Link}
+                        to={`/generation/${encodeURIComponent(job.id)}`}
+                        leftSection={<SlidersHorizontal size={18} />}
+                      >
+                        微调
+                      </Menu.Item>
+                      <Menu.Item
+                        component="a"
+                        href={download.url}
+                        download={download.name}
+                        leftSection={<Download size={18} />}
+                      >
+                        下载
+                      </Menu.Item>
+                      <Menu.Item
+                        leftSection={<Share2 size={18} />}
+                        onClick={() => setSharing(job)}
+                      >
+                        分享
+                      </Menu.Item>
+                    </Menu.Dropdown>
+                  </Menu>
+                )}
               </article>
             );
           })}

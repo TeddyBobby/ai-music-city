@@ -21,30 +21,24 @@ import {
   Settings2,
   Square,
 } from "lucide-react";
-import { assistantApi } from "../lib/assistant";
-import type {
-  AssistantConfig,
-  AssistantConfigPatch,
-  AssistantMessage,
-  Suggestion,
-} from "../lib/assistant";
+import type { AssistantMessage, Suggestion } from "../lib/assistant";
 import {
   generateFromSuggestion,
   isInstrumentalPrompt,
 } from "../lib/musicCreation";
 import { errorMessage } from "../lib/utils";
-import { Button, Dialog, IconButton, Input } from "../components/ui";
+import { Button, Dialog, IconButton } from "../components/ui";
+import { AssistantConnectionSettings } from "../components/AssistantConnectionSettings";
 import { AssistantAudioInput } from "../components/AssistantAudioInput";
 import { AssistantImageInput } from "../components/AssistantImageInput";
 import { AssistantCopyButton } from "../components/AssistantCopyButton";
+import { AssistantMarkdown } from "../components/AssistantMarkdown";
 import { MusicKindToggle, type MusicKind } from "../components/MusicKindToggle";
 import { assistantConversation } from "../lib/assistantConversation";
 import { useAuth } from "../state/auth";
 import "./Assistant.css";
 import "./AssistantMessage.css";
-
-const isAbort = (error: unknown) =>
-  error instanceof Error && error.name === "AbortError";
+import "../components/AssistantMarkdown.css";
 
 function messageText(message: AssistantMessage) {
   if (message.suggestion) {
@@ -84,109 +78,6 @@ function messageCopyText(message: AssistantMessage) {
   ]
     .filter(Boolean)
     .join("\n\n");
-}
-
-function ConnectionSettings({ onConnected }: { onConnected: () => void }) {
-  const [config, setConfig] = useState<AssistantConfig | null>(null);
-  const [values, setValues] = useState<AssistantConfigPatch>({
-    hermes_base_url: "",
-  });
-  const [busy, setBusy] = useState(false);
-  const [notice, setNotice] = useState("");
-  const controller = useRef<AbortController | null>(null);
-  useEffect(() => {
-    const request = new AbortController();
-    controller.current = request;
-    assistantApi
-      .config(request.signal)
-      .then((saved) => {
-        if (!request.signal.aborted) {
-          setConfig(saved);
-          setValues({ hermes_base_url: saved.hermes_base_url });
-        }
-      })
-      .catch((error) => {
-        if (!isAbort(error)) setNotice(errorMessage(error));
-      });
-    return () => controller.current?.abort();
-  }, []);
-  const save = async () => {
-    if (busy || !config || !values.hermes_base_url.trim()) return;
-    const request = new AbortController();
-    controller.current = request;
-    setBusy(true);
-    setNotice("");
-    try {
-      const patch = {
-        ...values,
-        hermes_base_url: values.hermes_base_url.trim(),
-      };
-      if (!patch.hermes_api_key?.trim()) delete patch.hermes_api_key;
-      const saved = await assistantApi.saveConfig(patch, request.signal);
-      const status = await assistantApi.check(request.signal);
-      if (request.signal.aborted) return;
-      setConfig(saved);
-      setValues({ hermes_base_url: saved.hermes_base_url });
-      setNotice(
-        status.chat.available
-          ? "已连接"
-          : status.chat.message || "连接失败，请检查配置。",
-      );
-      if (status.chat.available) onConnected();
-    } catch (error) {
-      if (!isAbort(error)) setNotice(errorMessage(error));
-    } finally {
-      if (!request.signal.aborted) setBusy(false);
-    }
-  };
-  return (
-    <form
-      className="as-settings"
-      onSubmit={(event) => {
-        event.preventDefault();
-        void save();
-      }}
-    >
-      <label className="field">
-        服务地址
-        <Input
-          aria-label="Agent 服务地址"
-          type="url"
-          required
-          value={values.hermes_base_url}
-          onChange={(event) =>
-            setValues((old) => ({
-              ...old,
-              hermes_base_url: event.target.value,
-            }))
-          }
-          disabled={busy}
-        />
-      </label>
-      <label className="field">
-        访问凭证
-        <Input
-          aria-label="Agent 访问凭证"
-          type="password"
-          autoComplete="new-password"
-          placeholder={config?.has_hermes_api_key ? "留空保持现有凭证" : "选填"}
-          value={values.hermes_api_key || ""}
-          onChange={(event) =>
-            setValues((old) => ({ ...old, hermes_api_key: event.target.value }))
-          }
-          disabled={busy}
-        />
-      </label>
-      <Button type="submit" variant="primary" disabled={busy || !config}>
-        {busy ? "连接中…" : "保存并连接"}
-      </Button>
-      {notice && (
-        <p className="muted" role="status">
-          {notice}
-        </p>
-      )}
-    </form>
-  );
 }
 
 function SongDraft({ suggestion }: { suggestion: Suggestion }) {
@@ -231,15 +122,12 @@ function SongDraft({ suggestion }: { suggestion: Suggestion }) {
   };
   return (
     <section className="as-song-draft" aria-label="音乐草稿">
-      <div className="as-draft-topline">
-        <span className="as-draft-eyebrow">创作方案</span>
-        {musicKind === "vocal" && suggestion.lyrics && (
-          <AssistantCopyButton value={suggestion.lyrics} label="复制歌词" />
-        )}
-      </div>
       <div className="as-draft-heading">
         <Music2 size={20} />
         <strong>{suggestion.title || "你的新歌"}</strong>
+        {musicKind === "vocal" && suggestion.lyrics && (
+          <AssistantCopyButton value={suggestion.lyrics} label="复制歌词" />
+        )}
       </div>
       {(suggestion.description || suggestion.style) && (
         <p className="as-draft-style">
@@ -250,8 +138,7 @@ function SongDraft({ suggestion }: { suggestion: Suggestion }) {
         <details className="as-draft-lyrics-block">
           <summary>
             歌词
-            <span className="as-draft-fold-open">收起</span>
-            <span className="as-draft-fold-closed">展开</span>
+            <ChevronDown size={16} aria-hidden="true" />
           </summary>
           <div className="as-draft-lyrics">{suggestion.lyrics}</div>
         </details>
@@ -319,7 +206,7 @@ const starters = {
 };
 
 export function AssistantPage() {
-  const canConfigure = useAuth((s) => !!s.user?.is_admin);
+  const canConfigure = useAuth((s) => !!s.user);
   const userInitial = useAuth((s) =>
     Array.from(s.user?.email?.split("@")[0] || "我")[0].toUpperCase(),
   );
@@ -408,6 +295,16 @@ export function AssistantPage() {
     void assistantConversation.send();
   };
   const providers = [...new Set(models.map((model) => model.provider))];
+  const modelPlaceholder = modelsLoading
+    ? "加载模型…"
+    : modelsError
+      ? "模型加载失败"
+      : models.length
+        ? "选择模型"
+        : "暂无可用模型";
+  const modelLabel =
+    models.find((model) => model.id === selectedModel)?.name ||
+    modelPlaceholder;
 
   return (
     <div className="assistant-page">
@@ -475,18 +372,15 @@ export function AssistantPage() {
                     )}
                   </span>
                   <div className="as-message-body">
-                    <div className="as-message-meta">
-                      <span>
-                        {message.role === "assistant" ? "AI 助手" : "你"}
-                      </span>
-                      {message.role === "assistant" &&
-                        message.status === "streaming" && (
+                    {message.role === "assistant" &&
+                      message.status === "streaming" && (
+                        <div className="as-message-meta">
                           <span className="as-answering" role="status">
                             <Loader size={11} />
                             正在回答…
                           </span>
-                        )}
-                    </div>
+                        </div>
+                      )}
                     <div className="as-message-content">
                       {message.image && (
                         <img
@@ -527,11 +421,17 @@ export function AssistantPage() {
                         <>
                           {messageText(message) && (
                             <div className="as-message-text">
-                              {messageText(message)
-                                .split(/\n{2,}/)
-                                .map((paragraph, index) => (
-                                  <p key={index}>{paragraph}</p>
-                                ))}
+                              {message.role === "assistant" ? (
+                                <AssistantMarkdown>
+                                  {messageText(message)}
+                                </AssistantMarkdown>
+                              ) : (
+                                messageText(message)
+                                  .split(/\n{2,}/)
+                                  .map((paragraph, index) => (
+                                    <p key={index}>{paragraph}</p>
+                                  ))
+                              )}
                             </div>
                           )}
                           {message.suggestion && (
@@ -635,14 +535,14 @@ export function AssistantPage() {
               value={input}
               placeholder={
                 image
-                  ? "想让这张图片听起来怎样？"
+                  ? "描述图片的氛围…"
                   : audio
                     ? lyricsMode
-                      ? "补充歌词主题、风格或想唱的话…"
-                      : "补充这段语音的想法…"
+                      ? "补充歌词主题…"
+                      : "补充音频描述…"
                     : lyricsMode
-                      ? "描述想写的主题，或粘贴想改的歌词…"
-                      : "聊聊音乐，也聊聊你的想法…"
+                      ? "歌词主题或原稿…"
+                      : "聊聊你的想法…"
               }
               aria-label="给 AI 助手发消息"
               disabled={sessionLoading}
@@ -688,81 +588,83 @@ export function AssistantPage() {
                   radius="md"
                   withItemsBorders={false}
                 />
-                <Select
-                  className="as-model-picker"
-                  w={156}
-                  maw="100%"
-                  style={{ flexShrink: 0 }}
-                  classNames={{
-                    input: "as-model-input",
-                    dropdown: "as-model-dropdown",
-                    option: "as-model-option",
-                    groupLabel: "as-model-group",
-                  }}
-                  aria-label="选择助手模型"
-                  aria-busy={modelsLoading}
-                  variant="unstyled"
-                  value={selectedModel || null}
-                  data={providers.map((provider) => ({
-                    group: provider || "其他模型",
-                    items: models
-                      .filter((model) => model.provider === provider)
-                      .map((model) => ({ value: model.id, label: model.name })),
-                  }))}
-                  onChange={(value) => {
-                    if (
-                      !busy &&
-                      !modelsLoading &&
-                      !modelsError &&
-                      value &&
-                      models.some((model) => model.id === value)
-                    )
-                      assistantConversation.setModel(value);
-                  }}
-                  onKeyDown={(event) => {
-                    // Selecting or searching a model must not submit the message form.
-                    if (event.key === "Enter" && !event.nativeEvent.isComposing)
-                      event.preventDefault();
-                  }}
-                  disabled={
-                    busy || modelsLoading || !!modelsError || !models.length
-                  }
-                  searchable
-                  clearable={false}
-                  allowDeselect={false}
-                  placeholder={
-                    modelsLoading
-                      ? "加载模型…"
-                      : modelsError
-                        ? "模型加载失败"
-                        : models.length
-                          ? "选择模型"
-                          : "暂无可用模型"
-                  }
-                  nothingFoundMessage={
-                    modelsLoading
-                      ? "正在加载模型…"
-                      : modelsError
-                        ? "模型加载失败，请重试"
-                        : models.length
-                          ? "没有匹配的模型"
-                          : "暂无可用模型"
-                  }
-                  rightSection={
-                    modelsLoading ? (
-                      <Loader size={13} />
-                    ) : (
-                      <ChevronDown size={14} aria-hidden="true" />
-                    )
-                  }
-                  comboboxProps={{
-                    position: "top-start",
-                    withinPortal: true,
-                    width: 240,
-                    offset: 8,
-                  }}
-                  maxDropdownHeight={260}
-                />
+                <div className="as-model-control">
+                  <span className="as-model-measure" aria-hidden="true">
+                    {modelLabel}
+                  </span>
+                  <Select
+                    className="as-model-picker"
+                    classNames={{
+                      input: "as-model-input",
+                      dropdown: "as-model-dropdown",
+                      option: "as-model-option",
+                      groupLabel: "as-model-group",
+                    }}
+                    aria-label="选择助手模型"
+                    title={modelLabel}
+                    aria-busy={modelsLoading}
+                    variant="unstyled"
+                    value={selectedModel || null}
+                    data={providers.map((provider) => ({
+                      group: provider || "其他模型",
+                      items: models
+                        .filter((model) => model.provider === provider)
+                        .map((model) => ({
+                          value: model.id,
+                          label: model.name,
+                        })),
+                    }))}
+                    onChange={(value) => {
+                      if (
+                        !busy &&
+                        !modelsLoading &&
+                        !modelsError &&
+                        value &&
+                        models.some((model) => model.id === value)
+                      )
+                        assistantConversation.setModel(value);
+                    }}
+                    onKeyDown={(event) => {
+                      // Selecting or searching a model must not submit the message form.
+                      if (
+                        event.key === "Enter" &&
+                        !event.nativeEvent.isComposing
+                      )
+                        event.preventDefault();
+                    }}
+                    disabled={
+                      busy || modelsLoading || !!modelsError || !models.length
+                    }
+                    searchable
+                    clearable={false}
+                    allowDeselect={false}
+                    placeholder={modelPlaceholder}
+                    nothingFoundMessage={
+                      modelsLoading
+                        ? "正在加载模型…"
+                        : modelsError
+                          ? "模型加载失败，请重试"
+                          : models.length
+                            ? "没有匹配的模型"
+                            : "暂无可用模型"
+                    }
+                    rightSection={
+                      modelsLoading ? (
+                        <Loader size={13} />
+                      ) : (
+                        <ChevronDown size={14} aria-hidden="true" />
+                      )
+                    }
+                    rightSectionWidth={28}
+                    comboboxProps={{
+                      position: "top-start",
+                      withinPortal: true,
+                      width: 240,
+                      offset: 8,
+                    }}
+                    maxDropdownHeight={260}
+                  />
+                </div>
               </div>
               <AssistantImageInput
                 compact
@@ -802,7 +704,7 @@ export function AssistantPage() {
           </form>
           {phase === "uploading" && (
             <p className="as-uploading" role="status">
-              正在准备素材…
+              上传中…
             </p>
           )}
           {empty && !audio && !image && (
@@ -861,12 +763,7 @@ export function AssistantPage() {
       </Drawer>
       {canConfigure && settingsOpen && (
         <Dialog title="助手设置" onClose={() => setSettingsOpen(false)}>
-          <ConnectionSettings
-            onConnected={() => {
-              assistantConversation.setConnected(true);
-              void assistantConversation.refreshModels();
-            }}
-          />
+          <AssistantConnectionSettings />
         </Dialog>
       )}
     </div>

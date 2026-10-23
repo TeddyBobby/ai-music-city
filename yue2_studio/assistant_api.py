@@ -80,14 +80,12 @@ async def status(request: Request):
 
 
 @router.post('/check')
-async def check(request: Request):
-    return await service(request).status(refresh=True)
+async def check(request: Request, body: dict | None = None):
+    return await service(request).status(refresh=True, draft=body or None)
 
 
 @router.get('/config')
 async def config(request: Request):
-    from yue2_studio.auth_api import require_admin
-    require_admin(request)
     return service(request).public_config()
 
 
@@ -176,8 +174,6 @@ async def read_image(request: Request, image_id: str):
 
 @router.put('/config')
 async def update_config(request: Request, body: dict):
-    from yue2_studio.auth_api import require_admin
-    require_admin(request)
     return service(request).update_config(body)
 
 

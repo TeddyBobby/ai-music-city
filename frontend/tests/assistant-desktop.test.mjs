@@ -28,6 +28,7 @@ function setup({
   messages = [],
   current = null,
   isAdmin = false,
+  signedIn = true,
   mode = "chat",
   image = null,
   audio = null,
@@ -92,7 +93,10 @@ function setup({
           UnstyledButton: "UnstyledButton",
         };
       if (name === "../state/auth")
-        return { useAuth: (select) => select({ user: { is_admin: isAdmin } }) };
+        return {
+          useAuth: (select) =>
+            select({ user: signedIn ? { is_admin: isAdmin } : null }),
+        };
       if (name === "../lib/assistantConversation")
         return {
           assistantConversation: {
@@ -113,6 +117,8 @@ function setup({
         return { AssistantImageInput: "AssistantImageInput" };
       if (name === "../components/AssistantCopyButton")
         return { AssistantCopyButton: "AssistantCopyButton" };
+      if (name === "../components/AssistantMarkdown")
+        return { AssistantMarkdown: "AssistantMarkdown" };
       if (name === "../components/MusicKindToggle")
         return { MusicKindToggle: "MusicKindToggle" };
       if (name === "../lib/musicCreation")
@@ -284,13 +290,12 @@ test("the empty composer has two quick actions, and a conversation hides the wel
   assert.equal(chat.runEffects().scrollTop, 500);
 });
 
-test("history uses a drawer and administrative settings stay inside that drawer", () => {
-  const h = setup({ isAdmin: true });
+test("history uses a drawer and every signed-in user can configure their own assistant", () => {
+  const h = setup();
   assert.equal(
     h.find((node) => node.type === "aside"),
     undefined,
   );
-  const drawer = h.find((node) => node.type === "Drawer");
   const header = h.find((node) => node.type === "header");
   assert.equal(
     h.within(header, (node) => node.props?.label === "新对话").length,
@@ -300,10 +305,22 @@ test("history uses a drawer and administrative settings stay inside that drawer"
     h.within(header, (node) => node.props?.label === "聊天历史").length,
     1,
   );
+  for (const isAdmin of [false, true]) {
+    const account = setup({ isAdmin });
+    const drawer = account.find((node) => node.type === "Drawer");
+    assert.equal(
+      account.within(
+        drawer,
+        (node) => node.props?.className === "as-history-settings",
+      ).length,
+      1,
+    );
+  }
   assert.equal(
-    h.within(drawer, (node) => node.props?.className === "as-history-settings")
-      .length,
-    1,
+    setup({ signedIn: false }).find(
+      (node) => node.props?.className === "as-history-settings",
+    ),
+    undefined,
   );
 });
 
@@ -377,11 +394,10 @@ test("a natural reply and its creation proposal are both readable", () => {
     ],
   });
   const natural = h.find((node) => node.props?.className === "as-message-text");
-  assert.deepEqual(
-    h
-      .within(natural, (node) => node.type === "p")
-      .map((node) => node.props.children),
-    ["这是我整理的创作方案。", "听起来会很温暖。"],
+  assert.equal(
+    h.within(natural, (node) => node.type === "AssistantMarkdown")[0].props
+      .children,
+    "这是我整理的创作方案。\n\n听起来会很温暖。",
   );
   const proposal = h.find(
     (node) => typeof node.type === "function" && node.type.name === "SongDraft",

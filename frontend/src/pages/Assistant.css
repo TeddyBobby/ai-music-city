@@ -166,8 +166,27 @@
   background: var(--surface);
   box-shadow: 0 1px 4px #1020170b;
 }
-.as-compose-controls .as-model-picker {
-  max-width: 156px;
+.as-model-control {
+  position: relative;
+  flex: 0 1 auto;
+  width: max-content;
+  max-width: 100%;
+  min-width: 0;
+  font-size: 13px;
+  font-weight: 500;
+}
+/* Size the searchable input from its label, not its default intrinsic width. */
+.as-model-measure {
+  display: block;
+  height: 44px;
+  padding-inline: 4px 32px;
+  visibility: hidden;
+  white-space: pre;
+}
+.as-model-control .as-model-picker {
+  position: absolute;
+  inset: 0;
+  width: 100%;
   min-width: 0;
 }
 .as-model-picker .as-model-input {
@@ -180,8 +199,7 @@
   background: transparent;
   color: var(--muted);
   font: inherit;
-  font-size: 13px;
-  font-weight: 500;
+  padding-inline: 4px 32px;
   text-overflow: ellipsis;
   outline-offset: 1px;
   cursor: pointer;
@@ -544,19 +562,23 @@ button.as-connect-notice {
 .as-message-text + .as-song-draft {
   margin-top: 20px;
 }
-.as-draft-eyebrow {
-  color: var(--accent);
-  font-size: 11px;
-  letter-spacing: 0.6px;
-}
 .as-draft-heading {
   display: flex;
   align-items: center;
   gap: 9px;
+  width: 100%;
+  min-width: 0;
   font-size: 20px;
 }
 .as-draft-heading strong {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-weight: 550;
+}
+.as-draft-heading .assistant-copy-button {
+  flex-shrink: 0;
+  margin-block: -8px;
 }
 .as-draft-heading svg {
   flex-shrink: 0;
@@ -580,16 +602,12 @@ button.as-connect-notice {
   display: flex;
   align-items: center;
 }
-.as-song-draft summary > span {
+.as-song-draft summary > svg {
   margin-left: auto;
-  font-size: 11px;
+  flex-shrink: 0;
 }
-.as-draft-lyrics-block .as-draft-fold-open,
-.as-draft-lyrics-block[open] .as-draft-fold-closed {
-  display: none;
-}
-.as-draft-lyrics-block[open] .as-draft-fold-open {
-  display: inline;
+.as-draft-lyrics-block[open] summary > svg {
+  transform: rotate(180deg);
 }
 .as-draft-lyrics {
   white-space: pre-wrap;
@@ -612,6 +630,12 @@ button.as-connect-notice {
   min-height: 40px;
   border-radius: 10px;
   font-size: 13px;
+}
+
+@media (max-width: 760px), (pointer: coarse) {
+  .as-model-control {
+    font-size: max(16px, 1rem);
+  }
 }
 
 @media (max-width: 760px) {
@@ -690,13 +714,6 @@ button.as-connect-notice {
     max-height: 44px;
     border-radius: 10px;
     box-shadow: inset 0 0 0 3px var(--surface-2);
-  }
-  .as-compose-settings .as-model-picker {
-    flex: 0 1 156px !important;
-    min-width: 0;
-  }
-  .as-model-picker .as-model-input {
-    font-size: 16px;
   }
   .as-compose-controls .assistant-image-pick {
     grid-column: 1;
