@@ -6,6 +6,7 @@ import "@mantine/core/styles.css";
 import "./styles.css";
 import "./Product.css";
 import "./mobile.css";
+import "./pages/Auth.css";
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: boolean }

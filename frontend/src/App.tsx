@@ -295,7 +295,13 @@ function AccountMenu({ showName = false }: { showName?: boolean }) {
   const location = useLocation();
   const { user, logout } = useAuth();
   const [busy, setBusy] = useState(false);
-  if (!user) return null;
+  if (!user)
+    return (
+      <Link to="/login" className="account-guest-login" aria-label="登录">
+        <span className="account-avatar" aria-hidden="true">?</span>
+        {showName && <span className="account-name">登录</span>}
+      </Link>
+    );
   return (
     <Menu position="bottom-end" width={240}>
       <Menu.Target>
@@ -316,6 +322,15 @@ function AccountMenu({ showName = false }: { showName?: boolean }) {
       <Menu.Dropdown>
         <Menu.Label>我的账号</Menu.Label>
         <div className="account-menu-email">{user.email}</div>
+        {user.is_admin && (
+          <Menu.Item
+            component={Link}
+            to="/admin"
+            leftSection={<Settings size={15} />}
+          >
+            管理控制台
+          </Menu.Item>
+        )}
         <Menu.Item
           component={Link}
           to="/pricing"

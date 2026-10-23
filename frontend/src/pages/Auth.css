@@ -474,3 +474,16 @@
   opacity: 0.65;
   letter-spacing: 0.08em;
 }
+
+/* guest login entry in the top bar */
+.account-guest-login {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+  padding: 4px 6px;
+  border-radius: 8px;
+}
+.account-guest-login:hover { opacity: 0.85; }
+.account-guest-login .account-name { font-size: 0.85rem; }
