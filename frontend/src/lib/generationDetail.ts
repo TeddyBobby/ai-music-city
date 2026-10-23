@@ -40,7 +40,13 @@ const text = (value: unknown) =>
   typeof value === "string" ? value.trim() : "";
 
 function hasLyricText(lyrics: string) {
-  return Boolean(lyrics.replace(/\[[^\]]*\]/g, "").trim());
+  const body = lyrics.replace(/\[[^\]]*\]/g, "").trim();
+  // 占位词（纯音乐/无人声/instrumental 等）不是可唱歌词，视为无词。
+  if (
+    /^(纯音乐|无人声|无歌词|instrumental|inst|no vocals?|без слов)$/i.test(body)
+  )
+    return false;
+  return Boolean(body);
 }
 
 export function draftFromJob(job: Job): GenerationDraft {
