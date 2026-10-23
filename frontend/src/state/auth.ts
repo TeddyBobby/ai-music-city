@@ -1,35 +1,65 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
+import { adoptAccount, leaveAccount } from "../lib/accountBoundary";
 
-interface AuthUser {
+export interface AuthUser {
   id: string;
   email: string;
+  is_admin: boolean;
+  legacy_owner: boolean;
 }
-
 interface AuthState {
   user: AuthUser | null;
   loading: boolean;
+  setupRequired: boolean;
+  error: string;
   refresh: () => Promise<void>;
   logout: () => Promise<void>;
 }
-
-export const useAuth = create<AuthState>((set) => ({
+let pending: Promise<void> | null = null;
+export const useAuth = create<AuthState>((set, get) => ({
   user: null,
   loading: true,
-  refresh: async () => {
-    try {
-      const data = await api.get("/api/auth/status");
-      set({ user: data.user ?? null, loading: false });
-    } catch {
-      set({ user: null, loading: false });
-    }
+  setupRequired: false,
+  error: "",
+  refresh: () => {
+    if (pending) return pending;
+    pending = (async () => {
+      try {
+        const data = await api.get("/api/auth/status");
+        const user: AuthUser | null = data.user ?? null;
+        if (!get().loading && get().user?.id !== user?.id) {
+          leaveAccount(user?.id || null);
+          return;
+        }
+        // Bind storage before Shell mounts and restores personal drafts.
+        if (adoptAccount(user?.id || null) && user) {
+          leaveAccount(user.id, false);
+          return;
+        }
+        set({
+          user,
+          loading: false,
+          setupRequired: !!data.setup_required,
+          error: "",
+        });
+      } catch (error) {
+        set({
+          error:
+            error instanceof Error
+              ? error.message
+              : "登录状态读取失败，请重试。",
+          loading: false,
+        });
+      } finally {
+        pending = null;
+      }
+    })();
+    return pending;
   },
   logout: async () => {
-    try {
-      await api.post("/api/auth/logout", {});
-    } catch {
-      /* ignore */
-    }
-    set({ user: null });
+    // A failed logout must not pretend the HttpOnly session was revoked.
+    await api.post("/api/auth/logout", {});
+    leaveAccount(null);
   },
 }));

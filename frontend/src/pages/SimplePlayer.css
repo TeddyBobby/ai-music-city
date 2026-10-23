@@ -1,0 +1,280 @@
+.listening-page.simple-listening {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: none;
+  min-height: 100dvh;
+  margin: 0;
+}
+.simple-listening .listening-top {
+  flex-shrink: 0;
+  margin-bottom: 32px;
+}
+.simple-listening .listening-layout {
+  flex: 1;
+  width: 100%;
+  max-width: 1440px;
+  margin-inline: auto;
+  grid-template-columns: minmax(280px, 1fr) minmax(300px, 1.15fr);
+}
+.simple-listening .player-collapse {
+  min-height: 44px;
+  font-size: 13px;
+}
+.simple-listening-caption {
+  color: var(--muted);
+  font-size: 13px;
+  letter-spacing: 2px;
+}
+.simple-listening-top-spacer {
+  width: 65px;
+}
+.record-transport {
+  display: contents;
+}
+.listening-key-hint {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.listening-key-hint kbd {
+  padding: 2px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font: inherit;
+  line-height: 1.3;
+}
+.simple-listening .listening-record {
+  max-width: min(100%, clamp(300px, calc(100dvh - 450px), 560px));
+}
+.simple-listening-media {
+  width: 100%;
+  aspect-ratio: 1;
+  overflow: hidden;
+  border-radius: 22px;
+}
+.simple-listening-media > .artwork,
+.simple-listening-media > .synced-lyrics {
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+}
+.simple-listening-cover {
+  box-shadow: 0 16px 42px #142c2312;
+}
+.simple-listening .record-info {
+  margin-top: 26px;
+  text-align: center;
+}
+.simple-listening .record-info h1 {
+  font-size: 24px;
+}
+.simple-listening .record-controls {
+  gap: 36px;
+  margin: 16px 0 8px;
+}
+.simple-listening .record-controls > .icon-btn {
+  width: 44px;
+  height: 44px;
+}
+.simple-listening .record-controls > .record-play {
+  width: 60px;
+  height: 60px;
+}
+.simple-listening .record-volume {
+  margin-bottom: 12px;
+}
+.simple-listening .record-volume > .icon-btn {
+  width: 44px;
+  height: 44px;
+}
+.simple-listening .record-volume > .mantine-Slider-root {
+  flex-basis: 110px;
+}
+.simple-listening-actions {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 30px;
+  border-top: 1px solid var(--line);
+  padding-top: 12px;
+}
+.simple-listening-actions > a,
+.simple-listening-actions > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  cursor: pointer;
+}
+.simple-listening-actions > a:hover,
+.simple-listening-actions > button:hover {
+  color: var(--text);
+  background: var(--surface-2);
+}
+.simple-listening-view {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+.simple-listening-view > button {
+  min-width: 60px;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.simple-listening-view > button[aria-pressed="true"] {
+  color: var(--text);
+  font-weight: 600;
+}
+@media (min-width: 1024px) {
+  .listening-page.simple-listening {
+    padding: 24px clamp(36px, 5vw, 88px) 28px;
+  }
+  .simple-listening .listening-top {
+    margin-bottom: 24px;
+  }
+  .simple-listening .listening-layout {
+    max-width: 1520px;
+    padding: 0;
+    grid-template-columns: minmax(280px, 0.9fr) minmax(340px, 1.1fr);
+    grid-template-rows: minmax(0, 1fr) auto;
+    column-gap: clamp(40px, 6vw, 100px);
+    row-gap: 28px;
+  }
+  .simple-listening .listening-record {
+    display: contents;
+  }
+  .simple-listening-media {
+    grid-column: 1;
+    grid-row: 1;
+    justify-self: center;
+    width: min(100%, clamp(280px, calc(100dvh - 300px), 600px));
+    border-radius: 28px;
+  }
+  .simple-listening .listening-lyrics {
+    grid-column: 2;
+    grid-row: 1;
+    height: clamp(280px, calc(100dvh - 280px), 680px);
+  }
+  .simple-listening .record-transport {
+    display: grid;
+    grid-column: 1 / -1;
+    grid-row: 2;
+    grid-template-columns: minmax(200px, 1fr) minmax(280px, 1.4fr) minmax(
+        180px,
+        1fr
+      );
+    align-items: center;
+    column-gap: 32px;
+    row-gap: 10px;
+    padding-top: 22px;
+    border-top: 1px solid var(--line);
+  }
+  .simple-listening .record-info {
+    grid-column: 1;
+    grid-row: 1 / 3;
+    margin: 0;
+    text-align: left;
+  }
+  .simple-listening .record-info h1 {
+    font-size: clamp(19px, 1.7vw, 26px);
+  }
+  .simple-listening .record-info .listening-key-hint {
+    margin-top: 10px;
+  }
+  .simple-listening .record-controls {
+    grid-column: 2;
+    grid-row: 1;
+    margin: 0;
+    gap: 28px;
+  }
+  .simple-listening .record-controls > .record-play {
+    width: 52px;
+    height: 52px;
+  }
+  .simple-listening .record-progress {
+    grid-column: 2;
+    grid-row: 2;
+    margin: 0;
+  }
+  .simple-listening .record-volume {
+    grid-column: 3;
+    grid-row: 2;
+    justify-content: flex-end;
+    margin: 0;
+  }
+  .simple-listening .record-volume > .icon-btn {
+    width: 30px;
+    height: 30px;
+  }
+  .simple-listening-actions {
+    grid-column: 3;
+    grid-row: 1;
+    justify-content: flex-end;
+    gap: 6px;
+    padding: 0;
+    border: 0;
+  }
+}
+@media (max-width: 760px) {
+  .listening-page.simple-listening {
+    padding-left: max(24px, env(safe-area-inset-left, 0px));
+    padding-right: max(24px, env(safe-area-inset-right, 0px));
+  }
+  .simple-listening .listening-top {
+    margin-bottom: 16px;
+  }
+  .simple-listening .listening-layout {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .simple-listening .listening-record {
+    display: flex;
+    flex: 1;
+    flex-direction: column;
+    width: 100%;
+    max-width: none;
+    min-width: 0;
+    margin: 0;
+  }
+  .simple-listening-media {
+    flex-shrink: 0;
+    align-self: center;
+    width: min(100%, max(150px, calc(100dvh - 400px)));
+  }
+  .simple-listening .listening-record > *,
+  .simple-listening .record-transport > * {
+    flex-shrink: 0;
+  }
+  .simple-listening .record-info {
+    margin-top: 5px;
+  }
+  .simple-listening .record-info h1 {
+    font-size: 21px;
+  }
+  .simple-listening .record-progress {
+    margin-top: auto;
+    padding-top: 18px;
+  }
+  .simple-listening .record-controls {
+    margin-top: 12px;
+  }
+  .simple-listening .record-volume {
+    margin-bottom: 4px;
+  }
+  .simple-listening-actions {
+    padding-top: 4px;
+  }
+}

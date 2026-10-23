@@ -36,7 +36,10 @@ class Songs:
 
 
 @pytest.fixture
-async def setup(tmp_path):
+async def setup(tmp_path, monkeypatch):
+    monkeypatch.setenv("AMC_ASSISTANT_BASE_URL", "https://assistant.example.test/v1")
+    monkeypatch.setenv("AMC_ASSISTANT_MODEL", "test-music-model")
+    monkeypatch.setenv("AMC_ASSISTANT_API_KEY", "test-provider-secret")
     app = FastAPI()
     app.state.paths = SimpleNamespace(songs_dir=tmp_path / 'songs', data_dir=tmp_path / 'data')
     for job_id in ('song', 'another', 'running'):
@@ -115,9 +118,8 @@ async def test_rejects_cross_site_and_nonlocal_host(setup):
                              headers={'origin': 'http://127.0.0.1:9999'})).status_code == 403
 
 
-async def test_factory_mounts_review_routes_before_static(app):
-    async with HTTP_CLIENT(transport=httpx.ASGITransport(app=app), base_url='http://127.0.0.1') as client:
-        response = await client.get('/api/reviews')
+async def test_factory_mounts_review_routes_before_static(app, client):
+    response = await client.get('/api/reviews')
     assert response.status_code == 200
     assert response.json() == {'reviews': {}}
     assert app.state.reviews.assistant is app.state.assistant
@@ -134,7 +136,7 @@ async def test_audio_symlink_outside_song_is_rejected(setup, tmp_path):
 
 async def test_provider_request_contains_honest_evidence_and_persists(setup, monkeypatch):
     svc, client, _ = setup
-    monkeypatch.setattr(svc.assistant, 'model_info', lambda: ('configured-text-model', 'provider'))
+    svc.assistant._save_config({**svc.assistant.config(), 'hermes_model': 'configured-text-model'})
     captured = []
     secret = svc.assistant.config()['hermes_api_key']
     def handler(request):
@@ -154,6 +156,7 @@ async def test_provider_request_contains_honest_evidence_and_persists(setup, mon
     assert review['result']['evidence']['lyrics_available'] is False
     assert review['result']['evidence']['score_available'] is True
     assert review['result']['evidence']['audio']['duration_seconds'] == 1
+    assert captured[0]['model'] == 'configured-text-model'
     assert '你没有听到音频' in captured[0]['messages'][0]['content']
     assert 'score_abc' in captured[0]['messages'][1]['content']
     assert secret not in response.text and str(svc.root) not in response.text

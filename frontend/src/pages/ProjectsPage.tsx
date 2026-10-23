@@ -127,6 +127,13 @@ export function ProjectsPage() {
   }
   return (
     <div className="wk-page">
+      <header className="product-page-heading">
+        <div>
+          <span className="product-eyebrow">把零散灵感，慢慢收成一张专辑</span>
+          <h1>我的项目</h1>
+          <p>为每个音乐想法留一个空间，整理曲目与不同版本。</p>
+        </div>
+      </header>
       <form className="card wk-project-create" onSubmit={create}>
         <label className="field">
           <span>项目名称</span>

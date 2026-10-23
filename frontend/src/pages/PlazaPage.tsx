@@ -15,6 +15,7 @@ import {
   ArrowUpRight,
   CircleHelp,
   Disc3,
+  Headphones,
   MoreHorizontal,
   Music2,
   Pause,
@@ -43,6 +44,7 @@ import { useApp } from "../state/app";
 import { usePlayer } from "../state/player";
 import { usePlayerOverlay } from "../state/playerOverlay";
 import "./Plaza.css";
+import "./CollectionDesign.css";
 
 type PlazaView = "singles" | "albums" | "rankings";
 type Withdrawal =
@@ -540,7 +542,50 @@ export function PlazaPage() {
         : rankings.manual.length + rankings.ai.length;
   const unit = view === "albums" ? "张专辑" : "首单曲";
   return (
-    <div className="plaza-page">
+    <div className="collection-page plaza-page">
+      <header className="collection-heading plaza-intro">
+        <div className="collection-heading-copy">
+          <span className="collection-eyebrow">
+            <Headphones size={14} /> 音乐广场
+          </span>
+          <h1>让灵感，有回响。</h1>
+          <p>听见一首好歌，也留下你的创作故事。</p>
+          <div className="collection-heading-actions">
+            <Button
+              variant="primary"
+              className="plaza-publish"
+              onClick={openPublish}
+            >
+              <Plus size={16} />
+              {view === "albums" ? "发布专辑" : "发布单曲"}
+            </Button>
+            {view === "singles" && posts.length > 0 && (
+              <Button
+                onClick={() =>
+                  usePlayer.getState().play(posts.map((post) => post.job))
+                }
+              >
+                <Play size={15} fill="currentColor" /> 开始听歌
+              </Button>
+            )}
+          </div>
+        </div>
+        <div className="plaza-intro-art" aria-hidden="true">
+          <div className="plaza-record-sleeve">
+            <span>
+              每一种心情
+              <br />
+              都有自己的旋律
+            </span>
+            <Music2 size={25} />
+          </div>
+          <div className="plaza-record">
+            <span>
+              <Music2 size={21} />
+            </span>
+          </div>
+        </div>
+      </header>
       <Tabs
         value={view}
         onChange={(value) => {
@@ -576,20 +621,12 @@ export function PlazaPage() {
             value={query}
             onChange={(event) => setQuery(event.currentTarget.value)}
           />
-          <Button
-            variant="primary"
-            className="plaza-publish"
-            onClick={openPublish}
-          >
-            <Plus size={15} />
-            {view === "albums" ? "发布专辑" : "发布单曲"}
-          </Button>
         </div>
         <div className="plaza-feed-meta">
           <span className="plaza-count" aria-live="polite">
             {loaded
               ? view === "rankings"
-                ? "已发布单曲 · 按真实评分排序 · 未评分不上榜"
+                ? "听过，才有自己的答案 · 已评分的单曲在这里相遇"
                 : `${search ? "找到" : "已发布"} ${total} ${unit}`
               : error
                 ? "暂时无法读取"

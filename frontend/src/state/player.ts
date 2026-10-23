@@ -259,3 +259,21 @@ export async function restorePlayer() {
   loadSong(j);
   usePlayer.getState().seek(Number.isFinite(saved.time) ? saved.time : 0);
 }
+
+export function resetPlayerForAccount() {
+  selectionVersion++;
+  sourceVersion++;
+  pendingSeek = null;
+  audio.pause();
+  audio.removeAttribute("src");
+  audio.load();
+  usePlayer.setState({
+    current: null,
+    queue: [],
+    index: -1,
+    playing: false,
+    time: 0,
+    duration: 0,
+  });
+  if ("mediaSession" in navigator) navigator.mediaSession.metadata = null;
+}

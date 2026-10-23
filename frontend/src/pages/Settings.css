@@ -1,0 +1,203 @@
+.preferences-page {
+  --settings-padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  width: 100%;
+  max-width: 1040px;
+  min-width: 0;
+  margin: 0 auto;
+}
+.preferences-page h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0;
+}
+.preferences-page h2 {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+.preferences-page p {
+  margin: 0;
+}
+.preferences-section {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.preferences-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 17px var(--settings-padding);
+  border-bottom: 1px solid var(--line);
+}
+.preferences-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 260px;
+  align-items: center;
+  gap: 12px 32px;
+  min-width: 0;
+  padding: 18px var(--settings-padding);
+}
+.preferences-row + .preferences-row {
+  border-top: 1px solid var(--line);
+}
+.preferences-label-group,
+.preferences-account-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 5px;
+}
+.preferences-label {
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.preferences-hint {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.preferences-page .preferences-control {
+  width: 100%;
+  min-width: 0;
+}
+.preferences-page .preferences-control .mantine-Input-input {
+  min-height: 40px;
+  border-radius: 7px;
+  background: var(--surface);
+}
+.preferences-account-row,
+.preferences-connection-row {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.preferences-email {
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.preferences-page .mantine-Button-root.btn {
+  flex: none;
+  min-height: 40px;
+  border-radius: 7px;
+  font-size: 13px;
+}
+.preferences-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px var(--settings-padding);
+  border-top: 1px solid var(--line);
+}
+.preferences-actions > span {
+  min-width: 0;
+}
+.preferences-advanced {
+  min-width: 0;
+  border-top: 1px solid var(--line);
+}
+.preferences-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 52px;
+  padding: 12px var(--settings-padding);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+  list-style: none;
+}
+.preferences-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.preferences-advanced > summary svg {
+  flex: none;
+  color: var(--muted);
+}
+.preferences-advanced[open] > summary svg {
+  transform: rotate(180deg);
+}
+.preferences-advanced > summary:focus-visible,
+.preferences-login:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -3px;
+  border-radius: 7px;
+}
+.preferences-agent-form {
+  border-top: 1px solid var(--line);
+}
+.preferences-agent-form .preferences-row {
+  grid-template-columns: minmax(140px, 0.65fr) minmax(0, 1fr);
+}
+.preferences-feedback {
+  padding: 0 var(--settings-padding) 14px;
+}
+.preferences-error {
+  color: var(--danger);
+  font-size: 12px;
+  line-height: 1.65;
+  overflow-wrap: anywhere;
+}
+.preferences-load-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: var(--settings-padding);
+}
+.preferences-login {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--accent);
+  font-size: 14px;
+}
+@media (max-width: 760px) {
+  .preferences-page {
+    --settings-padding: 16px;
+    gap: 16px;
+  }
+  .preferences-page h1 {
+    margin: 0;
+    font-size: 22px;
+  }
+  .preferences-section-heading {
+    padding-block: 14px;
+  }
+  .preferences-row,
+  .preferences-agent-form .preferences-row {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 10px;
+    padding-block: 16px;
+  }
+  .preferences-account-row,
+  .preferences-connection-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+    gap: 12px;
+  }
+  .preferences-page .preferences-control .mantine-Input-input,
+  .preferences-page .mantine-Button-root.btn {
+    min-height: 44px;
+  }
+  .preferences-actions {
+    padding-block: 12px;
+  }
+  .preferences-page .preferences-account-row .btn {
+    padding-inline: 8px;
+  }
+}

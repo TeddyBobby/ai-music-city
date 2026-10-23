@@ -462,6 +462,16 @@ export function CreatePage() {
 
   return (
     <div className="create-page music-page">
+      <header className="product-page-heading">
+        <div>
+          <span className="product-eyebrow">你的专属音乐工作室</span>
+          <h1>让灵感，成为作品。</h1>
+          <p>写下歌词，选好氛围，剩下的交给音乐。</p>
+        </div>
+        <Link to="/assistant" className="product-outline-link">
+          和 AI 一起写歌 <ArrowRight size={16} />
+        </Link>
+      </header>
       {!ready ? (
         <div className="music-loading">
           <LoaderCircle size={18} className="music-spin" />

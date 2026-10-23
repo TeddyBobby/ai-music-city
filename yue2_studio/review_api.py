@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, StrictFloat
 
 from yue2_studio.api import ApiError
 from yue2_studio.assistant_api import same_origin
+from yue2_studio.tenancy import runtime
 from yue2_studio.jobs import NotFound
 from yue2_studio.review_service import ReviewService
 
@@ -19,10 +20,10 @@ def install(app):
 
 def completed_job(request, job_id):
     try:
-        job = request.app.state.store.get(job_id)
+        job = runtime(request).store.get(job_id)
     except NotFound:
         raise ApiError(404, 'not_found', '作品不存在') from None
-    root = Path(request.app.state.paths.songs_dir).resolve()
+    root = Path(runtime(request).paths.songs_dir).resolve()
     song_dir = (root / job.id).resolve()
     audio = (song_dir / 'song' / 'audio.flac').resolve()
     if not song_dir.is_relative_to(root) or not audio.is_relative_to(song_dir):
@@ -45,31 +46,31 @@ async def list_summaries(request: Request, ids: str = Query(default='', max_leng
         raise ApiError(400, 'validation_error', '一次最多查询 60 首作品')
     for job_id in job_ids:
         try:
-            request.app.state.store.get(job_id)
+            runtime(request).store.get(job_id)
         except NotFound:
             raise ApiError(404, 'not_found', '作品不存在') from None
-    return request.app.state.reviews.summaries(job_ids)
+    return runtime(request).reviews.summaries(job_ids)
 
 
 @router.get('/{job_id}')
 async def get_review(request: Request, job_id: str):
     completed_job(request, job_id)
-    return request.app.state.reviews.get(job_id)
+    return runtime(request).reviews.get(job_id)
 
 
 @router.put('/{job_id}/manual')
 async def save_manual(request: Request, job_id: str, body: ManualBody):
     completed_job(request, job_id)
-    return request.app.state.reviews.save_manual(job_id, body.score, body.comment)
+    return runtime(request).reviews.save_manual(job_id, body.score, body.comment)
 
 
 @router.delete('/{job_id}/manual')
 async def delete_manual(request: Request, job_id: str):
     completed_job(request, job_id)
-    return request.app.state.reviews.delete_manual(job_id)
+    return runtime(request).reviews.delete_manual(job_id)
 
 
 @router.post('/{job_id}/ai', status_code=202)
 async def generate_review(request: Request, job_id: str):
     job, song_dir = completed_job(request, job_id)
-    return request.app.state.reviews.start(job, song_dir)
+    return runtime(request).reviews.start(job, song_dir)

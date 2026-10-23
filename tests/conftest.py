@@ -82,7 +82,8 @@ async def app(engine, home, static_dir, fake_probe):
 
 @pytest.fixture
 async def client(app):
-    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
+    async with AsyncClient(transport=ASGITransport(app=app), base_url="http://127.0.0.1") as c:
+        await authenticate_owner(c)
         yield c
 
 
@@ -96,10 +97,20 @@ def make_app(tmp_path, fake_probe):
                                  static_dir=static_dir or tmp_path / "s", **kwargs)
         span = application.router.lifespan_context(application) if lifespan else contextlib.nullcontext()
         async with span:
-            async with AsyncClient(transport=ASGITransport(app=application), base_url="http://test") as c:
+            async with AsyncClient(transport=ASGITransport(app=application), base_url="http://127.0.0.1") as c:
+                await authenticate_owner(c)
                 yield application, c
 
     return _make
+
+
+async def authenticate_owner(client):
+    """Exercise real login on HTTP integration fixtures; never bypass the production gate."""
+    credentials = {"email": "owner@example.test", "password": "test-owner-password-42"}
+    status = (await client.get("/api/auth/status")).json()
+    endpoint = "register" if status.get("setup_required") else "login"
+    response = await client.post(f"/api/auth/{endpoint}", json=credentials)
+    assert response.status_code in (200, 201), response.text
 
 
 class Api:
@@ -121,7 +132,7 @@ class Api:
         async with self.client.stream("GET", f"/api/jobs/{job_id}/events") as r:
             assert r.status_code == 200, await r.aread()
             assert r.headers["content-type"].startswith("text/event-stream")
-            assert r.headers["cache-control"] == "no-cache"
+            assert "no-store" in r.headers["cache-control"]
             assert r.headers["x-accel-buffering"] == "no"
             event, data = None, None
 

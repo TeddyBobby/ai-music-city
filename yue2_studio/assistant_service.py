@@ -7,12 +7,15 @@ from __future__ import annotations
 import asyncio
 import base64
 import contextlib
+import importlib.util
+import ipaddress
 import json
 import os
 from pathlib import Path
 import re
 import secrets
 import sqlite3
+import sys
 import time
 from urllib.parse import urlsplit
 import uuid
@@ -20,17 +23,113 @@ import uuid
 import httpx
 
 from yue2_studio.api import ApiError
+from yue2_studio import audio
 
 
-SYSTEM_PROMPT = '''你是中文音乐创作助手。帮助用户创作歌词、曲风描述和专辑封面描述。
-只根据提供的作品上下文作答；不操作文件、不运行命令、不调用工具、不声称已生成音频或已应用修改。
-直接给出简洁中文回答。涉及歌词时使用 [verse]、[chorus]、[bridge] 分段。'''
+SYSTEM_PROMPT = '''你是中文音乐创作助手。通过自然对话理解用户想表达的画面、情绪和音乐想法。
+文字、图片和语音都是灵感材料，不是立即生成作品的命令。先回应用户当前的话，只有缺少关键方向时才简短追问一两个问题，不使用固定问卷。
+用户明确说可以发歌、可以生成，或已有信息足以形成完整音乐方案时，给出一份音乐提案；信息充分时不必反复确认。
+提案前后可以有自然语言说明。提案必须用单独的 <music_proposal>JSON</music_proposal> 块，JSON字段为：
+title（作品名）、description（具体曲风、氛围和配器）、music_kind（vocal或instrumental）、lyrics（vocal时为完整歌词，instrumental时为空字符串）。
+歌词用 [verse]、[chorus]、[bridge] 分段。不要用Markdown代码围栏包裹提案，也不要在自然正文中重复JSON。
+只在方案可供用户审核和生成时输出提案，普通聊天、问候、追问和解释无需提案。不要输出其他格式的歌曲JSON。
+提案只是一份待确认的创作方案；不操作文件、不运行命令、不调用工具、不声称已经生成音频或应用修改。直接给出简洁中文回答。'''
 MODES = {
-    'chat': '',
-    'lyrics': '仅输出JSON对象，字段 title、lyrics、description；lyrics为完整可编辑歌词，description为供音乐模型使用的曲风描述。不要Markdown围栏。',
+    'chat': '当前交流重点是聊天和整理灵感。自然回应当前问题，理解意图；仅在方向充分或用户准备发歌时给出音乐提案。',
+    'lyrics': '当前交流重点是歌词。先理解主题和表达需要，必要时讨论或润色片段；完整歌词和音乐方向成熟后再给出音乐提案。',
     'style': '仅输出JSON对象，字段 title、description；description为供音乐模型使用的曲风、配器、节奏、人声描述。不要Markdown围栏。',
     'cover_prompt': '仅输出JSON对象，字段 cover_prompt；内容为详细中文方形专辑封面提示词，不包含生成或保存成功的陈述。不要Markdown围栏。',
 }
+PROPOSAL_OPEN = '<music_proposal>'
+
+
+def visible_reply(content):
+    """Hide protocol blocks, including an opening marker split across stream chunks."""
+    visible = re.sub(r'<music_proposal>[\s\S]*?(?:</music_proposal>|$)', '', content)
+    for size in range(min(len(visible), len(PROPOSAL_OPEN) - 1), 0, -1):
+        if visible.endswith(PROPOSAL_OPEN[:size]):
+            return visible[:-size]
+    return visible
+
+
+def audio_prompt(attachment):
+    transcript = str(attachment.get('transcript') or '').strip()
+    if transcript:
+        return '语音转写（自动识别，可能有误；请结合用户补充描述）：\n' + transcript
+    return ('用户上传了一段音频灵感，但没有识别到可转写的话语。'
+            '本次没有分析音频中的旋律、音色或节奏，不要声称听懂或猜测其内容。'
+            '请结合用户补充描述继续了解想法；若还缺少方向，简短询问想表达的情绪或风格。'
+            '可以根据用户文字整理音乐提案，但不要声称提案已经复现这段录音的旋律。')
+
+
+def music_proposal(content):
+    """Only the explicit proposal protocol can turn conversational text into a music card."""
+    for match in re.finditer(r'<music_proposal>([\s\S]*?)</music_proposal>', content):
+        try:
+            value = json.loads(match.group(1))
+        except (ValueError, TypeError):
+            continue
+        if not isinstance(value, dict):
+            continue
+        kind = value.get('music_kind')
+        if not isinstance(kind, str) or kind not in {'vocal', 'instrumental'}:
+            continue
+        if not all(isinstance(value.get(key), str) and value[key].strip() for key in ('title', 'description')):
+            continue
+        lyrics = value.get('lyrics', '')
+        if not isinstance(lyrics, str) or (value['music_kind'] == 'vocal' and not lyrics.strip()):
+            continue
+        return {'title': value['title'].strip()[:20000], 'description': value['description'].strip()[:20000],
+                'lyrics': lyrics[:20000] if value['music_kind'] == 'vocal' else '',
+                'music_kind': value['music_kind']}
+    return None
+
+
+# Runs in the already-configured Hermes environment. Only the requested audio capability or
+# transcript crosses the process boundary; provider credentials never do.
+HERMES_AUDIO_BRIDGE = r'''
+import contextlib, io, json, sys
+from pathlib import Path
+request = json.load(sys.stdin)
+root = Path(request['home'])
+sys.path.insert(0, str(root / 'hermes-agent'))
+try:
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        from dotenv import load_dotenv
+        load_dotenv(root / '.env', override=False)
+        import tools.transcription_tools as stt
+        cfg = stt._load_stt_config()
+        cfg = {**cfg, 'language': '', 'local': {**(cfg.get('local') or {}), 'language': ''},
+               'openai': {**(cfg.get('openai') or {}), 'language': ''}}
+        stt._load_stt_config = lambda: cfg
+        provider = stt._get_provider(cfg)
+        if request['mode'] == 'probe':
+            result = {'available': provider != 'none', 'method': 'transcription'}
+        elif provider == 'none':
+            result = {'success': False, 'error': 'unavailable'}
+        else:
+            response = stt.transcribe_audio(request['path'], source='music-assistant')
+            result = {'success': bool(response.get('success')),
+                      'transcript': response.get('transcript') or ''}
+    print(json.dumps(result, ensure_ascii=False))
+except Exception:
+    print(json.dumps({'success': False, 'error': 'bridge_unavailable'}))
+'''
+
+LOCAL_AUDIO_BRIDGE = r'''
+import contextlib, io, json, sys
+request = json.load(sys.stdin)
+try:
+    with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+        from faster_whisper import WhisperModel
+        model = WhisperModel(request['model_path'], device='cpu', compute_type='int8', cpu_threads=4)
+        segments, _ = model.transcribe(request['path'], language=None, beam_size=3,
+            vad_filter=True, condition_on_previous_text=False)
+        transcript = ''.join(segment.text for segment in segments).strip()
+    print(json.dumps({'success': True, 'transcript': transcript}, ensure_ascii=False))
+except Exception:
+    print(json.dumps({'success': False, 'error': 'local_transcription_failed'}))
+'''
 
 
 def now():
@@ -53,11 +152,21 @@ def _atomic_json(path, data):
 
 def _safe_url(value, *, local=False):
     value = value.rstrip('/')
-    parsed = urlsplit(value)
+    try:
+        parsed = urlsplit(value)
+        parsed.port  # validate malformed/out-of-range ports before persisting
+    except ValueError:
+        raise ApiError(400, 'invalid_url', '服务地址格式不正确') from None
     if parsed.username or parsed.password or parsed.query or parsed.fragment or not parsed.hostname:
         raise ApiError(400, 'invalid_url', '服务地址不能包含凭证、查询参数或锚点')
     if parsed.scheme not in {'http', 'https'}:
         raise ApiError(400, 'invalid_url', '服务地址必须使用 http 或 https')
+    try:
+        loopback = ipaddress.ip_address(parsed.hostname).is_loopback
+    except ValueError:
+        loopback = parsed.hostname == 'localhost'
+    if parsed.scheme == 'http' and not loopback:
+        raise ApiError(400, 'invalid_url', '远程服务地址必须使用 HTTPS，本机服务可以使用 HTTP')
     return value
 
 
@@ -76,17 +185,25 @@ def structured(content):
 
 
 class AssistantService:
-    def __init__(self, data_dir: Path, *, hermes_home: Path | None = None, recover=False):
+    def __init__(self, data_dir: Path, *, hermes_home: Path | None = None, recover=False,
+                 config_source: AssistantService | None = None):
+        self.config_source = config_source
         self.root = Path(data_dir) / 'assistant'
         self.root.mkdir(parents=True, exist_ok=True, mode=0o700)
         self.images = self.root / 'images'
         self.images.mkdir(exist_ok=True)
+        self.audio_dir = self.root / 'audio'
+        self.audio_dir.mkdir(exist_ok=True, mode=0o700)
         self.settings_path = self.root / 'settings.json'
         self.hermes_home = hermes_home or Path.home() / '.hermes'
         self.db_path = self.root / 'assistant.db'
         self.active = {}
         self.image_busy = False
         self.last_chat_check = None
+        self.model_cache = None
+        self.audio_cache = None
+        self.chat_tasks = set()
+        self.audio_slots = config_source.audio_slots if config_source else asyncio.Semaphore(1)
         self.image_task_path = self.root / 'image-task.json'
         if recover and self.image_task().get('status') == 'running':
             self.write_image_task(status='interrupted', error='服务重启中断了封面生成，请重试')
@@ -101,15 +218,20 @@ class AssistantService:
                 model TEXT NOT NULL, filename TEXT NOT NULL, created_at TEXT NOT NULL);
             CREATE TABLE IF NOT EXISTS artwork (job_id TEXT PRIMARY KEY, current_id TEXT, history TEXT NOT NULL);
             ''')
+            columns = {row['name'] for row in db.execute('PRAGMA table_info(messages)')}
+            for column in ('audio', 'model', 'mode', 'image'):
+                if column not in columns:
+                    db.execute(f'ALTER TABLE messages ADD COLUMN {column} TEXT')
             if recover:
                 db.execute("UPDATE messages SET status='interrupted' WHERE status='streaming'")
-        if not self.settings_path.exists():
-            self._save_config({'hermes_base_url': 'https://api.vectron.meta-stone.com/v1',
-                'hermes_model': 'ZhipuAi/GLM-5.3', 'hermes_api_key': 'sk-0f6975cd471b73925f8c71838ca5c4e4',
-                'image_provider': 'openai-compatible',
-                'image_base_url': 'https://api.vectron.meta-stone.com/v1', 'image_model': 'gpt-image-2-low',
-                'image_api_key': 'sk-0f6975cd471b73925f8c71838ca5c4e4',
-                'image_verified': False})
+        if config_source is None and not self.settings_path.exists():
+            # Provider credentials are server configuration, never shipped defaults or copied into
+            # users' workspaces. Existing local settings remain intact during the account upgrade.
+            self._save_config({'hermes_base_url': os.environ.get('AMC_ASSISTANT_BASE_URL', ''),
+                'hermes_model': os.environ.get('AMC_ASSISTANT_MODEL', ''),
+                'hermes_api_key': os.environ.get('AMC_ASSISTANT_API_KEY', ''),
+                'image_provider': 'disabled', 'image_base_url': '', 'image_model': '',
+                'image_api_key': '', 'image_verified': False})
 
     @contextlib.contextmanager
     def db(self):
@@ -122,10 +244,16 @@ class AssistantService:
             connection.close()
 
     def config(self):
+        if self.config_source is not None:
+            return self.config_source.config()
         return json.loads(self.settings_path.read_text())
 
     def _save_config(self, cfg):
+        if self.config_source is not None:
+            self.config_source._save_config(cfg)
+            return
         _atomic_json(self.settings_path, cfg)
+        self.model_cache = None
 
     def public_config(self):
         cfg = self.config()
@@ -145,23 +273,207 @@ class AssistantService:
         new['image_provider'] = 'disabled'
         self._save_config(new)
         self.last_chat_check = None
+        self.model_cache = None
         return self.public_config()
 
-    async def auto_model(self, cfg):
-        """Auto-pick a chat model from the provider's /v1/models list."""
+    async def hermes_bridge(self, mode, *, path=None):
+        if not self.hermes_python().exists():
+            raise ApiError(503, 'audio_unavailable', '语音识别服务尚未配置，请输入文字')
+        payload = {'mode': mode, 'home': str(self.hermes_home)}
+        if path is not None:
+            payload['path'] = str(path)
+        proc = await asyncio.create_subprocess_exec(str(self.hermes_python()), '-c', HERMES_AUDIO_BRIDGE,
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        try:
+            raw, _ = await asyncio.wait_for(proc.communicate(json.dumps(payload).encode()),
+                                           150 if mode == 'transcribe' else 15)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            if proc.returncode is None:
+                proc.kill()
+            await proc.wait()
+            raise
+        try:
+            result = json.loads(raw)
+        except (ValueError, TypeError):
+            raise ApiError(503, 'audio_unavailable', '语音服务暂时不可用，请稍后重试') from None
+        if not isinstance(result, dict):
+            raise ApiError(503, 'audio_unavailable', '语音服务暂时不可用，请稍后重试')
+        return result
+
+    @property
+    def voice_model_dir(self):
+        if self.config_source is not None:
+            return self.config_source.voice_model_dir
+        return self.root / 'whisper-base'
+
+    def local_voice_available(self):
+        model = self.voice_model_dir
+        return (importlib.util.find_spec('faster_whisper') is not None
+                and all((model / filename).is_file() for filename in ('model.bin', 'config.json', 'tokenizer.json')))
+
+    async def transcribe_audio(self, path):
+        if not self.local_voice_available():
+            return await self.hermes_bridge('transcribe', path=path)
+        proc = await asyncio.create_subprocess_exec(sys.executable, '-c', LOCAL_AUDIO_BRIDGE,
+            stdin=asyncio.subprocess.PIPE, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.DEVNULL)
+        try:
+            raw, _ = await asyncio.wait_for(proc.communicate(json.dumps({
+                'path': str(path), 'model_path': str(self.voice_model_dir)}).encode()), 150)
+        except (asyncio.TimeoutError, asyncio.CancelledError):
+            if proc.returncode is None:
+                proc.kill()
+            await proc.wait()
+            raise
+        try:
+            result = json.loads(raw)
+            return result if isinstance(result, dict) else {'success': False}
+        except (ValueError, TypeError):
+            return {'success': False}
+
+    async def audio_capability(self):
+        if self.local_voice_available():
+            return {'available': True, 'method': 'transcription', 'message': '语音在本机转成文字，与补充描述一起发送'}
+        if not self.audio_cache or time.monotonic() - self.audio_cache[0] > 60:
+            try:
+                capability = await self.hermes_bridge('probe')
+                available = bool(capability.get('available'))
+            except (ApiError, OSError, asyncio.TimeoutError):
+                available = False
+            self.audio_cache = (time.monotonic(), {'available': available, 'method': 'transcription',
+                'message': '语音会转成文字，与补充描述一起发送' if available else '语音识别服务尚未连接'})
+        return self.audio_cache[1]
+
+    async def _model_catalog(self):
+        # The configured endpoint owns the selectable inventory, including Hermes route aliases.
+        # A provider's general catalog is not evidence that this connection can use a model.
+        if self.config_source is not None:
+            return await self.config_source._model_catalog()
+        cfg = self.config()
+        if not cfg.get('hermes_base_url'):
+            raise ApiError(503, 'unconfigured', 'AI 助手尚未连接，请先配置服务地址')
+        if self.model_cache and time.monotonic() - self.model_cache[0] < 60:
+            return self.model_cache[1]
+        self.model_cache = None
         try:
             async with httpx.AsyncClient(timeout=8, trust_env=False) as client:
                 response = await client.get(cfg['hermes_base_url'].removesuffix('/v1') + '/v1/models',
-                                            headers={'Authorization': 'Bearer ' + cfg['hermes_api_key']})
-                data = response.json().get('data') or []
-                ids = [m.get('id') for m in data if m.get('id')]
-                if not ids:
-                    return None
-                cfg['hermes_model'] = ids[0]
-                self._save_config(cfg)
-                return ids[0]
+                    headers={'Authorization': 'Bearer ' + cfg.get('hermes_api_key', '')})
+                response.raise_for_status()
+                payload = response.json()
+            if not isinstance(payload, dict) or not isinstance(payload.get('data'), list):
+                raise ValueError('invalid model list')
+        except httpx.HTTPStatusError as exc:
+            message = ('模型列表鉴权失败，请检查服务凭证' if exc.response.status_code in {401, 403}
+                       else '模型列表暂时无法获取，请稍后重试')
+            raise ApiError(502, 'models_unavailable', message) from None
         except (httpx.HTTPError, ValueError):
+            raise ApiError(502, 'models_unavailable', '模型列表暂时无法获取，请检查连接后重试') from None
+        options, seen = [], set()
+        for item in payload['data']:
+            if not isinstance(item, dict) or not isinstance(item.get('id'), str):
+                continue
+            model_id = item['id'].strip()
+            if not model_id or len(model_id) > 300 or model_id in seen:
+                continue
+            seen.add(model_id)
+            options.append({'id': model_id, 'name': model_id,
+                            'provider': str(item.get('owned_by') or 'Agent')})
+        default = cfg.get('hermes_model') or ''
+        if default not in seen:
+            default = options[0]['id'] if options else ''
+        result = {'models': options, 'default_model': default}
+        # Do not install a stale response after the administrator changes the connection.
+        if self.config() != cfg:
+            return await self._model_catalog()
+        self.model_cache = (time.monotonic(), result)
+        return result
+
+    async def models(self):
+        return {**await self._model_catalog(), 'audio': await self.audio_capability()}
+
+    async def request_model(self, selected):
+        catalog = await self._model_catalog()
+        model_id = selected or catalog['default_model']
+        if not model_id:
+            raise ApiError(503, 'no_models', '当前服务没有可用模型，请检查服务配置')
+        if not any(item['id'] == model_id for item in catalog['models']):
+            raise ApiError(400, 'invalid_model', '该模型不在当前已连接的模型列表中，请重新选择')
+        # Send the advertised id unchanged: Hermes resolves its own aliases and provider routes.
+        return {'model': model_id}
+
+    def audio_attachment(self, audio_id):
+        if not re.fullmatch(r'[a-f0-9]{32}', audio_id or ''):
+            raise ApiError(404, 'not_found', '语音文件不存在')
+        try:
+            record = json.loads((self.audio_dir / (audio_id + '.json')).read_text())
+        except (OSError, ValueError):
+            raise ApiError(404, 'not_found', '语音文件不存在') from None
+        if record.get('ext') not in audio.UPLOAD_EXTENSIONS or not self.audio_path(record).is_file():
+            raise ApiError(404, 'not_found', '语音文件不存在')
+        return record
+
+    def audio_path(self, record):
+        return self.audio_dir / (record['id'] + '.' + record['ext'])
+
+    def public_audio(self, record):
+        return {**{key: record[key] for key in ('id', 'filename', 'url', 'seconds', 'transcript')},
+                'transcription_status': record.get('transcription_status') or
+                    ('transcribed' if record.get('transcript') else 'no_speech')}
+
+    async def receive_audio(self, file):
+        try:
+            ext = audio.validate_upload_name(file.filename)
+        except audio.BadUploadType:
+            raise ApiError(400, 'invalid_audio', '请选择 MP3、WAV、M4A 或 WebM 音频') from None
+        audio_id = identifier()
+        destination = self.audio_dir / (audio_id + '.' + ext)
+        total = 0
+        try:
+            with destination.open('wb') as target:
+                while chunk := await file.read(1024 * 1024):
+                    total += len(chunk)
+                    if total > 20 * 1024 * 1024:
+                        raise ApiError(413, 'audio_too_large', '语音文件不能超过 20 MB')
+                    target.write(chunk)
+            destination.chmod(0o600)
+            seconds = await asyncio.to_thread(audio.probe_duration, destination)
+            if not total or seconds is None or seconds <= 0:
+                raise ApiError(400, 'invalid_audio', '无法读取这段音频，请重新录制或选择其他文件')
+            if seconds > 120:
+                raise ApiError(400, 'audio_too_long', '语音最长支持 2 分钟，请截取后再发送')
+            # Keep model memory bounded even if more than one browser tab uploads a voice note.
+            async with self.audio_slots:
+                result = await self.transcribe_audio(destination)
+            transcript = str(result.get('transcript') or '').strip()
+            if not result.get('success'):
+                raise ApiError(503, 'transcription_failed', '语音识别暂时不可用，请稍后重试或输入文字描述')
+            record = {'id': audio_id, 'ext': ext, 'filename': Path(file.filename or ('语音.' + ext)).name,
+                      'url': f'/api/assistant/audio/{audio_id}', 'seconds': seconds,
+                      'transcript': transcript[:12000],
+                      'transcription_status': 'transcribed' if transcript else 'no_speech'}
+            _atomic_json(self.audio_dir / (audio_id + '.json'), record)
+            return self.public_audio(record)
+        except asyncio.TimeoutError:
+            destination.unlink(missing_ok=True)
+            raise ApiError(504, 'transcription_timeout', '语音识别超时，请稍后重试') from None
+        except BaseException:
+            destination.unlink(missing_ok=True)
+            raise
+        finally:
+            await file.close()
+
+    async def auto_model(self, cfg):
+        """Auto-pick a chat model from the same validated inventory as the model selector."""
+        try:
+            catalog = await self._model_catalog()
+        except ApiError:
             return None
+        if not catalog['default_model'] or self.config() != cfg:
+            return None
+        if cfg.get('hermes_model') != catalog['default_model']:
+            cfg['hermes_model'] = catalog['default_model']
+            self._save_config(cfg)
+        return cfg['hermes_model']
 
     def model_info(self):
         try:
@@ -218,14 +530,22 @@ class AssistantService:
         for msg in messages:
             msg.pop('session_id', None)
             msg['suggestion'] = json.loads(msg['suggestion']) if msg['suggestion'] else None
-        return {**dict(row), 'messages': messages, 'message_count': len(messages)}
+            msg['audio'] = json.loads(msg['audio']) if msg.get('audio') else None
+            msg['image'] = json.loads(msg['image']) if msg.get('image') else None
+        return {**dict(row), 'messages': messages, 'message_count': len(messages),
+                'active': session_id in self.active}
 
-    def save_message(self, sid, role, content, *, status='complete', message_id=None, suggestion=None):
+    def save_message(self, sid, role, content, *, status='complete', message_id=None, suggestion=None,
+                     attachment=None, model=None, mode=None, image_attachment=None):
         msg = {'id': message_id or identifier(), 'role': role, 'content': content, 'status': status,
-               'created_at': now(), 'suggestion': suggestion}
+               'created_at': now(), 'suggestion': suggestion, 'audio': attachment, 'model': model, 'mode': mode, 'image': image_attachment}
         with self.db() as db:
-            db.execute('INSERT OR REPLACE INTO messages VALUES (?,?,?,?,?,?,?)',
-                (msg['id'], sid, role, content, status, msg['created_at'], json.dumps(suggestion) if suggestion else None))
+            db.execute('INSERT OR REPLACE INTO messages '
+                       '(id,session_id,role,content,status,created_at,suggestion,audio,model,mode,image) '
+                       'VALUES (?,?,?,?,?,?,?,?,?,?,?)',
+                (msg['id'], sid, role, content, status, msg['created_at'], json.dumps(suggestion) if suggestion else None,
+                 json.dumps(attachment, ensure_ascii=False) if attachment else None, model, mode,
+                 json.dumps(image_attachment, ensure_ascii=False) if image_attachment else None))
             db.execute('UPDATE sessions SET updated_at=? WHERE id=?', (now(), sid))
         return msg
 
@@ -243,36 +563,86 @@ class AssistantService:
         if not run:
             return {'status': 'idle'}
         run['stop'].set()
-        if run['response']:
+        task = run.get('task')
+        if task and run.get('started') and not task.done():
+            # Closing a response cannot interrupt a request still waiting for headers. Cancel
+            # the owned producer instead; stream's finally block persists the partial reply.
+            task.cancel()
+            with contextlib.suppress(asyncio.CancelledError):
+                await task
+        elif run['response']:
             await run['response'].aclose()
         return {'status': 'stopping'}
 
-    async def stream(self, sid, content, mode, context, run):
+    async def stream(self, sid, content, mode, context, run, *, model=None, attachment=None, selected_model=None, image_attachment=None):
         cfg = self.config()
         previous = self.session(sid)
-        self.save_message(sid, 'user', content)
+        self.save_message(sid, 'user', content, attachment=attachment, mode=mode, image_attachment=image_attachment)
         if previous['title'] == '新对话':
             with self.db() as db:
-                db.execute('UPDATE sessions SET title=? WHERE id=?', (content[:32], sid))
-        message_id, result = identifier(), ''
+                title = (content or (attachment or {}).get('transcript') or
+                         ('图片灵感' if image_attachment else '音频灵感' if attachment else '音乐灵感'))
+                db.execute('UPDATE sessions SET title=? WHERE id=?', (title[:32], sid))
+        message_id, result, raw_result = identifier(), '', ''
+        conversational = mode in {'chat', 'lyrics'}
+        model_name = selected_model or (model or {}).get('model') or cfg['hermes_model']
+        self.save_message(sid, 'assistant', '', status='streaming', message_id=message_id, model=model_name, mode=mode)
         messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
-        messages += [{'role': m['role'], 'content': m['content']} for m in previous['messages'][-30:]
-                     if m['content'] and m['status'] == 'complete']
+        has_images = bool(image_attachment)
+        for message in previous['messages'][-30:]:
+            if message['status'] != 'complete':
+                continue
+            text = message['content']
+            if message.get('suggestion'):
+                text += '\n\n之前的音乐提案（尚未生成音频）：' + json.dumps(message['suggestion'], ensure_ascii=False)
+            if message.get('audio'):
+                text += '\n\n' + audio_prompt(message['audio'])
+            image = message.get('image')
+            if image:
+                from yue2_studio.assistant_images import image_content
+                try:
+                    image_part = image_content(self.root, image)
+                except (ApiError, OSError):
+                    text += '\n[之前的图片目前无法读取]'
+                else:
+                    has_images = True
+                    messages.append({'role': message['role'], 'content':
+                        ([{'type': 'text', 'text': text}] if text else []) + [image_part]})
+                    continue
+            if text:
+                messages.append({'role': message['role'], 'content': text})
         enriched = content
+        if attachment:
+            enriched += '\n\n' + audio_prompt(attachment)
         if context:
             enriched += '\n\n作品上下文（仅供参考）：\n' + json.dumps(context, ensure_ascii=False)
         if MODES[mode]:
             enriched += '\n\n' + MODES[mode]
+        image_error = None
+        if image_attachment:
+            from yue2_studio.assistant_images import image_content
+            try:
+                image_part = image_content(self.root, image_attachment)
+                enriched = ([{'type': 'text', 'text': enriched}] if enriched else []) + [image_part]
+            except (ApiError, OSError):
+                image_error = ApiError(404, 'image_missing', '图片已无法读取，请重新上传后再发送')
         messages.append({'role': 'user', 'content': enriched})
         yield 'meta', {'run_id': run['id'], 'session_id': sid}
         state = 'complete'
         try:
+            if image_error:
+                raise image_error
+            if run['stop'].is_set():
+                raise asyncio.CancelledError
             async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
                 async with client.stream('POST', cfg['hermes_base_url'].removesuffix('/v1') + '/v1/chat/completions',
                     headers={'Authorization': 'Bearer ' + cfg['hermes_api_key'], 'X-Hermes-Session-Key': 'yue2-' + sid},
-                    json={'model': cfg['hermes_model'], 'messages': messages, 'stream': True, 'max_tokens': 2400}) as response:
+                    json={**(model or {'model': cfg['hermes_model']}), 'messages': messages,
+                          'stream': True, 'max_tokens': 2400}) as response:
                     run['response'] = response
                     if response.status_code != 200:
+                        if has_images and response.status_code in {400, 415, 422}:
+                            raise ApiError(502, 'image_unsupported', '当前模型暂时无法读取图片，请切换支持图片的模型，或用文字描述画面。')
                         raise ApiError(502, 'hermes_failed', 'Agent 鉴权失败' if response.status_code in {401,403} else f'Agent 请求失败（HTTP {response.status_code}）')
                     checkpoint = time.monotonic()
                     async for line in response.aiter_lines():
@@ -291,30 +661,38 @@ class AssistantService:
                         choices = event.get('choices') or []
                         delta = choices[0].get('delta', {}).get('content', '') if choices else ''
                         if isinstance(delta, str) and delta:
-                            result += delta
-                            yield 'delta', {'text': delta}
+                            raw_result += delta
+                            visible = visible_reply(raw_result) if conversational else raw_result
+                            if len(visible) > len(result):
+                                text = visible[len(result):]
+                                result = visible
+                                yield 'delta', {'text': text}
                             if time.monotonic() - checkpoint > 2:
-                                self.save_message(sid, 'assistant', result, status='streaming', message_id=message_id)
+                                self.save_message(sid, 'assistant', result, status='streaming',
+                                                  message_id=message_id, model=model_name, mode=mode)
                                 checkpoint = time.monotonic()
             if run['stop'].is_set():
                 state = 'stopped'
-            if not result and state == 'complete':
+            proposal = music_proposal(raw_result) if conversational else None
+            if conversational and PROPOSAL_OPEN in raw_result and not proposal and state == 'complete':
+                raise ApiError(502, 'invalid_proposal', '音乐提案尚未整理完整，请重试')
+            if not result.strip() and not proposal and state == 'complete':
                 raise ApiError(502, 'empty_response', 'Hermes 没有返回回复，请重试')
         except asyncio.CancelledError:
             state = 'stopped'
-            raise
         except Exception as exc:
             if run['stop'].is_set():
                 state = 'stopped'
             else:
                 state = 'error'
                 error = exc.message if isinstance(exc, ApiError) else 'Hermes 连接中断或超时，请检查服务后重试'
-                yield 'error', {'message': error, 'code': 'hermes_failed'}
+                yield 'error', {'message': error, 'code': exc.code if isinstance(exc, ApiError) else 'hermes_failed'}
         finally:
             run['response'] = None
-            suggestion = structured(result) if mode != 'chat' and state == 'complete' else None
+            suggestion = ((music_proposal(raw_result) if conversational else structured(result))
+                          if state == 'complete' else None)
             final = self.save_message(sid, 'assistant', result, status=state,
-                                      message_id=message_id, suggestion=suggestion)
+                                      message_id=message_id, suggestion=suggestion, model=model_name, mode=mode)
             self.active.pop(sid, None)
         yield 'done', {'message': final}
 
@@ -472,6 +850,7 @@ class AssistantService:
         for sid in list(self.active):
             await self.stop(sid)
         tasks = list(getattr(self, 'image_tasks', set()))
+        tasks += list(self.chat_tasks)
         for task in tasks:
             task.cancel()
         if tasks:

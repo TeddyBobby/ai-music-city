@@ -25,12 +25,7 @@ import {
 } from "../lib/utils";
 import { useApp } from "../state/app";
 import { usePlayer } from "../state/player";
-import {
-  Artwork,
-  Badge,
-  Button,
-  EmptyState,
-} from "../components/ui";
+import { Artwork, Badge, Button, EmptyState } from "../components/ui";
 import "./Music.css";
 
 const STAGES = [
@@ -570,6 +565,16 @@ export function QueuePage() {
   );
   return (
     <div className="queue-page music-page">
+      <header className="product-page-heading">
+        <div>
+          <span className="product-eyebrow">每一段灵感，都在路上</span>
+          <h1>创作进度</h1>
+          <p>新作品完成后，会自动加入你的作品库。</p>
+        </div>
+        <Link className="product-outline-link" to="/library">
+          前往我的作品
+        </Link>
+      </header>
       <div className="queue-summary">
         <span>
           <i className="music-status-dot" />
@@ -583,11 +588,7 @@ export function QueuePage() {
           <Check size={14} />
           <strong>{jobs.doneTotal}</strong> 已完成
         </span>
-        <Button
-          variant="ghost"
-          className="queue-refresh"
-          onClick={jobs.reload}
-        >
+        <Button variant="ghost" className="queue-refresh" onClick={jobs.reload}>
           <RefreshCw size={14} />
           刷新
         </Button>

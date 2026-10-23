@@ -1,3 +1,9 @@
+import {
+  accountEpoch,
+  assertAccountEpoch,
+  accountFetch,
+} from "./accountBoundary";
+
 export interface AssistantCapability {
   configured: boolean;
   available: boolean;
@@ -11,6 +17,37 @@ export interface AssistantStatus {
   chat: AssistantCapability;
   image: AssistantCapability;
 }
+export interface AssistantModel {
+  id: string;
+  name: string;
+  provider: string;
+}
+export interface AssistantAudioCapability {
+  available: boolean;
+  method: string;
+  message: string;
+}
+export interface AssistantModels {
+  models: AssistantModel[];
+  default_model: string;
+  audio: AssistantAudioCapability;
+}
+export interface AssistantAudio {
+  id: string;
+  filename: string;
+  url: string;
+  seconds: number;
+  transcript?: string;
+  transcription_status?: "transcribed" | "no_speech";
+}
+export interface AssistantImage {
+  id: string;
+  url: string;
+  mime_type: string;
+  filename: string;
+  width: number;
+  height: number;
+}
 export interface AssistantConfig {
   hermes_base_url: string;
   has_hermes_api_key: boolean;
@@ -21,6 +58,7 @@ export type AssistantConfigPatch = Omit<
 > & { hermes_api_key?: string };
 export type AssistantMode = "chat" | "lyrics" | "style" | "cover_prompt";
 export interface Suggestion {
+  music_kind?: "vocal" | "instrumental";
   title?: string;
   lyrics?: string;
   description?: string;
@@ -35,6 +73,10 @@ export interface AssistantMessage {
   status?: string;
   suggestion?: Suggestion;
   pendingStructured?: boolean;
+  audio?: AssistantAudio;
+  image?: AssistantImage;
+  model?: string;
+  mode?: AssistantMode | null;
 }
 export interface AssistantSession {
   id: string;
@@ -44,6 +86,7 @@ export interface AssistantSession {
   updated_at: string;
   message_count?: number;
   messages?: AssistantMessage[];
+  active?: boolean;
 }
 export interface CoverCandidate {
   id: string;
@@ -79,6 +122,9 @@ export interface MessageBody {
   content: string;
   mode: AssistantMode;
   context?: { title?: string; lyrics?: string; description?: string };
+  model?: string;
+  audio_id?: string;
+  image_id?: string;
 }
 export type StreamEvent =
   | { type: "meta"; run_id: string; session_id: string }
@@ -101,9 +147,11 @@ async function response(
   path: string,
   { method = "GET", body, signal }: RequestOptions = {},
 ) {
+  const epoch = accountEpoch();
+  assertAccountEpoch(epoch);
   let result: Response;
   try {
-    result = await fetch(base + path, {
+    result = await accountFetch(base + path, {
       method,
       signal,
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
@@ -111,12 +159,9 @@ async function response(
     });
   } catch (error) {
     if (error instanceof Error && error.name === "AbortError") throw error;
-    throw new AssistantError(
-      0,
-      "network_error",
-      "连接失败，请稍后重试。",
-    );
+    throw new AssistantError(0, "network_error", "连接失败，请稍后重试。");
   }
+  assertAccountEpoch(epoch);
   if (!result.ok) {
     const data = await result.json().catch(() => null);
     throw new AssistantError(
@@ -128,8 +173,11 @@ async function response(
   return result;
 }
 async function request<T>(path: string, options?: RequestOptions): Promise<T> {
+  const epoch = accountEpoch();
   const result = await response(path, options);
-  return result.status === 204 ? (null as T) : result.json();
+  const data = result.status === 204 ? (null as T) : await result.json();
+  assertAccountEpoch(epoch);
+  return data;
 }
 
 /** A POST SSE stream; handles arbitrary UTF-8 and CRLF chunk boundaries. */
@@ -141,6 +189,7 @@ export async function streamMessage(
     onEvent?: (event: StreamEvent) => void;
   } = {},
 ) {
+  const epoch = accountEpoch();
   const res = await response(
     `/sessions/${encodeURIComponent(sessionId)}/messages`,
     { method: "POST", body, signal: options.signal },
@@ -178,6 +227,7 @@ export async function streamMessage(
   try {
     while (true) {
       const { value, done } = await reader.read();
+      assertAccountEpoch(epoch);
       buffer += decoder.decode(value, { stream: !done });
       buffer = buffer.replace(/\r\n/g, "\n");
       let boundary: number;
@@ -196,6 +246,74 @@ export async function streamMessage(
 }
 
 export const assistantApi = {
+  models: (signal?: AbortSignal) =>
+    request<AssistantModels>("/models", { signal }),
+  uploadAudio: async (
+    file: File,
+    signal?: AbortSignal,
+  ): Promise<AssistantAudio> => {
+    const epoch = accountEpoch();
+    assertAccountEpoch(epoch);
+    const body = new FormData();
+    body.append("file", file, file.name);
+    let result: Response;
+    try {
+      result = await accountFetch(base + "/audio", {
+        method: "POST",
+        body,
+        signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") throw error;
+      throw new AssistantError(
+        0,
+        "network_error",
+        "语音上传失败，请稍后重试。",
+      );
+    }
+    const data = await result.json().catch(() => null);
+    assertAccountEpoch(epoch);
+    if (!result.ok || !data?.id)
+      throw new AssistantError(
+        result.status,
+        data?.error?.code || "audio_error",
+        data?.error?.message || "语音处理失败，请重试。",
+      );
+    return data;
+  },
+  uploadImage: async (
+    file: File,
+    signal?: AbortSignal,
+  ): Promise<AssistantImage> => {
+    const epoch = accountEpoch();
+    assertAccountEpoch(epoch);
+    const body = new FormData();
+    body.append("file", file, file.name);
+    let result: Response;
+    try {
+      result = await accountFetch(base + "/images", {
+        method: "POST",
+        body,
+        signal,
+      });
+    } catch (error) {
+      if (error instanceof Error && error.name === "AbortError") throw error;
+      throw new AssistantError(
+        0,
+        "network_error",
+        "图片上传失败，请稍后重试。",
+      );
+    }
+    const data = await result.json().catch(() => null);
+    assertAccountEpoch(epoch);
+    if (!result.ok || !data?.id)
+      throw new AssistantError(
+        result.status,
+        data?.error?.code || "image_error",
+        data?.error?.message || "图片处理失败，请重试。",
+      );
+    return data;
+  },
   status: (signal?: AbortSignal) =>
     request<AssistantStatus>("/status", { signal }),
   config: (signal?: AbortSignal) =>

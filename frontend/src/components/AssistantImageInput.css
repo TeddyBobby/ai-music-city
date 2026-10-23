@@ -1,0 +1,96 @@
+.assistant-image-input {
+  min-width: 0;
+}
+.assistant-image-input button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  gap: 7px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 12px;
+  color: var(--muted, #7f8a81);
+  background: transparent;
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.assistant-image-input button:hover:not(:disabled) {
+  color: var(--text, #202b25);
+  background: color-mix(in srgb, var(--accent, #b9d795) 15%, transparent);
+}
+.assistant-image-input button:focus-visible {
+  outline: 2px solid var(--accent, #78975b);
+  outline-offset: 2px;
+}
+.assistant-image-input button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+.assistant-image-preview {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: fit-content;
+  max-width: 100%;
+  margin-bottom: 8px;
+  padding: 6px;
+  border-radius: 14px;
+  background: color-mix(
+    in srgb,
+    var(--accent, #b9d795) 9%,
+    var(--surface, #fff)
+  );
+}
+.assistant-image-preview img {
+  width: 66px;
+  height: 66px;
+  border-radius: 9px;
+  object-fit: cover;
+}
+.assistant-image-preview > span {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text, #202b25);
+  font-size: 12px;
+}
+.assistant-image-file-input {
+  display: none;
+}
+.assistant-image-error {
+  margin: 4px 10px 8px;
+  color: #b95442;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.assistant-image-input.is-compact {
+  display: contents;
+}
+.assistant-image-input.is-compact .assistant-image-pick {
+  width: 44px;
+  height: 44px;
+  padding: 0;
+}
+.assistant-image-input.is-compact .assistant-image-pick > span {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+@media (max-width: 760px) {
+  .assistant-image-preview img {
+    width: 52px;
+    height: 52px;
+  }
+  .assistant-image-preview > span {
+    max-width: 130px;
+  }
+}

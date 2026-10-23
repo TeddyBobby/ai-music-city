@@ -1,11 +1,12 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
+import { ChevronDown } from "lucide-react";
 import { api, request } from "../lib/api";
 import { errorMessage } from "../lib/utils";
 import { useApp } from "../state/app";
 import { useAuth } from "../state/auth";
 import { Badge, Button, Input, Select } from "../components/ui";
-import "./Workspace.css";
+import "./Settings.css";
 
 type PrefValues = {
   theme: string;
@@ -62,15 +63,16 @@ export function SettingsPage() {
       .catch((e: any) => {
         if (active) setAssistantError(errorMessage(e));
       });
-    request("GET", "/api/assistant/config")
-      .then((data: any) => {
-        if (active) setAgentUrl(data.hermes_base_url || "");
-      })
-      .catch(() => {});
+    if (user?.is_admin)
+      request("GET", "/api/assistant/config")
+        .then((data: any) => {
+          if (active) setAgentUrl(data.hermes_base_url || "");
+        })
+        .catch(() => {});
     return () => {
       active = false;
     };
-  }, [attempt]);
+  }, [attempt, user?.is_admin]);
 
   useEffect(() => {
     if (!settings?.theme) return;
@@ -78,7 +80,8 @@ export function SettingsPage() {
     setForm((old) => (old ? { ...old, theme: settings.theme } : old));
   }, [settings?.theme]);
 
-  const dirty = !!form && !!saved && JSON.stringify(form) !== JSON.stringify(prefOf(saved));
+  const dirty =
+    !!form && !!saved && JSON.stringify(form) !== JSON.stringify(prefOf(saved));
   const change = <K extends keyof PrefValues>(key: K, value: PrefValues[K]) => {
     setForm((old) => (old ? { ...old, [key]: value } : old));
     setNotice("");
@@ -88,7 +91,10 @@ export function SettingsPage() {
     event.preventDefault();
     if (!form || busy) return;
     const prune = form.prune.trim() ? Number(form.prune) : null;
-    if (prune !== null && (!Number.isInteger(prune) || prune < 1 || prune > 365)) {
+    if (
+      prune !== null &&
+      (!Number.isInteger(prune) || prune < 1 || prune > 365)
+    ) {
       setError("清理天数需为 1–365，留空表示保留。");
       return;
     }
@@ -130,7 +136,7 @@ export function SettingsPage() {
       setAgentNotice("已保存");
       const data = await request("POST", "/api/assistant/check");
       setAssistant(data);
-      toast("Agent 连接已保存", "ok");
+      toast("助手连接已保存", "ok");
     } catch (e) {
       setAgentNotice(errorMessage(e));
     } finally {
@@ -156,16 +162,21 @@ export function SettingsPage() {
 
   if (loading)
     return (
-      <div className="wk-page">
-        <p className="muted" role="status">
+      <div className="preferences-page">
+        <h1>设置</h1>
+        <p className="preferences-hint" role="status">
           正在读取设置…
         </p>
       </div>
     );
   if (!form || !saved)
     return (
-      <div className="wk-page">
-        <div className="card wk-error" role="alert">
+      <div className="preferences-page">
+        <h1>设置</h1>
+        <div
+          className="preferences-section preferences-load-error"
+          role="alert"
+        >
           <span>{error || "设置暂时无法读取"}</span>
           <Button onClick={() => setAttempt((n) => n + 1)}>重新加载</Button>
         </div>
@@ -173,176 +184,231 @@ export function SettingsPage() {
     );
 
   return (
-    <div className="wk-page wk-settings-page">
-      <div className="wk-settings-layout">
-        <div className="wk-settings-col">
-          <section className="card wk-status-card">
-            <h2>账户</h2>
-            {user ? (
-              <>
-                <div className="row between" style={{ marginBottom: 8 }}>
-                  <span className="wk-account-email">{user.email}</span>
-                  <Button
-                    variant="ghost"
-                    onClick={async () => {
-                      await logout();
-                      toast("已退出登录", "ok");
-                    }}
-                  >
-                    退出登录
-                  </Button>
-                </div>
-                <p className="muted small">邮箱账号 · 已登录</p>
-              </>
-            ) : (
-              <>
-                <p className="muted small" style={{ marginBottom: 10 }}>
-                  登录后可保存作品、创作助手会话与播放列表。
-                </p>
-                <Link className="btn primary" to="/login">
-                  邮箱快捷登录 →
-                </Link>
-              </>
-            )}
-          </section>
+    <div className="preferences-page">
+      <h1>设置</h1>
 
-          <section className="card wk-status-card">
-            <h2>Agent 连接</h2>
-            <p className="muted small">
-              配置创作助手的 AI 服务地址与密钥，用于对话、写词与曲风构思。
+      <section
+        className="preferences-section"
+        aria-labelledby="preferences-account-title"
+      >
+        <header className="preferences-section-heading">
+          <h2 id="preferences-account-title">账户</h2>
+        </header>
+        <div className="preferences-row preferences-account-row">
+          {user ? (
+            <>
+              <div className="preferences-account-info">
+                <span className="preferences-hint">登录邮箱</span>
+                <p className="preferences-email">{user.email}</p>
+              </div>
+              <Button
+                variant="ghost"
+                onClick={async () => {
+                  try {
+                    await logout();
+                  } catch (error) {
+                    toast(errorMessage(error), "error");
+                  }
+                }}
+              >
+                退出登录
+              </Button>
+            </>
+          ) : (
+            <>
+              <span className="preferences-hint">尚未登录</span>
+              <Link className="preferences-login" to="/login">
+                登录 / 注册
+              </Link>
+            </>
+          )}
+        </div>
+      </section>
+
+      <form
+        className="preferences-section"
+        onSubmit={save}
+        aria-labelledby="preferences-general-title"
+      >
+        <header className="preferences-section-heading">
+          <h2 id="preferences-general-title">通用设置</h2>
+        </header>
+        <div className="preferences-row">
+          <label className="preferences-label" htmlFor="preferences-theme">
+            界面外观
+          </label>
+          <Select
+            id="preferences-theme"
+            className="preferences-control"
+            value={form.theme}
+            onChange={(e) => change("theme", e.target.value)}
+          >
+            <option value="system">跟随系统</option>
+            <option value="light">浅色</option>
+            <option value="dark">深色</option>
+          </Select>
+        </div>
+        <div className="preferences-row">
+          <div className="preferences-label-group">
+            <label
+              className="preferences-label"
+              htmlFor="preferences-retention"
+            >
+              上传素材保留时间
+            </label>
+            <p className="preferences-hint" id="preferences-retention-help">
+              仅清理闲置素材，已生成的歌曲不受影响。
             </p>
-            <form onSubmit={saveAgent} className="wk-agent-form">
-              <label className="field">
-                <span>服务地址（Base URL）</span>
+          </div>
+          <Select
+            id="preferences-retention"
+            aria-describedby="preferences-retention-help"
+            className="preferences-control"
+            value={form.prune}
+            onChange={(e) => change("prune", e.target.value)}
+          >
+            <option value="">一直保留</option>
+            {form.prune && form.prune !== "30" && (
+              <option value={form.prune}>{form.prune} 天</option>
+            )}
+            <option value="30">30 天</option>
+          </Select>
+        </div>
+        {error && (
+          <p className="preferences-error preferences-feedback" role="alert">
+            {error}
+          </p>
+        )}
+        <div className="preferences-actions">
+          <span className="preferences-hint" role="status">
+            {notice || (dirty ? "有未保存的更改" : "")}
+          </span>
+          <Button type="submit" variant="primary" disabled={busy || !dirty}>
+            {busy ? "保存中…" : "保存更改"}
+          </Button>
+        </div>
+      </form>
+
+      <section
+        className="preferences-section"
+        aria-labelledby="preferences-assistant-title"
+      >
+        <header className="preferences-section-heading">
+          <h2 id="preferences-assistant-title">AI 助手</h2>
+          {assistant && (
+            <Badge tone={assistant.chat?.available ? "ok" : "neutral"}>
+              {assistant.chat?.available
+                ? "已连接"
+                : assistant.chat?.configured
+                  ? "暂未连接"
+                  : "未配置"}
+            </Badge>
+          )}
+        </header>
+        <div className="preferences-row preferences-connection-row">
+          <div className="preferences-label-group">
+            <span className="preferences-label">服务连接</span>
+            <p className="preferences-hint">
+              {assistant
+                ? assistant.chat?.available
+                  ? "连接正常"
+                  : assistant.chat?.configured
+                    ? "连接不可用，请重新检测。"
+                    : user?.is_admin
+                      ? "请在连接设置中配置服务。"
+                      : "服务暂未配置，请联系管理员。"
+                : assistantError || "正在读取连接状态…"}
+            </p>
+          </div>
+          {user?.is_admin && (
+            <Button disabled={checking} onClick={testConnection}>
+              {checking ? "检测中…" : "检测连接"}
+            </Button>
+          )}
+        </div>
+        {assistantError && assistant && (
+          <p className="preferences-error preferences-feedback" role="alert">
+            {assistantError}
+          </p>
+        )}
+
+        {user?.is_admin && (
+          <details className="preferences-advanced">
+            <summary>
+              <span>连接设置</span>
+              <ChevronDown size={16} aria-hidden="true" />
+            </summary>
+            <form onSubmit={saveAgent} className="preferences-agent-form">
+              <div className="preferences-row">
+                <label
+                  className="preferences-label"
+                  htmlFor="preferences-service-url"
+                >
+                  服务地址
+                </label>
                 <Input
+                  id="preferences-service-url"
+                  className="preferences-control"
                   value={agentUrl}
                   onChange={(e: any) => setAgentUrl(e.target.value)}
                   placeholder="https://api.example.com/v1"
                   type="url"
+                  autoComplete="url"
                 />
-              </label>
-              <label className="field">
-                <span>API Key</span>
+              </div>
+              <div className="preferences-row">
+                <div className="preferences-label-group">
+                  <label
+                    className="preferences-label"
+                    htmlFor="preferences-service-key"
+                  >
+                    访问密钥
+                  </label>
+                  <p className="preferences-hint" id="preferences-key-help">
+                    留空保留已保存的密钥。
+                  </p>
+                </div>
                 <Input
+                  id="preferences-service-key"
+                  className="preferences-control"
+                  aria-describedby="preferences-key-help"
                   value={agentKey}
                   onChange={(e: any) => setAgentKey(e.target.value)}
-                  placeholder={assistant?.chat?.configured ? "已配置（输入可更换）" : "sk-…"}
+                  placeholder={
+                    assistant?.chat?.configured
+                      ? "填写以更换密钥"
+                      : "输入 API Key"
+                  }
                   type="password"
+                  autoComplete="new-password"
                 />
-              </label>
-              {agentNotice && (
-                <p className={agentNotice === "连接成功" || agentNotice === "已保存" ? "muted small" : "wk-inline-error small"} role="status">
-                  {agentNotice}
-                </p>
-              )}
-              <div className="row">
+              </div>
+              <div className="preferences-actions">
+                <span className="preferences-hint">
+                  {assistant?.chat?.model
+                    ? `当前模型：${assistant.chat.model}`
+                    : ""}
+                </span>
                 <Button type="submit" variant="primary" disabled={savingAgent}>
-                  {savingAgent ? "保存中…" : "保存"}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  disabled={checking || !assistant?.chat?.configured}
-                  onClick={testConnection}
-                >
-                  {checking ? "测试中…" : "测试连接"}
+                  {savingAgent ? "保存中…" : "保存连接"}
                 </Button>
               </div>
             </form>
-            {assistant?.chat && (
-              <div className="wk-agent-status row between" style={{ marginTop: 10 }}>
-                <span className="muted small">
-                  {assistant.chat.model || "未选择模型"}
-                </span>
-                <Badge tone={assistant.chat.available ? "ok" : "neutral"}>
-                  {assistant.chat.available ? "已连接" : "未连接"}
-                </Badge>
-              </div>
-            )}
-          </section>
-
-          <form className="card wk-settings-form" onSubmit={save}>
-            <h2>偏好</h2>
-            <label className="field">
-              <span>外观</span>
-              <Select
-                value={form.theme}
-                onChange={(e) => change("theme", e.target.value)}
-              >
-                <option value="system">跟随系统</option>
-                <option value="light">浅色</option>
-                <option value="dark">深色</option>
-              </Select>
-            </label>
-            <label className="field">
-              <span>上传文件保留天数</span>
-              <Select value={form.prune ? "30" : ""} onChange={(e) => change("prune", e.target.value)}>
-                <option value="">永久保留</option>
-                <option value="30">30 天</option>
-              </Select>
-              <small className="muted">
-                仅清理未被任务引用的上传文件，不删除已生成作品。
-              </small>
-            </label>
-            {error && (
-              <p className="wk-inline-error" role="alert">
-                {error}
-              </p>
-            )}
-            <div className="wk-settings-save row between">
-              <span className="muted small" role="status">
-                {notice || (dirty ? "有尚未保存的修改" : "偏好对下次操作生效")}
-              </span>
-              <Button type="submit" variant="primary" disabled={busy || !dirty}>
-                {busy ? "保存中…" : "保存偏好"}
-              </Button>
-            </div>
-          </form>
-        </div>
-
-        <aside className="wk-settings-side">
-          <section className="card wk-status-card">
-            <div className="row between">
-              <h2>AI 助手</h2>
-              <Button
-                variant="ghost"
-                disabled={checking}
-                onClick={testConnection}
-              >
-                {checking ? "检测中…" : "检测连接"}
-              </Button>
-            </div>
-            {assistant ? (
-              <div className="wk-capability">
-                <div className="row between">
-                  <span>Agent 对话</span>
-                  <Badge tone={assistant.chat?.available ? "ok" : "neutral"}>
-                    {assistant.chat?.available
-                      ? "已连接"
-                      : assistant.chat?.configured
-                        ? "未连接"
-                        : "未配置"}
-                  </Badge>
-                </div>
-                <p className="muted small">
-                  {assistant.chat?.model || "未选择模型"}
-                </p>
-              </div>
-            ) : (
-              <p className="muted small">{assistantError || "正在检测…"}</p>
-            )}
-            {assistantError && assistant && (
-              <p className="wk-inline-error small" role="alert">
-                {assistantError}
-              </p>
-            )}
-            <p className="muted small">对话使用联网模型，需配置 Agent 连接。</p>
-            <Link className="btn ghost wk-connect-link" to="/assistant">
-              进入创作助手 →
-            </Link>
-          </section>
-        </aside>
-      </div>
+          </details>
+        )}
+        {agentNotice && (
+          <p
+            className={
+              agentNotice === "连接成功" || agentNotice === "已保存"
+                ? "preferences-hint preferences-feedback"
+                : "preferences-error preferences-feedback"
+            }
+            role="status"
+          >
+            {agentNotice}
+          </p>
+        )}
+      </section>
     </div>
   );
 }

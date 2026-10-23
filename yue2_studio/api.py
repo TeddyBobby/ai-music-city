@@ -23,6 +23,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from yue2_studio import __version__, assist, audio, config, jobs, lora, projects, uploads
 from yue2_studio.assist import AssistError, AssistUnavailable
+from yue2_studio.tenancy import runtime
 from yue2_studio.jobs import Conflict, Job, JobStore, NotFound, ValidationFailure
 from yue2_studio.worker import Worker
 
@@ -110,21 +111,22 @@ def _fmt(exc: RequestValidationError) -> str:
 
 
 def _state(request: Request):
-    return request.app.state
+    return runtime(request)
 
 
 def _store(request: Request) -> JobStore:
-    return request.app.state.store
+    return runtime(request).store
 
 
 def _worker(request: Request) -> Worker:
-    return request.app.state.worker
+    return runtime(request).worker
 
 
 def describe(request: Request, job: Job) -> dict:
-    """Job JSON with the live last event overlaid for non-terminal jobs."""
+    """Job JSON with the latest real stage overlaid when no persisted progress exists."""
     if job.progress is None:
-        job.progress = _worker(request).bus.last(job.id)
+        bus = _worker(request).bus
+        job.progress = bus.last_stage(job.id) or bus.last(job.id)
     return job.to_api()
 
 
@@ -351,19 +353,35 @@ def _csv(value: str | None, allowed: tuple[str, ...], name: str) -> list[str] | 
 @router.get("/jobs")
 async def list_jobs(request: Request, status: str | None = None, group: str | None = None,
                     kind: str | None = None, track: str | None = None, project: str | None = None,
-                    limit: int = 50, offset: int = 0):
+                    limit: int = 50, offset: int = 0, music_kind: str | None = None,
+                    summary: bool = False):
     statuses = _csv(status, jobs.STATUSES, "status")
     kinds = _csv(kind, jobs.KINDS, "kind")
     if limit < 1 or limit > 500 or offset < 0:
         raise ApiError(400, "validation_error", "limit must be 1..500 and offset >= 0")
-    items, total = _store(request).list(status=statuses, kind=kinds, group=group or None, track=track or None,
-                                        project=project or None, limit=limit, offset=offset)
-    return {"jobs": [describe(request, j) for j in items], "total": total}
+    if music_kind and music_kind not in jobs.MUSIC_KINDS:
+        raise ApiError(400, "validation_error", f"music_kind must be one of {', '.join(jobs.MUSIC_KINDS)}")
+    result = _store(request).list(status=statuses, kind=kinds, group=group or None, track=track or None,
+                                 project=project or None, limit=limit, offset=offset,
+                                 music_kind=music_kind or None, summary=summary)
+    items, total = result[:2]
+    response = {"jobs": [describe(request, j) for j in items], "total": total}
+    if summary:
+        response["summary"] = result[2]
+    return response
 
 
 @router.get("/jobs/{job_id}")
 async def get_job(request: Request, job_id: str):
     return {"job": describe(request, _get_job(request, job_id))}
+
+
+@router.get("/jobs/{job_id}/versions")
+async def job_versions(request: Request, job_id: str, limit: int = 100, offset: int = 0):
+    if limit < 1 or limit > 500 or offset < 0:
+        raise ApiError(400, "validation_error", "limit must be 1..500 and offset >= 0")
+    items, total = _store(request).versions(job_id, limit=limit, offset=offset)
+    return {"jobs": [describe(request, job) for job in items], "total": total}
 
 
 @router.patch("/jobs/{job_id}")
@@ -435,7 +453,10 @@ async def job_events(request: Request, job_id: str):
         q = bus.subscribe(job_id)
         try:
             job = store.get(job_id)
-            last = bus.last(job_id) or job.progress
+            stage = None if job.terminal else bus.last_stage(job_id)
+            last = job.progress if job.terminal else bus.last(job_id) or job.progress
+            if stage is not None and stage != last:
+                yield _frame("progress", stage)
             if last is not None:
                 yield _frame("progress", last)
             if job.terminal:

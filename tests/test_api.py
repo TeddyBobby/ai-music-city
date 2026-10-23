@@ -16,6 +16,7 @@ from conftest import BASE, Api
 from yue2_studio import api as api_module
 from yue2_studio import assist, audio, config
 from yue2_studio.fake import FakeEngine
+from yue2_studio.worker import normalise, status_event
 
 JOB_KEYS = {"id", "kind", "status", "group_id", "parent_id", "preset", "precision", "ode_steps", "loras",
             "seed", "params", "title", "created_at", "started_at", "finished_at", "error", "timing",
@@ -339,7 +340,22 @@ async def test_http_sampling_limits_reach_worker_and_engine(client, api, engine)
     assert invalid.json()["error"]["code"] == "validation_error"
 
 
-async def test_submit_create_then_stream_to_done(client, api):
+async def test_submit_create_then_stream_to_done(client, api, app, monkeypatch):
+    # This test checks the complete event sequence, so subscribe before starting the
+    # engine. A late subscriber legitimately receives only the latest stage snapshot.
+    submit = app.state.worker.submit
+    subscribe = app.state.bus.subscribe
+    pending = []
+    monkeypatch.setattr(app.state.worker, "submit", pending.append)
+
+    def start_when_subscribed(job_id):
+        queue = subscribe(job_id)
+        for queued in pending:
+            submit(queued)
+        pending.clear()
+        return queue
+
+    monkeypatch.setattr(app.state.bus, "subscribe", start_when_subscribed)
     body = await api.submit({"kind": "create", "preset": "fast", "params": {**BASE, "title": "Test"}})
     job = body["job"]
     assert set(job) == JOB_KEYS
@@ -753,6 +769,50 @@ async def test_sse_late_subscriber_sees_last_event_first(client, api, app):
     assert progress[0]["type"] == "stage"  # cached last event first, not the run-from-the-beginning status
     assert progress[0]["job_id"] == job["id"] and progress[-1]["status"] == "done"
     assert (await api.get(job["id"]))["progress"]["status"] == "done"
+
+
+async def test_refresh_and_sse_restore_stage_when_last_event_is_a_log(make_app, monkeypatch):
+    async with make_app(FakeEngine(delay=0), lifespan=False) as (app, client):
+        bus = app.state.bus
+        bus.bind(asyncio.get_running_loop())
+        job = (await client.post("/api/jobs", json={"kind": "create", "params": BASE})).json()["job"]
+        job_id = job["id"]
+        app.state.store.update_status(job_id, "running")
+        stage = normalise({"type": "stage", "stage": "Generating song", "status": "running",
+                           "completed": 12, "total": 100}, job_id)
+        message = normalise({"type": "log", "text": "still composing"}, job_id)
+        bus.publish(job_id, stage)
+        bus.publish(job_id, normalise({"type": "token", "phase": "semantic", "tokens": 12}, job_id))
+        bus.publish(job_id, message)
+
+        detail = (await client.get(f"/api/jobs/{job_id}")).json()["job"]
+        listed = (await client.get("/api/jobs")).json()["jobs"][0]
+        assert detail["progress"] == listed["progress"] == stage
+        assert bus.last(job_id) == message  # restoring progress must not change event history
+
+        snapshots, seen = [], asyncio.Event()
+        original_frame = api_module._frame
+
+        def observe(event, payload):
+            if event == "progress":
+                snapshots.append(payload)
+                if len(snapshots) == 2:
+                    seen.set()
+            return original_frame(event, payload)
+
+        monkeypatch.setattr(api_module, "_frame", observe)
+        stream = asyncio.create_task(client.get(f"/api/jobs/{job_id}/events"))
+        try:
+            await asyncio.wait_for(seen.wait(), 3)
+            assert snapshots == [stage, message]
+        finally:
+            terminal = status_event(job_id, "cancelled", "cancelled", stage="semantic")
+            app.state.store.update_status(job_id, "cancelled", progress=terminal)
+            bus.publish(job_id, terminal)
+            bus.done(job_id, app.state.store.get(job_id).to_api())
+            response = await asyncio.wait_for(stream, 3)
+            assert response.status_code == 200
+            app.state.store.close()
 
 
 # -- regenerate ---------------------------------------------------------------------------------

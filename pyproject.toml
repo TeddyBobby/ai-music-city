@@ -20,9 +20,15 @@ dependencies = [
   "psutil",
   "librosa",
   "httpx",
+  "Pillow>=11,<13",
   "opencc-python-reimplemented==0.1.7",
   "pypinyin==0.55.0",
 ]
+
+[project.optional-dependencies]
+# CPU-only, multilingual voice input for the assistant. The speech model is downloaded once
+# with scripts/setup_assistant_voice.py; inference runs in a short-lived process.
+assistant-voice = ["faster-whisper>=1.2,<2", "av>=11,<19"]
 
 [project.scripts]
 yue2-studio = "yue2_studio.main:main"

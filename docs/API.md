@@ -22,6 +22,44 @@ Both sides implement this document independently; any change here must be made h
 | 503  | `engine_unavailable` | engine failed to load / models missing (`status.models.present=false`); `audio.mp3` or `album.zip?format=mp3` without ffmpeg |
 | 500  | `internal_error`     | anything else |
 
+### Account boundary
+
+All `/api/` routes, including audio, downloads, SSE, and API documentation, require the
+`amc_session` HttpOnly cookie except these authentication endpoints:
+
+| Method | Path | Body / result |
+|--------|------|---------------|
+| GET | `/api/auth/status` | `{user, setup_required}`; `user` is null while signed out |
+| POST | `/api/auth/register` | `{email, password}` → 201 `{user}` and a session cookie |
+| POST | `/api/auth/login` | `{email, password}` → `{user}` and a fresh session cookie |
+| POST | `/api/auth/logout` | Revoke the current session and remove its cookie |
+| POST | `/api/auth/code` | 410 `code_login_disabled`; the former demo code is never accepted |
+
+`user` contains `id`, `email`, `is_admin`, and `legacy_owner`. Passwords are 10–128
+characters and stored only as salted scrypt hashes. Sessions expire after 30 days;
+cookies use SameSite=Lax and Secure over HTTPS (or `AMC_FORCE_SECURE_COOKIE=1`).
+Mutating requests must be same-origin. Unauthenticated private requests return 401;
+another account's resource ID returns 404. Authentication attempts are rate limited.
+API responses use `Cache-Control: no-store` and `Vary: Cookie`, including media and SSE.
+
+The first password account must be created through a direct loopback connection to a
+loopback hostname, without forwarding headers. It becomes the sole administrator and
+owns the existing local workspace. Other accounts receive separate job databases,
+song/upload directories, assistant histories/audio/artwork, reviews, project data,
+and settings under `data/users/<id>/`. Existing demo sessions are revoked on upgrade.
+Shared AI connection configuration (`GET/PUT /api/assistant/config`) requires the
+administrator. Model execution is serialized across accounts; logout does not cancel jobs.
+Plaza endpoints are still a private workspace feature, not a public cross-account feed.
+
+### Assistant conversations and proposals
+
+- `GET /api/assistant/models` returns only models advertised by the configured service's `/v1/models`; unavailable or empty catalogs never fall back to a static model list.
+- `POST /api/assistant/images` accepts multipart `file` (static JPEG/PNG/WebP, at most 8 MB) and returns 201 `{id, url, mime_type, filename, width, height}`. Pixels are normalized to JPEG, stripped of metadata and limited to 1536px. `GET /api/assistant/images/{id}` requires the owning account; another account receives 404.
+- `POST /api/assistant/audio` accepts multipart `file`, returning an account-private playback attachment with `transcript` and `transcription_status: "transcribed" | "no_speech"`. Empty successful transcription preserves the audio but explicitly does not imply melody analysis. Failed transcription remains an error.
+- `POST /api/assistant/sessions/{id}/messages` accepts `{content, mode, model?, audio_id?, image_id?, context?}`. Text may be empty when an attachment is present; images and audio can be combined. `mode: "chat" | "lyrics"` changes conversational focus, not whether a card is mandatory. Current and prior image pixels are sent as actual multimodal content; audio uses the transcript plus user description.
+- SSE `delta` events contain natural reply text; `done.message` persists `content`, nullable `mode`, `audio`, `image`, and optional `suggestion`. Proposals use `{title, description, lyrics, music_kind: "vocal" | "instrumental"}`; instrumental lyrics are empty. The internal `<music_proposal>JSON</music_proposal>` block is removed from visible streaming text. Ordinary JSON is not interpreted as a proposal.
+- The assistant may propose when the user is ready or the idea is sufficiently developed. A proposal never submits a music job: only the explicit card action does. Navigation disconnects delivery without cancelling the reply; `/sessions/{id}/stop` owns cancellation. Old messages without the new optional fields remain readable.
+
 ## 2. Data models
 
 Types: `str`, `int`, `float`, `bool`, `[T]` list, `T?` nullable, `enum(a|b)`.
@@ -354,12 +392,24 @@ Body: `{"kind", "params", "preset"?, "precision"?, "ode_steps"?, "loras"?, "trac
 Errors: 400 validation; 404 unknown `parent_id`/`upload_id`/`track_id`; 409 cover unavailable; 503 models missing.
 With `track_id` every returned job carries `take` (attached before the response, in submit order).
 
-### `GET /api/jobs?status=&group=&kind=&track=&project=&limit=&offset=`
+### `GET /api/jobs?status=&group=&kind=&track=&project=&music_kind=&summary=&limit=&offset=`
 
 All query params optional. `status` and `kind` accept comma-separated lists (`status=queued,running`);
 `track=<track_id>` / `project=<project_id>` keep only takes of that track / project.
 `limit` default 50, max 500; `offset` default 0. Ordered by `created_at` **descending**.
 → 200 `{"jobs": [Job, …], "total": int}` (`total` = count matching the filter, ignoring limit/offset).
+
+`music_kind=instrumental|vocal` optionally filters by the stored generation settings (not the creation
+`kind`); omit it for both. Classification matches the library: both active instrumental adapters imply
+instrumental; otherwise an explicit instrumental style with no lyric text (section markers excluded)
+implies instrumental. Legacy adapter formats and rows without adapters remain supported. This describes
+the generation settings, not acoustic analysis of the resulting recording. Invalid values return 400.
+
+`summary=true` adds `"summary": {"audio_seconds": number}`. The duration sum and `total` use the same
+complete filtered set, **before** `limit` / `offset`; an empty match has count/duration zero. Stored
+`audio_seconds` is used, with the legacy `timing.audio_seconds` value as fallback when absent; unknown
+or invalid duration contributes zero. The default response remains unchanged when summary is omitted.
+All filtering and aggregation operate only on the signed-in account's store.
 
 ### `GET /api/jobs/{id}` → 200 `{"job": Job}` | 404.
 

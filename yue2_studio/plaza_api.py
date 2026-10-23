@@ -8,6 +8,7 @@ from pydantic import BaseModel, ConfigDict, Field, StringConstraints, field_vali
 
 from yue2_studio.api import ApiError, describe
 from yue2_studio.assistant_api import same_origin
+from yue2_studio.tenancy import runtime
 from yue2_studio.jobs import NotFound
 from yue2_studio.plaza_service import PlazaService
 
@@ -21,14 +22,14 @@ def install(app):
 
 def existing_job(request: Request, job_id: str):
     try:
-        return request.app.state.store.get(job_id)
+        return runtime(request).store.get(job_id)
     except NotFound:
         raise ApiError(404, 'not_found', '作品不存在') from None
 
 
 def playable_job(request: Request, job_id: str):
     job = existing_job(request, job_id)
-    root = Path(request.app.state.paths.songs_dir).resolve()
+    root = Path(runtime(request).paths.songs_dir).resolve()
     song_dir = (root / job.id).resolve()
     audio = (song_dir / 'song' / 'audio.flac').resolve()
     if not song_dir.is_relative_to(root) or not audio.is_relative_to(song_dir):
@@ -56,7 +57,7 @@ def matches_song(record: dict, job, needle: str) -> bool:
 
 def published_songs(request: Request) -> list[tuple]:
     songs = []
-    for record in request.app.state.plaza.records():
+    for record in runtime(request).plaza.records():
         try:
             songs.append((record, playable_job(request, record['job_id'])))
         except ApiError as exc:
@@ -87,7 +88,7 @@ def album(request: Request, record: dict) -> dict:
 
 
 def existing_album(request: Request, album_id: str) -> dict:
-    record = request.app.state.plaza.get_album(album_id)
+    record = runtime(request).plaza.get_album(album_id)
     if record is None:
         raise ApiError(404, 'not_found', '专辑不存在')
     return record
@@ -127,7 +128,7 @@ async def list_albums(request: Request, query: str = Query(default='', max_lengt
                       offset: int = Query(default=0, ge=0), limit: int = Query(default=24, ge=1, le=100)):
     needle = query.strip().casefold()
     albums = []
-    for record in request.app.state.plaza.album_records():
+    for record in runtime(request).plaza.album_records():
         item = album(request, record)
         haystack = '\n'.join([record['title'], record['caption']] +
                              [str(value or '') for track in item['tracks']
@@ -141,7 +142,7 @@ async def list_albums(request: Request, query: str = Query(default='', max_lengt
 async def create_album(request: Request, body: AlbumBody):
     for job_id in body.job_ids:
         playable_job(request, job_id)
-    record = request.app.state.plaza.publish_album(body.title, body.caption, body.job_ids)
+    record = runtime(request).plaza.publish_album(body.title, body.caption, body.job_ids)
     return {'album': album(request, record), 'scope': 'local'}
 
 
@@ -155,13 +156,13 @@ async def update_album(request: Request, album_id: str, body: AlbumBody):
     existing_album(request, album_id)
     for job_id in body.job_ids:
         playable_job(request, job_id)
-    record = request.app.state.plaza.publish_album(body.title, body.caption, body.job_ids, album_id)
+    record = runtime(request).plaza.publish_album(body.title, body.caption, body.job_ids, album_id)
     return {'album': album(request, record), 'scope': 'local'}
 
 
 @router.delete('/albums/{album_id}', status_code=204)
 async def withdraw_album(request: Request, album_id: str):
-    request.app.state.plaza.withdraw_album(album_id)
+    runtime(request).plaza.withdraw_album(album_id)
     return Response(status_code=204)
 
 
@@ -172,7 +173,7 @@ async def rankings(request: Request, query: str = Query(default='', max_length=2
     reviews = {}
     for start in range(0, len(songs), 500):
         ids = [job.id for _, job in songs[start:start + 500]]
-        reviews.update(request.app.state.reviews.summaries(ids)['reviews'])
+        reviews.update(runtime(request).reviews.summaries(ids)['reviews'])
     needle = query.strip().casefold()
 
     def ranked(source: str):
@@ -201,14 +202,14 @@ async def rankings(request: Request, query: str = Query(default='', max_length=2
 @router.get('/{job_id}')
 async def get_post(request: Request, job_id: str):
     job = playable_job(request, job_id)
-    record = request.app.state.plaza.get(job_id)
+    record = runtime(request).plaza.get(job_id)
     return {'post': post(request, record, job) if record else None, 'scope': 'local'}
 
 
 @router.put('/{job_id}')
 async def publish(request: Request, job_id: str, body: PublicationBody):
     job = playable_job(request, job_id)
-    record = request.app.state.plaza.publish(job_id, body.caption)
+    record = runtime(request).plaza.publish(job_id, body.caption)
     return {'post': post(request, record, job), 'scope': 'local'}
 
 
@@ -216,5 +217,5 @@ async def publish(request: Request, job_id: str, body: PublicationBody):
 async def withdraw(request: Request, job_id: str):
     # Withdrawal remains available if the audio is subsequently missing.
     existing_job(request, job_id)
-    request.app.state.plaza.withdraw(job_id)
+    runtime(request).plaza.withdraw(job_id)
     return Response(status_code=204)

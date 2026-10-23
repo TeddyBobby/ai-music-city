@@ -1,129 +1,190 @@
-import { useEffect, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { Button, Divider, Text, TextInput } from "@mantine/core";
-import { Mail, ShieldCheck, ArrowRight } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { Button, PasswordInput, TextInput } from "@mantine/core";
+import { ArrowRight, AudioLines, LockKeyhole } from "lucide-react";
 import { api } from "../lib/api";
+import { leaveAccount } from "../lib/accountBoundary";
 import { useAuth } from "../state/auth";
 import "./Auth.css";
 
 export function LoginPage() {
-  const nav = useNavigate();
-  const { user, refresh } = useAuth();
+  const setupRequired = useAuth((s) => s.setupRequired);
+  const [register, setRegister] = useState(setupRequired);
   const [email, setEmail] = useState("");
-  const [code, setCode] = useState("");
-  const [sent, setSent] = useState(false);
-  const [cooldown, setCooldown] = useState(0);
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
-  const timer = useRef<number | undefined>(undefined);
-
   useEffect(() => {
-    if (user) nav("/home", { replace: true });
-  }, [user, nav]);
+    document.title = "登录 · AI乐之城";
+  }, []);
+  const creating = setupRequired || register;
 
-  useEffect(() => {
-    if (cooldown <= 0) return;
-    timer.current = window.setInterval(() => setCooldown((c) => c - 1), 1000);
-    return () => window.clearInterval(timer.current);
-  }, [cooldown]);
-
-  async function requestCode() {
+  async function submit(event: FormEvent) {
+    event.preventDefault();
+    if (busy) return;
     setError("");
-    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) {
-      setError("请输入有效的邮箱地址");
+    if (creating && password !== confirm) {
+      setError("两次输入的密码不一致");
       return;
     }
     setBusy(true);
     try {
-      await api.post("/api/auth/code", { email });
-      setSent(true);
-      setCooldown(60);
-    } catch (e: any) {
-      setError(e?.message || "验证码发送失败，请稍后重试");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function login() {
-    setError("");
-    if (!code.trim()) {
-      setError("请输入验证码");
-      return;
-    }
-    setBusy(true);
-    try {
-      await api.post("/api/auth/login", { email, code });
-      await refresh();
-      nav("/home", { replace: true });
-    } catch (e: any) {
-      setError(e?.message || "登录失败，请检查验证码");
-    } finally {
+      const result = await api.post(
+        creating ? "/api/auth/register" : "/api/auth/login",
+        {
+          email: email.trim(),
+          password,
+        },
+      );
+      leaveAccount(result.user.id);
+    } catch (reason) {
+      setError(
+        reason instanceof Error ? reason.message : "暂时无法登录，请稍后重试。",
+      );
       setBusy(false);
     }
   }
 
   return (
-    <div className="auth-page">
-      <div className="auth-card">
-        <div className="auth-head">
-          <div className="auth-logo">
-            <Mail size={20} />
+    <main className="auth-screen">
+      <div className="auth-page">
+        <section className="auth-story" aria-label="欢迎来到 AI乐之城">
+          <span className="auth-brand">
+            <AudioLines size={23} /> AI乐之城
+          </span>
+          <div className="auth-story-copy">
+            <span className="auth-eyebrow">A LITTLE IDEA. YOUR OWN MUSIC.</span>
+            <h1>
+              让想象，
+              <br />
+              有回响。
+            </h1>
+            <p>
+              一句话、一段哼唱、一张照片。
+              <br />
+              下一首喜欢的歌，由你创造。
+            </p>
           </div>
-          <h2>AI乐之城</h2>
-          <Text size="sm" c="dimmed">
-            {sent ? "已发送验证码，输入即可登录" : "输入邮箱，验证码快捷登录"}
-          </Text>
+          <div className="auth-sound-art" aria-hidden="true">
+            <div className="auth-sound-disc">
+              <span>
+                <AudioLines size={32} strokeWidth={1.5} />
+              </span>
+            </div>
+            <div className="auth-sound-caption">
+              <span>属于你的音乐空间</span>
+              <strong>从一个小小的念头开始。</strong>
+            </div>
+          </div>
+          <span className="auth-story-footer">
+            让每个灵感，都有自己的声音。
+          </span>
+        </section>
+        <div className="auth-form-area">
+          <form className="auth-card" onSubmit={submit}>
+            <div className="auth-head">
+              <span className="auth-logo">
+                <LockKeyhole size={21} />
+              </span>
+              <h2>
+                {setupRequired
+                  ? "开启你的音乐空间"
+                  : creating
+                    ? "创建你的账号"
+                    : "欢迎回来"}
+              </h2>
+              <p>
+                {creating
+                  ? "保存每一首作品，继续每一个灵感。"
+                  : "登录后，继续你的创作。"}
+              </p>
+            </div>
+            {setupRequired && (
+              <p className="auth-setup-note">
+                首个账号将接收本机现有的作品和对话。
+              </p>
+            )}
+            <TextInput
+              label="邮箱"
+              placeholder="you@example.com"
+              type="email"
+              inputMode="email"
+              size="md"
+              value={email}
+              onChange={(e) => setEmail(e.currentTarget.value)}
+              required
+              maxLength={254}
+              disabled={busy}
+              autoComplete="username"
+              autoCapitalize="none"
+              spellCheck={false}
+            />
+            <PasswordInput
+              label="密码"
+              placeholder={creating ? "设置至少 10 位密码" : "输入密码"}
+              size="md"
+              value={password}
+              onChange={(e) => setPassword(e.currentTarget.value)}
+              required
+              minLength={creating ? 10 : undefined}
+              maxLength={128}
+              disabled={busy}
+              autoComplete={creating ? "new-password" : "current-password"}
+              visibilityToggleButtonProps={{ "aria-label": "显示或隐藏密码" }}
+            />
+            {creating && (
+              <PasswordInput
+                label="确认密码"
+                placeholder="再次输入密码"
+                size="md"
+                value={confirm}
+                onChange={(e) => setConfirm(e.currentTarget.value)}
+                required
+                minLength={10}
+                maxLength={128}
+                disabled={busy}
+                autoComplete="new-password"
+                visibilityToggleButtonProps={{
+                  "aria-label": "显示或隐藏确认密码",
+                }}
+              />
+            )}
+            {error && (
+              <p className="auth-error" role="alert">
+                {error}
+              </p>
+            )}
+            <Button
+              type="submit"
+              fullWidth
+              loading={busy}
+              rightSection={<ArrowRight size={17} />}
+            >
+              {creating ? "创建账号，开始创作" : "登录"}
+            </Button>
+            {!setupRequired && (
+              <p className="auth-switch">
+                {creating ? "已经有账号？" : "第一次来？"}
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => {
+                    setRegister(!register);
+                    setError("");
+                    setPassword("");
+                    setConfirm("");
+                  }}
+                >
+                  {creating ? "去登录" : "创建账号"}
+                </button>
+              </p>
+            )}
+            <p className="auth-privacy">
+              <LockKeyhole size={13} /> 作品、素材与对话仅属于你的账号
+            </p>
+          </form>
         </div>
-
-        <TextInput
-          label="邮箱"
-          placeholder="you@example.com"
-          value={email}
-          onChange={(e) => setEmail(e.target.value.trim())}
-          disabled={busy}
-          autoComplete="email"
-        />
-
-        {sent && (
-          <TextInput
-            label="验证码"
-            placeholder="6 位数字"
-            value={code}
-            onChange={(e) => setCode(e.target.value.trim())}
-            disabled={busy}
-            inputMode="numeric"
-            maxLength={6}
-            onKeyDown={(e) => e.key === "Enter" && login()}
-          />
-        )}
-
-        {error && (
-          <Text size="sm" c="red" className="auth-error">
-            {error}
-          </Text>
-        )}
-
-        {!sent ? (
-          <Button fullWidth loading={busy} onClick={requestCode} rightSection={<ArrowRight size={16} />}>
-            获取验证码
-          </Button>
-        ) : (
-          <>
-            <Button fullWidth loading={busy} onClick={login} rightSection={<ShieldCheck size={16} />}>
-              登录 / 注册
-            </Button>
-            <Button variant="subtle" fullWidth disabled={cooldown > 0} onClick={requestCode}>
-              {cooldown > 0 ? `重新发送（${cooldown}s）` : "重新发送验证码"}
-            </Button>
-          </>
-        )}
-
-        <Divider my="sm" label="首次使用的邮箱将自动注册" labelPosition="center" />
-        <Text size="xs" c="dimmed" ta="center">
-          登录后可保存作品、创作助手会话与播放列表
-        </Text>
       </div>
-    </div>
+    </main>
   );
 }

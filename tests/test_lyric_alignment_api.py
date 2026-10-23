@@ -206,9 +206,7 @@ def test_result_validation_preserves_unmatched_lines_and_rejects_fake_timestamps
             {"text": "先", "at": 1}, {"text": "后", "at": .5}]}, 2)
 
 
-async def test_factory_mounts_alignment_before_static(app):
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
-                                 base_url="http://127.0.0.1") as client:
-        response = await client.get("/api/jobs/missing/lyrics-alignment")
+async def test_factory_mounts_alignment_before_static(client):
+    response = await client.get("/api/jobs/missing/lyrics-alignment")
     assert response.status_code == 404
     assert response.json()["error"]["code"] == "not_found"

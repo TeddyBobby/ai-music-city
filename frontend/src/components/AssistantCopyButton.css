@@ -1,0 +1,71 @@
+.assistant-page .assistant-copy-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  width: 32px;
+  min-width: 32px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--muted, #7f8a81);
+  font: inherit;
+  font-size: 12px;
+  line-height: 20px;
+  cursor: pointer;
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    color 0.15s ease;
+}
+.assistant-page .as-message:hover .as-message-tools .assistant-copy-button,
+.assistant-page .as-song-draft:hover .assistant-copy-button,
+.assistant-page .assistant-copy-button:focus-visible,
+.assistant-page .assistant-copy-button[data-copied],
+.assistant-page .assistant-copy-button[data-failed] {
+  opacity: 1;
+}
+.assistant-copy-feedback {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+.assistant-page .assistant-copy-button > svg {
+  flex: 0 0 auto;
+}
+.assistant-page .assistant-copy-button:hover {
+  color: var(--text, #202b25);
+}
+.assistant-page .assistant-copy-button:focus-visible {
+  outline: 2px solid var(--accent, #78975b);
+  outline-offset: 2px;
+}
+.assistant-page .assistant-copy-button[data-copied] {
+  color: var(--accent, #4f733e);
+}
+.assistant-page .assistant-copy-button[data-failed] {
+  color: #b95442;
+}
+@media (max-width: 760px), (pointer: coarse) {
+  .assistant-page .assistant-copy-button {
+    width: 44px;
+    min-width: 44px;
+    min-height: 44px;
+    opacity: 1;
+  }
+}
+@media (hover: none) {
+  .assistant-page .assistant-copy-button {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .assistant-page .assistant-copy-button {
+    transition: none;
+  }
+}

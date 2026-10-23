@@ -4,6 +4,8 @@ import App from "./App";
 import { StudioProvider } from "./components/StudioProvider";
 import "@mantine/core/styles.css";
 import "./styles.css";
+import "./Product.css";
+import "./mobile.css";
 class ErrorBoundary extends React.Component<
   { children: React.ReactNode },
   { error: boolean }

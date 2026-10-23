@@ -748,7 +748,7 @@ class Engine:
         fields, generation, abc_sampling, semantic_sampling = self._split_request(request)
         if fields.get("abc") is not None:
             raise ValueError("Hum takes a recording, not a supplied score")
-        fields["cot"] = "melody"
+        fields["cot"] = hum_mod.planning_mode(fields["lyrics"], options.loras)
         SongRequest(**fields)
         transcription_dir, hum_dir = out_dir / "transcription", out_dir / "hum"
         for directory in (transcription_dir, hum_dir, out_dir / "song"):

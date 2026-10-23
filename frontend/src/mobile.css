@@ -1,0 +1,241 @@
+/* Keep text inputs readable at their natural scale. Safari zooms focused fields
+   below 16px; preserving the viewport's default zoom keeps pinch zoom available. */
+@media (max-width: 760px), (pointer: coarse) {
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  textarea,
+  select,
+  [contenteditable="true"],
+  .mantine-Input-input,
+  .mantine-Textarea-input,
+  .mantine-Select-input,
+  .mantine-MultiSelect-input,
+  .mantine-PillsInputField-field {
+    font-size: max(16px, 1rem) !important;
+  }
+
+  .btn,
+  button.primary,
+  button.ghost,
+  button.danger,
+  .mantine-Button-root,
+  .mantine-Tabs-tab,
+  .mantine-SegmentedControl-label,
+  .mantine-Menu-item,
+  .mantine-Combobox-option {
+    min-height: 44px;
+  }
+
+  .icon-btn,
+  .mantine-ActionIcon-root,
+  .mantine-CloseButton-root {
+    min-width: 44px;
+    min-height: 44px;
+  }
+
+  input:not([type="range"]):not([type="checkbox"]):not([type="radio"]),
+  select,
+  .mantine-Input-input:not(textarea) {
+    min-height: 44px;
+  }
+
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    scroll-margin-block: 24px;
+  }
+
+  .mantine-Modal-content,
+  .mantine-Drawer-content {
+    max-width: 100%;
+    overscroll-behavior-y: contain;
+  }
+
+  .mantine-Modal-body,
+  .mantine-Drawer-body,
+  .mantine-InputWrapper-root,
+  .mantine-Input-wrapper {
+    min-width: 0;
+  }
+
+  .app-shell[data-keyboard-open="true"] {
+    height: var(--app-viewport-height, 100dvh);
+  }
+
+  .app-shell[data-keyboard-open="true"] .mobile-navigation,
+  .app-shell[data-keyboard-open="true"] .player-dock {
+    display: none;
+  }
+
+  .app-shell[data-keyboard-open="true"] .workspace-content {
+    padding-bottom: 16px;
+    scroll-padding-bottom: 24px;
+  }
+
+  .app-shell[data-keyboard-open="true"] .workspace-content.route-assistant {
+    padding-bottom: 0;
+  }
+
+  html[data-keyboard-open="true"] .as-history-drawer .mantine-Drawer-content {
+    height: var(--app-viewport-height, 100dvh);
+    max-height: var(--app-viewport-height, 100dvh);
+  }
+
+  html[data-keyboard-open="true"] .as-history-drawer .mantine-Drawer-body {
+    height: calc(var(--app-viewport-height, 100dvh) - 90px);
+    overflow-y: auto;
+  }
+
+  html[data-keyboard-open="true"]
+    .mantine-Modal-content:not(.fullscreen-player-shell) {
+    max-height: calc(var(--app-viewport-height, 100dvh) - 24px);
+    overflow-y: auto;
+  }
+}
+
+/* A landscape phone can have less than 250px above its keyboard. Keep the
+   composer reachable instead of allowing fixed headers to push it out. */
+@media (max-height: 500px) and (pointer: coarse) {
+  .app-shell[data-keyboard-open="true"] .workspace-topbar,
+  .app-shell[data-keyboard-open="true"] .as-chat-top {
+    display: none;
+  }
+
+  .app-shell[data-keyboard-open="true"] .as-messages {
+    padding-block: 0;
+  }
+
+  .app-shell[data-keyboard-open="true"] .as-compose-wrap {
+    padding: 8px 12px;
+  }
+
+  .app-shell[data-keyboard-open="true"] .as-composer {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  .app-shell[data-keyboard-open="true"] .as-composer textarea {
+    min-height: 44px !important;
+    max-height: 64px;
+  }
+
+  .app-shell[data-keyboard-open="true"] .as-chat > .as-error {
+    max-height: 44px;
+    overflow: auto;
+    margin-block: 0;
+  }
+}
+
+@media (max-width: 760px) {
+  :root {
+    --mobile-nav-height: calc(68px + env(safe-area-inset-bottom, 0px));
+  }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
+  body,
+  #root,
+  .app-shell,
+  .app-workspace,
+  .workspace-content,
+  .page-container {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .workspace-content {
+    overscroll-behavior-y: contain;
+  }
+
+  .workspace-content > *,
+  .page-container > *,
+  .field,
+  .search-field,
+  .ui-input,
+  .ui-select {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .field input,
+  .field textarea,
+  .field select {
+    max-width: 100%;
+  }
+
+  .dialog-backdrop {
+    padding: max(12px, env(safe-area-inset-top, 0px))
+      max(12px, env(safe-area-inset-right, 0px))
+      max(12px, env(safe-area-inset-bottom, 0px))
+      max(12px, env(safe-area-inset-left, 0px));
+  }
+
+  .dialog {
+    min-width: 0;
+    max-width: 100%;
+    max-height: calc(100dvh - 24px);
+    padding: 20px;
+    border-radius: 18px;
+    overflow-wrap: anywhere;
+  }
+
+  .dialog-actions,
+  .wk-dialog-actions {
+    flex-wrap: wrap;
+  }
+
+  .dialog-actions > *,
+  .wk-dialog-actions > * {
+    flex: 1 1 auto;
+  }
+
+  .mantine-Modal-inner {
+    --modal-inner-y-offset: max(12px, env(safe-area-inset-top, 0px));
+    --modal-inner-x-offset: 12px;
+  }
+
+  .mantine-Modal-content {
+    border-radius: 18px;
+  }
+
+  .mantine-Modal-header,
+  .mantine-Modal-body {
+    padding-inline: 18px;
+  }
+
+  .mantine-Modal-body {
+    overflow-wrap: anywhere;
+  }
+
+  .library-toolbar,
+  .wk-takes-filters {
+    flex-wrap: wrap;
+  }
+
+  .library-toolbar > .search-field {
+    flex-basis: 100%;
+    width: 100%;
+  }
+
+  .wk-filter-tabs {
+    max-width: 100%;
+    overflow-x: auto;
+  }
+
+  .dock-controls .dock-play {
+    width: 44px;
+    height: 44px;
+  }
+
+  .app-toasts {
+    max-width: calc(100% - 24px);
+    bottom: calc(var(--mobile-nav-height) + var(--player-height, 0px) + 12px);
+  }
+
+  .app-shell[data-keyboard-open="true"] .app-toasts {
+    bottom: 12px;
+  }
+}

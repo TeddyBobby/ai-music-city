@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import { Popover, Slider, UnstyledButton } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import {
   Play,
   Pause,
@@ -28,12 +29,42 @@ export function PlayerBar() {
     [focusInside, setFocusInside] = useState(false),
     [dragging, setDragging] = useState(false);
   const location = useLocation();
+  const desktop = useMediaQuery("(min-width: 1024px)");
   const { hidden, reveal } = useAutoHidePlayerBar({
-    locked: queueOpen || fullscreenOpen || pointerInside || focusInside || dragging,
+    locked:
+      desktop ||
+      queueOpen ||
+      fullscreenOpen ||
+      pointerInside ||
+      focusInside ||
+      dragging,
     resetKey: `${location.key}:${p.current?.id ?? ""}`,
   });
-  // 无播放内容时整个播放条不渲染
-  if (!p.current && !p.queue.length) return null;
+  useEffect(() => {
+    if (!desktop || fullscreenOpen || !p.current) return;
+    const key = (event: KeyboardEvent) => {
+      if (
+        event.code !== "Space" ||
+        event.defaultPrevented ||
+        event.repeat ||
+        event.isComposing ||
+        event.altKey ||
+        event.ctrlKey ||
+        event.metaKey ||
+        event.shiftKey ||
+        document.querySelector('[role="dialog"], [aria-modal="true"]') ||
+        (event.target instanceof Element &&
+          event.target.closest(
+            'input, textarea, select, button, a, [role="button"], [role="slider"], [role="textbox"], [role="combobox"], [role="menu"], [role="listbox"], [contenteditable]:not([contenteditable="false"])',
+          ))
+      )
+        return;
+      event.preventDefault();
+      p.toggle();
+    };
+    window.addEventListener("keydown", key);
+    return () => window.removeEventListener("keydown", key);
+  }, [desktop, fullscreenOpen, p.current?.id, p.toggle]);
   useEffect(() => {
     if (!dragging) return;
     const release = () => setDragging(false);
@@ -44,6 +75,8 @@ export function PlayerBar() {
       window.removeEventListener("pointercancel", release);
     };
   }, [dragging]);
+  // Keep hooks unconditional when the playback queue is restored or cleared.
+  if (!p.current && !p.queue.length) return null;
   function openPlayer() {
     setQueueOpen(false);
     expand();
@@ -94,9 +127,7 @@ export function PlayerBar() {
             {p.current ? titleOf(p.current) : "选一首歌，听听看"}
           </UnstyledButton>
           <span className="muted small">
-            {p.current
-              ? p.current.take?.project_name || "AI乐之城 · 我的作品"
-              : "从作品库开始播放"}
+            {p.current ? "我的音乐" : "我的音乐"}
           </span>
         </div>
       </div>
@@ -108,6 +139,10 @@ export function PlayerBar() {
           <IconButton
             className="dock-play"
             label={p.playing ? "暂停" : "播放"}
+            title={
+              desktop ? `${p.playing ? "暂停" : "播放"}（空格）` : undefined
+            }
+            aria-keyshortcuts={desktop ? "Space" : undefined}
             disabled={!p.current}
             onClick={p.toggle}
           >

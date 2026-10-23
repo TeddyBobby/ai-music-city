@@ -133,6 +133,19 @@ def open_score_has_notes(abc: str) -> bool:
     return bool(score_body_lines(abc))
 
 
+def planning_mode(lyrics: str, loras: tuple[tuple[str, float], ...]) -> str:
+    """Use the instrumental adapter's full-score training mode without losing the hum.
+
+    The paired instrumental adapters and section-only lyrics are the explicit
+    instrumental contract. Plain vocal hums retain melody-only planning. Both
+    modes continue the same transcribed open score; neither replaces the upload.
+    """
+    active = {name for name, scale in loras if scale > 0}
+    instrumental = {"ar_lora_inst_v3abc.bf16", "nar_lora_joint_v4.bf16"}
+    sections_only = bool(re.fullmatch(r"(?:\s*\[[A-Za-z][A-Za-z0-9 _-]*\]\s*)+", lyrics))
+    return "full" if instrumental <= active and sections_only else "melody"
+
+
 # ---------------------------------------------------------------------------------------------
 # carrier analysis
 # ---------------------------------------------------------------------------------------------

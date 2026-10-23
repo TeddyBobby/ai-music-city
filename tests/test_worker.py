@@ -122,6 +122,7 @@ async def test_create_job_runs_to_done_with_normalised_events(harness):
     assert done["artifacts"] == {"audio": True, "score": True, "plan": True, "transcription": False,
                                  "hum": False}
     assert done["progress"]["type"] == "status" and done["progress"]["status"] == "done"
+    assert done["progress"]["stage"] == "save"
     assert done["started_at"] and done["finished_at"] and done["error"] is None and done["position"] is None
     timing = done["timing"]
     assert set(timing) == {"plan", "semantic", "synthesize", "decode", "transcribe", "e2e", "abc_tps",
@@ -218,6 +219,40 @@ async def test_failure_marks_failed_and_worker_survives(tmp_path):
         assert done2["status"] == "done" and h.engine.state == "ready"
     finally:
         h.worker.stop()
+        h.store.close()
+
+
+@pytest.mark.parametrize("stage", ["load", "semantic"])
+@pytest.mark.parametrize("status", ["failed", "cancelled"])
+async def test_terminal_progress_retains_latest_real_stage_after_logs(tmp_path, stage, status):
+    error_type = RuntimeError if status == "failed" else InterruptedError
+
+    class InterruptedEngine(FakeEngine):
+        def ensure(self, options, on_event=None):
+            if stage == "load":
+                on_event({"type": "log", "text": "model loading interrupted"})
+                raise error_type("stopped during model load")
+            return super().ensure(options, on_event)
+
+        def create_song(self, request, out_dir, *, options, on_event=None, cancelled=None):
+            on_event({"type": "stage", "stage": "Generating song", "status": "running",
+                      "completed": 12, "total": 100})
+            on_event({"type": "token", "phase": "semantic", "tokens": 12})
+            on_event({"type": "log", "text": "generation interrupted"})
+            raise error_type("stopped during generation")
+
+    h = Harness(tmp_path, InterruptedEngine(delay=0))
+    h.worker.start(asyncio.get_running_loop())
+    try:
+        job = h.submit({"kind": "create", "params": BASE})
+        _, done = await h.collect(job.id)
+        assert done["status"] == status
+        assert done["progress"]["stage"] == stage
+        assert done["progress"]["status"] == status
+        assert h.store.get(job.id).progress == done["progress"]
+        assert h.bus.last(job.id) is None and h.bus.last_stage(job.id) is None
+    finally:
+        await asyncio.to_thread(h.worker.stop)
         h.store.close()
 
 
@@ -534,6 +569,28 @@ async def test_event_bus_fanout_and_cache():
     bus.bind(None)
     bus.publish("k", {"n": 4})  # unbound bus drops fan-out but still caches
     assert other.empty() and bus.last("k") == {"n": 4}
+
+
+def test_event_bus_stage_cache_is_independent_and_cleared():
+    bus = EventBus()
+    assert bus.last_stage("j") is None
+    loading = status_event("j", "running", "loading", stage="load")
+    bus.publish("j", loading)
+    token = normalise({"type": "token", "phase": "abc", "tokens": 2}, "j")
+    bus.publish("j", token)
+    assert bus.last("j") == token and bus.last_stage("j") == loading
+    stage = normalise({"type": "stage", "stage": "Planning score", "completed": 3,
+                       "total": 10, "status": "running"}, "j")
+    bus.publish("j", stage)
+    message = normalise({"type": "log", "text": "still working"}, "j")
+    bus.publish("j", message)
+    assert bus.last("j") == message and bus.last_stage("j") == stage
+    assert bus.last_stage("other") is None
+    bus.done("j", {"id": "j"})
+    assert bus.last("j") is None and bus.last_stage("j") is None
+    bus.publish("j", loading)
+    bus.forget("j")
+    assert bus.last("j") is None and bus.last_stage("j") is None
 
 
 def test_worker_cancel_unknown_job_raises(tmp_path):

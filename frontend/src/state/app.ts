@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
+import { accountEpoch } from "../lib/accountBoundary";
 type Toast = { id: number; text: string; kind: string };
 interface State {
   status: any;
@@ -15,7 +16,9 @@ export const useApp = create<State>((set, get) => ({
   settings: null,
   toasts: [],
   refresh: async () => {
+    const epoch = accountEpoch();
     const [s, c] = await Promise.allSettled([api.status(), api.settings()]);
+    if (epoch !== accountEpoch()) return;
     set({
       status: s.status === "fulfilled" ? s.value : null,
       ...(c.status === "fulfilled" ? { settings: c.value } : {}),

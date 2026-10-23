@@ -20,7 +20,7 @@ async def plaza(tmp_path):
     app.state.paths = SimpleNamespace(data_dir=tmp_path / 'data', songs_dir=tmp_path / 'data/songs')
     app.state.store = jobs.JobStore(tmp_path / 'data/app.db', app.state.paths.songs_dir)
     app.state.worker = SimpleNamespace(
-        bus=SimpleNamespace(last=lambda _id: None),
+        bus=SimpleNamespace(last=lambda _id: None, last_stage=lambda _id: None),
         delete_song_dir=lambda job_id: shutil.rmtree(app.state.paths.songs_dir / job_id, ignore_errors=True))
     app.state.reviews = ReviewService(app.state.paths.data_dir, None)
     api.install_error_handlers(app)
@@ -212,10 +212,8 @@ async def test_storage_errors_use_private_json_message(plaza):
     assert str(app.state.plaza.root) not in response.text
 
 
-async def test_factory_mounts_plaza_before_static(app):
-    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app),
-                                 base_url='http://127.0.0.1') as client:
-        response = await client.get('/api/plaza')
+async def test_factory_mounts_plaza_before_static(app, client):
+    response = await client.get('/api/plaza')
     assert response.status_code == 200
     assert response.json() == {'posts': [], 'total': 0, 'scope': 'local'}
     assert app.state.plaza.db_path.is_file()

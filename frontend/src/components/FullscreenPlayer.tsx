@@ -117,6 +117,8 @@ export function FullscreenPlayer() {
         },
       }}
       classNames={{
+        root: "fullscreen-player-root",
+        inner: "fullscreen-player-inner",
         content: "fullscreen-player-shell",
         body: "fullscreen-player-body",
       }}

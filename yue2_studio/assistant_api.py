@@ -6,12 +6,15 @@ import json
 from typing import Literal
 from urllib.parse import urlsplit
 
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Form, Request, UploadFile
 from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 from yue2_studio.api import ApiError
 from yue2_studio.assistant_service import AssistantService
+from yue2_studio import assistant_images
+from yue2_studio.image_music import analyze_image
+from yue2_studio.tenancy import runtime
 from yue2_studio.jobs import NotFound
 
 
@@ -34,14 +37,14 @@ def install(app):
 
 
 def service(request: Request) -> AssistantService:
-    return request.app.state.assistant
+    return runtime(request).assistant
 
 
 def validate_job(request, job_id, *, completed=False):
     if not job_id:
         return
     try:
-        job = request.app.state.store.get(job_id)
+        job = runtime(request).store.get(job_id)
     except NotFound:
         raise ApiError(404, 'not_found', '关联作品不存在') from None
     if completed and job.status != 'done':
@@ -54,9 +57,12 @@ class SessionBody(BaseModel):
 
 
 class MessageBody(BaseModel):
-    content: str = Field(min_length=1, max_length=12000)
+    content: str = Field(default='', max_length=12000)
     mode: Literal['chat', 'lyrics', 'style', 'cover_prompt'] = 'chat'
     context: dict[str, str] | None = None
+    model: str | None = Field(default=None, max_length=300)
+    audio_id: str | None = Field(default=None, max_length=32)
+    image_id: str | None = Field(default=None, max_length=32)
 
 
 class CoverBody(BaseModel):
@@ -80,11 +86,98 @@ async def check(request: Request):
 
 @router.get('/config')
 async def config(request: Request):
+    from yue2_studio.auth_api import require_admin
+    require_admin(request)
     return service(request).public_config()
+
+
+@router.get('/models')
+async def models(request: Request):
+    return await service(request).models()
+
+
+@router.post('/audio', status_code=201)
+async def upload_audio(request: Request, file: UploadFile | None = None):
+    if file is None:
+        raise ApiError(400, 'validation_error', '请选择或录制语音')
+    task = asyncio.create_task(service(request).receive_audio(file))
+
+    async def watch_disconnect():
+        while not task.done():
+            await asyncio.sleep(.25)
+            if await request.is_disconnected():
+                task.cancel()
+                return
+
+    watcher = asyncio.create_task(watch_disconnect())
+    try:
+        return await task
+    finally:
+        watcher.cancel()
+        await asyncio.gather(watcher, return_exceptions=True)
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        await file.close()
+
+
+@router.get('/audio/{audio_id}')
+async def play_audio(request: Request, audio_id: str):
+    svc = service(request)
+    record = svc.audio_attachment(audio_id)
+    return FileResponse(svc.audio_path(record), headers={'Cache-Control': 'private, max-age=86400',
+                                                       'X-Content-Type-Options': 'nosniff'})
+
+
+@router.post('/image-mood')
+async def image_mood(request: Request, file: UploadFile | None = None,
+                     description: str = Form(default=''), model: str | None = Form(default=None)):
+    if file is None:
+        raise ApiError(400, 'invalid_image', '请选择一张图片')
+    task = asyncio.create_task(analyze_image(service(request), file, description, model))
+
+    async def watch_disconnect():
+        while not task.done():
+            await asyncio.sleep(.25)
+            if await request.is_disconnected():
+                task.cancel()
+                return
+
+    watcher = asyncio.create_task(watch_disconnect())
+    try:
+        return await task
+    finally:
+        watcher.cancel()
+        await asyncio.gather(watcher, return_exceptions=True)
+        if not task.done():
+            task.cancel()
+            await asyncio.gather(task, return_exceptions=True)
+        await file.close()
+
+
+@router.post('/images', status_code=201)
+async def upload_image(request: Request, file: UploadFile | None = None):
+    if file is None:
+        raise ApiError(400, 'invalid_image', '请选择一张图片')
+    try:
+        return await assistant_images.receive_image(service(request).root, file)
+    finally:
+        await file.close()
+
+
+@router.get('/images/{image_id}')
+async def read_image(request: Request, image_id: str):
+    root = service(request).root
+    record = assistant_images.image_attachment(root, image_id)
+    return FileResponse(assistant_images.image_path(root, record), media_type='image/jpeg',
+                        headers={'Cache-Control': 'private, max-age=86400',
+                                 'X-Content-Type-Options': 'nosniff'})
 
 
 @router.put('/config')
 async def update_config(request: Request, body: dict):
+    from yue2_studio.auth_api import require_admin
+    require_admin(request)
     return service(request).update_config(body)
 
 
@@ -106,20 +199,49 @@ async def get_session(request: Request, session_id: str):
 
 @router.post('/sessions/{session_id}/messages')
 async def send(request: Request, session_id: str, body: MessageBody):
-    if not body.content.strip():
+    if not body.content.strip() and not body.audio_id and not body.image_id:
         raise ApiError(400, 'validation_error', '请输入消息')
     if body.context and (set(body.context) - {'title', 'lyrics', 'description'} or
                          sum(len(v) for v in body.context.values()) > 30000):
         raise ApiError(400, 'validation_error', '作品上下文过长或字段无效')
     svc = service(request)
+    svc.session(session_id)
+    attachment = svc.public_audio(svc.audio_attachment(body.audio_id)) if body.audio_id else None
+    image_attachment = assistant_images.image_attachment(svc.root, body.image_id) if body.image_id else None
+    model = await svc.request_model(body.model)
     run = svc.reserve(session_id)
+    queue = asyncio.Queue()
+
+    async def produce():
+        run['started'] = True
+        try:
+            async for event, data in svc.stream(session_id, body.content, body.mode, body.context, run,
+                                                model=model, attachment=attachment, selected_model=body.model,
+                                                image_attachment=image_attachment):
+                if not run.get('disconnected'):
+                    await queue.put((event, data))
+        finally:
+            await queue.put(None)
+
+    task = asyncio.create_task(produce())
+    run['task'] = task
+    svc.chat_tasks.add(task)
+
+    def completed(task):
+        svc.chat_tasks.discard(task)
+        if not task.cancelled():
+            task.exception()
+    task.add_done_callback(completed)
 
     async def events():
         try:
-            async for event, data in svc.stream(session_id, body.content, body.mode, body.context, run):
+            while item := await queue.get():
+                event, data = item
                 yield f'event: {event}\ndata: {json.dumps(data, ensure_ascii=False)}\n\n'
         finally:
-            svc.active.pop(session_id, None)
+            # Navigating away closes only this delivery stream. Explicit /stop owns cancellation;
+            # the producer continues checkpointing its reply for the next session read.
+            run['disconnected'] = True
 
     return StreamingResponse(events(), media_type='text/event-stream',
                              headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})

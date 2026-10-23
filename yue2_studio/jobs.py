@@ -12,6 +12,8 @@ from __future__ import annotations
 
 import contextlib
 import json
+import math
+import re
 import random
 import sqlite3
 import threading
@@ -28,6 +30,7 @@ from yue2_studio import config, hum, lora
 STATUSES = ("queued", "running", "done", "failed", "cancelled")
 TERMINAL = frozenset({"done", "failed", "cancelled"})
 KINDS = ("create", "regenerate", "cover", "hum")
+MUSIC_KINDS = ("instrumental", "vocal")
 SUBMIT_KINDS = ("create", "regenerate", "cover", "hum", "variations")
 COVER_TASKS = ("melody-full", "melody-vocal", "full")
 COT_MODES = ("full", "melody", "off")
@@ -314,8 +317,14 @@ class SubmitRequest(_Params):
     preset: Literal["quality", "fast", "custom"] | None = None
     precision: Literal["bf16", "8bit", "4bit"] | None = None
     ode_steps: int | None = None
-    loras: list[LoraRef] | None = None  # omitted => none (create/cover) or inherited (regenerate)
+    loras: list[LoraRef] | None = None  # omitted => none for new songs, inherited for revisions
     track_id: str | None = None  # attach every created job to this project track as a take
+    parent_id: str | None = Field(default=None, max_length=128)  # a new create/hum revision
+
+    @field_validator("parent_id")
+    @classmethod
+    def _parent(cls, v):
+        return None if v is None else _non_empty(v, "parent_id").strip()
 
     @field_validator("track_id")
     @classmethod
@@ -691,6 +700,7 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS jobs_status ON jobs(status);
 CREATE INDEX IF NOT EXISTS jobs_group ON jobs(group_id);
+CREATE INDEX IF NOT EXISTS jobs_parent ON jobs(parent_id);
 CREATE INDEX IF NOT EXISTS jobs_created ON jobs(created_at DESC, seq DESC);
 CREATE TABLE IF NOT EXISTS groups (
     id TEXT PRIMARY KEY,
@@ -756,6 +766,40 @@ def _dumps(value) -> str | None:
     return None if value is None else json.dumps(value, ensure_ascii=False)
 
 
+_INSTRUMENTAL_ADAPTERS = {"ar_lora_inst_v3abc.bf16", "nar_lora_joint_v4.bf16"}
+_NOT_INSTRUMENTAL = re.compile(
+    r"不要(?:做成)?纯音乐|不是纯音乐|不想要纯音乐|非纯音乐|not\s+(?:an?\s+)?instrumental|non[- ]instrumental",
+    re.I | re.ASCII,
+)
+_INSTRUMENTAL_PROMPT = re.compile(
+    r"纯音乐|无人声|无歌词|无演唱|不要人声|没有人声|\binstrumental\b|\bno vocals?\b|\bwithout vocals?\b",
+    re.I | re.ASCII,
+)
+
+
+def stored_music_kind(params_json: str, loras_json: str | None) -> str:
+    """Match frontend draftFromJob using stored metadata, without hydrating audio artifacts."""
+    params = json.loads(params_json)
+    active = {name for name, scale in config.normalise_loras(_loads(loras_json)) if scale > 0}
+    if _INSTRUMENTAL_ADAPTERS <= active:
+        return "instrumental"
+    lyrics = params.get("lyrics") if isinstance(params.get("lyrics"), str) else ""
+    style = params.get("style") if isinstance(params.get("style"), str) else ""
+    has_lyrics = bool(re.sub(r"\[[^\]]*\]", "", lyrics).strip())
+    return ("instrumental" if not has_lyrics and not _NOT_INSTRUMENTAL.search(style)
+            and _INSTRUMENTAL_PROMPT.search(style) else "vocal")
+
+
+def stored_audio_seconds(seconds: float | None, timing_json: str | None) -> float:
+    """Older rows can have duration only in timing_json; unknown duration contributes zero."""
+    if seconds is None:
+        timing = _loads(timing_json)
+        seconds = timing.get("audio_seconds") if isinstance(timing, dict) else None
+    if isinstance(seconds, bool) or not isinstance(seconds, int | float):
+        return 0.0
+    return float(seconds) if math.isfinite(seconds) and seconds > 0 else 0.0
+
+
 class JobStore:
     def __init__(self, db_path: Path | str, songs_dir: Path | str | None = None):
         self.db_path = Path(db_path)
@@ -764,6 +808,8 @@ class JobStore:
         self._lock = threading.RLock()
         self._conn = sqlite3.connect(str(self.db_path), check_same_thread=False, isolation_level=None)
         self._conn.row_factory = sqlite3.Row
+        self._conn.create_function("job_music_kind", 2, stored_music_kind, deterministic=True)
+        self._conn.create_function("job_audio_seconds", 2, stored_audio_seconds, deterministic=True)
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
         self._conn.executescript(SCHEMA)
@@ -872,6 +918,33 @@ class JobStore:
         except NotFound:
             return None
 
+    def versions(self, job_id: str, *, limit: int = 100, offset: int = 0) -> tuple[list[Job], int]:
+        """The original and all revisions, oldest first, including sibling revision branches.
+
+        Parent links also cover legacy score regenerations. A missing original still connects its
+        surviving children; UNION makes even malformed legacy cycles finite. Variation groups stay
+        independent unless an explicit parent link joins them.
+        """
+        self.get(job_id)  # distinguish an unknown job from an empty list
+        family = """WITH RECURSIVE family(id) AS (
+            SELECT ?
+            UNION SELECT jobs.parent_id FROM jobs JOIN family ON jobs.id = family.id
+                  WHERE jobs.parent_id IS NOT NULL
+            UNION SELECT jobs.id FROM jobs JOIN family ON jobs.parent_id = family.id
+        ) """
+        where = " WHERE jobs.id IN (SELECT id FROM family)"
+        with self._lock:
+            total = self._conn.execute(
+                family + "SELECT COUNT(*) FROM jobs" + where, (job_id,),
+            ).fetchone()[0]
+            rows = self._conn.execute(
+                family + _JOB_SELECT + where + " ORDER BY jobs.seq ASC LIMIT ? OFFSET ?",
+                (job_id, int(limit), int(offset)),
+            ).fetchall()
+            result = [self._row_to_job(row) for row in rows]
+            self._fill_positions(result)
+        return result, total
+
     def get_group(self, group_id: str) -> dict:
         with self._lock:
             row = self._conn.execute("SELECT * FROM groups WHERE id = ?", (group_id,)).fetchone()
@@ -883,8 +956,9 @@ class JobStore:
 
     def list(self, *, status: list[str] | str | None = None, kind: list[str] | str | None = None,
              group: str | None = None, track: str | None = None, project: str | None = None,
-             limit: int = 50, offset: int = 0) -> tuple[list[Job], int]:
-        """Newest first. Returns ``(jobs, total)`` where ``total`` ignores limit/offset."""
+             limit: int = 50, offset: int = 0, music_kind: str | None = None,
+             summary: bool = False) -> tuple[list[Job], int] | tuple[list[Job], int, dict]:
+        """Newest first. Count and optional duration summary match all filters before pagination."""
         clauses, args = [], []
         if status:
             values = [status] if isinstance(status, str) else list(status)
@@ -894,6 +968,11 @@ class JobStore:
             values = [kind] if isinstance(kind, str) else list(kind)
             clauses.append(f"jobs.kind IN ({','.join('?' * len(values))})")
             args.extend(values)
+        if music_kind:
+            if music_kind not in MUSIC_KINDS:
+                raise ValueError(f"music_kind must be one of {', '.join(MUSIC_KINDS)}")
+            clauses.append("job_music_kind(jobs.params_json, jobs.loras_json) = ?")
+            args.append(music_kind)
         if group:
             clauses.append("jobs.group_id = ?")
             args.append(group)
@@ -905,14 +984,18 @@ class JobStore:
             args.append(project)
         where = f" WHERE {' AND '.join(clauses)}" if clauses else ""
         with self._lock:
-            total = self._conn.execute(f"SELECT COUNT(*) {_JOB_FROM}{where}", args).fetchone()[0]
+            aggregate = "COUNT(*) AS total"
+            if summary:
+                aggregate += ", COALESCE(SUM(job_audio_seconds(jobs.audio_seconds, jobs.timing_json)), 0) AS audio_seconds"
+            totals = self._conn.execute(f"SELECT {aggregate} {_JOB_FROM}{where}", args).fetchone()
+            total = totals["total"]
             rows = self._conn.execute(
                 f"{_JOB_SELECT}{where} ORDER BY jobs.created_at DESC, jobs.seq DESC LIMIT ? OFFSET ?",
                 [*args, int(limit), int(offset)],
             ).fetchall()
             jobs = [self._row_to_job(r) for r in rows]
             self._fill_positions(jobs)
-        return jobs, total
+        return (jobs, total, {"audio_seconds": float(totals["audio_seconds"])}) if summary else (jobs, total)
 
     def queued_ids(self) -> list[str]:
         with self._lock:
@@ -1359,6 +1442,8 @@ _PARAM_MODELS = {"create": CreateParams, "regenerate": RegenerateParams, "cover"
 def validate_submit(body: Any) -> SubmitRequest:
     """Shape-check a ``POST /api/jobs`` body without touching the store (400 before any 503/409)."""
     req = parse(SubmitRequest, body)
+    if req.parent_id is not None and req.kind not in ("create", "hum"):
+        raise ValidationFailure("top-level parent_id is only supported for create and hum revisions")
     params = parse(_PARAM_MODELS[req.kind], req.params)
     if isinstance(params, CreateParams | HumParams):
         params.check()
@@ -1417,8 +1502,22 @@ def _title_from_track(req: SubmitRequest, name: str | None) -> SubmitRequest:
 def _submit(store: JobStore, req: SubmitRequest, *, upload_lookup, lora_lookup,
             hum_adapter_lookup) -> Submission:
     settings = store.get_settings()
+    parent = None
+    if req.parent_id is not None:
+        parent = store.get(req.parent_id)
+        if parent.status in ("queued", "running"):
+            raise Conflict("wait for the current generation to finish before creating a revision")
+        if parent.kind == "hum" or req.kind == "hum":
+            if parent.kind != "hum" or req.kind != "hum":
+                raise ValidationFailure("a hum revision must keep kind=hum")
+            if req.params.get("upload_id") != parent.params.get("upload_id"):
+                raise ValidationFailure("a hum revision must keep the original upload_id")
 
     def options_for(**defaults) -> config.EngineOptions:
+        if parent is not None:
+            defaults = {"default_preset": parent.preset, "default_precision": parent.precision,
+                        "default_ode_steps": parent.ode_steps, "default_loras": parent.loras,
+                        **defaults}
         return resolve_options(req, settings, lora_lookup=lora_lookup, **defaults)
 
     if req.kind == "create":
@@ -1426,7 +1525,8 @@ def _submit(store: JobStore, req: SubmitRequest, *, upload_lookup, lora_lookup,
         p.check()
         options = options_for()
         seed = p.seed if p.seed is not None else random_seed()
-        job = store.create(kind="create", params=_create_params_dict(p, seed), options=options, seed=seed)
+        job = store.create(kind="create", params=_create_params_dict(p, seed), options=options, seed=seed,
+                           parent_id=req.parent_id)
         return Submission([job])
 
     if req.kind == "variations":
@@ -1508,7 +1608,7 @@ def _submit(store: JobStore, req: SubmitRequest, *, upload_lookup, lora_lookup,
                   "title": title, "melody": p.melody, "adapter": p.adapter,
                   "hum_influence": float(p.hum_influence), "offset_s": float(p.offset_s),
                   "cfg_scale": p.cfg_scale}
-        job = store.create(kind="hum", params=params, options=options, seed=seed)
+        job = store.create(kind="hum", params=params, options=options, seed=seed, parent_id=req.parent_id)
         return Submission([job])
 
     raise ValidationFailure(f"unknown kind {req.kind!r}")  # pragma: no cover
@@ -1536,7 +1636,7 @@ def engine_request(job: Job) -> dict:
         request["cot"] = "full" if p.get("task") == "full" else "melody"
         return request
     if job.kind == "hum":
-        request["cot"] = "melody"
+        request["cot"] = hum.planning_mode(p["lyrics"], job.loras)
         return request
     if p.get("abc"):
         request["abc"] = p["abc"]

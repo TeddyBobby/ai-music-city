@@ -1,4 +1,9 @@
 import type { LyricsAlignment } from "./types";
+import {
+  accountEpoch,
+  assertAccountEpoch,
+  accountFetch,
+} from "./accountBoundary";
 
 export class ApiError extends Error {
   status: number;
@@ -15,6 +20,8 @@ export async function request(
   body?: any,
   opts: any = {},
 ) {
+  const epoch = accountEpoch();
+  assertAccountEpoch(epoch);
   const init: RequestInit = { method, headers: {} };
   if (body instanceof FormData) init.body = body;
   else if (body !== undefined) {
@@ -23,16 +30,15 @@ export async function request(
   }
   let res: Response;
   try {
-    res = await fetch(path, init);
-  } catch {
-    throw new ApiError(
-      0,
-      "network_error",
-      "服务暂时不可用，请稍后重试。",
-    );
+    res = await accountFetch(path, init);
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") throw error;
+    throw new ApiError(0, "network_error", "服务暂时不可用，请稍后重试。");
   }
+  assertAccountEpoch(epoch);
   if (res.status === 204) return null;
   const raw = await res.text();
+  assertAccountEpoch(epoch);
   let data: any;
   try {
     data = raw ? JSON.parse(raw) : null;
@@ -107,24 +113,32 @@ export const api = {
       ...body,
     }),
   text: async (path: string) => {
-    const r = await fetch(path);
+    const epoch = accountEpoch();
+    assertAccountEpoch(epoch);
+    const r = await accountFetch(path);
+    assertAccountEpoch(epoch);
     if (!r.ok) throw new ApiError(r.status, "not_found", "文件暂时不可读取");
-    return r.text();
+    const text = await r.text();
+    assertAccountEpoch(epoch);
+    return text;
   },
 };
 export const songUrl = (id: string, name: string) => `/api/songs/${id}/${name}`;
 export const albumUrl = (id: string, format = "flac") =>
   `/api/projects/${id}/album.zip?format=${format}`;
 export function subscribe(id: string, { onProgress, onDone, onError }: any) {
+  const epoch = accountEpoch();
   const es = new EventSource(`/api/jobs/${id}/events`);
   es.addEventListener("progress", (e) => {
     try {
+      assertAccountEpoch(epoch);
       onProgress?.(JSON.parse(e.data));
     } catch {}
   });
   es.addEventListener("done", (e) => {
     es.close();
     try {
+      assertAccountEpoch(epoch);
       onDone?.(JSON.parse(e.data).job);
     } catch {}
   });

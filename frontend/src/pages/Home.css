@@ -1,652 +1,676 @@
-.home-page {
+.route-home .page-container {
+  display: flex;
+  align-items: flex-start;
+}
+.simple-home {
+  width: 100%;
+  max-width: 1120px;
+  margin: 0 auto;
+}
+.simple-home .home-hero-grid {
   display: flex;
   flex-direction: column;
+  align-items: center;
+  padding: 48px 0 28px;
   gap: 28px;
-  font-size: 13px;
-  isolation: isolate;
-  position: relative;
 }
-.home-page h1,
-.home-page h2,
-.home-page h3,
-.home-page p {
-  margin: 0;
-}
-.home-page .mantine-Paper-root {
-  background: var(--surface);
-  color: var(--text);
-  border-color: var(--line);
-}
-.home-create-hub {
-  width: min(100%, 900px);
-  margin: 0 auto 4px;
-  padding-top: 15px;
-}
-.home-greeting {
-  text-align: center;
-  margin-bottom: 24px;
-}
-.home-brand {
+.simple-home-heading {
   display: flex;
-  justify-content: center;
-  margin-bottom: 18px;
+  flex-direction: column;
+  align-items: center;
+  gap: 18px;
+  text-align: center;
 }
-.home-brand .brand-wordmark {
-  width: 224px;
+.simple-home-heading h1 {
+  font-size: clamp(30px, 3.4vw, 46px);
+  font-weight: 560;
+  letter-spacing: -1.8px;
+  line-height: 1.45;
 }
-.home-greeting h1 {
-  font-size: 26px;
-  font-weight: 600;
-  line-height: 1.5;
-  letter-spacing: -0.7px;
-}
-.home-page .home-composer {
-  padding: 14px 18px 14px;
-  border: 1px solid color-mix(in srgb, var(--accent) 15%, var(--line));
-  border-radius: 18px;
-  background: color-mix(in srgb, var(--surface) 94%, transparent);
+.music-composer-card {
+  --composer-panel-height: 360px;
+  width: min(100%, 720px);
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
   box-shadow:
-    0 8px 40px #102b1310,
-    0 0 0 5px color-mix(in srgb, var(--accent) 3%, transparent);
-  transition:
-    border-color 0.2s,
-    box-shadow 0.2s;
+    0 12px 60px #17312308,
+    0 1px 4px #17312305;
+  overflow: hidden;
 }
-.home-page .home-composer:focus-within {
-  border-color: color-mix(in srgb, var(--accent) 55%, var(--line));
-  box-shadow:
-    0 8px 40px #102b1310,
-    0 0 0 4px color-mix(in srgb, var(--accent) 6%, transparent);
+.music-mode-tabs {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 18px 22px 0;
 }
-.home-prompt .mantine-Textarea-input {
-  color: var(--text);
-  background: transparent;
+.music-mode-tabs > button {
   border: 0;
-  border-radius: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 16px;
+  min-height: 44px;
+  border-radius: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   font-size: 14px;
-  line-height: 1.9;
-  padding: 4px 2px;
-  min-height: 112px;
-  resize: vertical;
-  max-height: 270px;
-  box-shadow: none;
 }
-.home-prompt .mantine-Textarea-input:focus {
+.music-mode-tabs > button.selected {
+  background: var(--surface-2);
+  color: var(--accent);
+  font-weight: 600;
+}
+.simple-prompt-form {
+  padding: 12px 26px 24px;
+}
+.simple-prompt-form textarea {
+  display: block;
+  width: 100%;
+  padding: 10px 0 20px;
+  min-height: 140px;
+  max-height: 260px;
+  border: 0;
+  resize: none;
+  height: 154px;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  line-height: 1.8;
+  border-radius: 0;
+}
+.simple-prompt-form textarea::placeholder {
+  color: var(--muted);
+  opacity: 0.8;
+}
+.simple-prompt-form textarea:focus-visible {
   outline: none;
 }
-.home-prompt .mantine-Textarea-input::placeholder {
-  color: var(--muted);
-  opacity: 0.9;
-}
-.home-composer-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding-top: 14px;
-}
-.home-composer-options {
-  display: flex;
-  gap: 15px;
-  align-items: center;
-}
-.home-instrumental .mantine-Switch-label {
-  color: var(--muted);
-  font-size: 12px;
-  cursor: pointer;
-  padding-left: 9px;
-}
-.home-instrumental .mantine-Switch-track {
-  cursor: pointer;
-}
-.home-composer-separator {
-  width: 1px;
-  height: 14px;
-  background: var(--line);
-}
-.home-custom-link {
-  display: inline-flex;
-  gap: 6px;
-  align-items: center;
-  color: var(--muted);
-  text-decoration: none;
-  font-size: 11px;
-  white-space: nowrap;
-}
-.home-custom-link:hover {
-  color: var(--accent);
-}
-.home-page .home-create-button {
-  min-height: 38px;
-  border-radius: 11px;
-  padding-inline: 17px;
-}
-.home-page .home-create-button .mantine-Button-label {
-  color: inherit;
-}
-.home-page .home-create-button:disabled {
-  background: var(--surface-2);
-  color: var(--muted);
-  border-color: var(--line);
-  opacity: 1;
-}
-.home-composer-error {
-  padding-top: 12px;
-  color: var(--danger);
-  font-size: 12px;
-}
-.home-inspiration-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  color: var(--muted);
-  font-size: 11px;
-  margin: 18px 3px 9px;
-}
-.home-shuffle {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 3px 0;
-  font-size: 11px;
-  color: var(--muted);
-}
-.home-shuffle:hover {
-  color: var(--accent);
-}
-.home-inspiration-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-}
-.home-page .home-inspiration {
-  position: relative;
-  overflow: hidden;
-  height: 92px;
-  border-radius: 11px;
-  background: #36463c;
-  color: #fff;
-  text-align: left;
-  border: 1px solid #ffffff18;
-  transition:
-    transform 0.2s,
-    box-shadow 0.2s;
-}
-.home-inspiration img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transition: transform 0.45s;
-}
-.home-inspiration-shade {
-  position: absolute;
-  inset: 0;
-  background: linear-gradient(0deg, #07150cd9, transparent 100%);
-}
-.home-inspiration-copy {
-  position: absolute;
-  bottom: 11px;
-  left: 13px;
-  right: 12px;
-  display: flex;
-  flex-direction: column;
-  gap: 1px;
-}
-.home-inspiration-copy strong {
-  font-size: 12px;
-  font-weight: 600;
-}
-.home-inspiration-copy small {
-  font-size: 10px;
-  color: #ffffffb8;
-}
-.home-inspiration-arrow {
-  position: absolute;
-  top: 9px;
-  right: 9px;
-  display: grid;
-  place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 50%;
-  color: white;
-  background: #10201840;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-.home-inspiration:hover img {
-  transform: scale(1.05);
-}
-.home-inspiration:hover .home-inspiration-arrow,
-.home-inspiration:focus-visible .home-inspiration-arrow,
-.home-inspiration.is-selected .home-inspiration-arrow {
-  opacity: 1;
-}
-.home-inspiration.is-selected {
-  box-shadow: 0 0 0 2px var(--accent);
-}
-.home-explore-grid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 18px;
-}
-.home-page .home-feature-card {
-  position: relative;
-  isolation: isolate;
-  display: flex;
-  flex-direction: column;
-  min-width: 0;
-  height: 284px;
-  padding: 0;
-  overflow: hidden;
-  border: 1px solid #ffffff18;
-  border-radius: 15px;
-  background: #17392e;
-  color: #f7f9f3;
-}
-.home-feature-art,
-.home-feature-shade {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-}
-.home-feature-art {
-  z-index: -2;
-  overflow: hidden;
-}
-.home-feature-art > img,
-.home-feature-art .artwork,
-.home-feature-art .artwork img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  border-radius: 0;
-}
-.home-feature-art > img,
-.home-feature-art .artwork {
-  transition: transform 450ms ease;
-}
-.home-feature-card:hover .home-feature-art > img,
-.home-feature-card:hover .home-feature-art .artwork {
-  transform: scale(1.035);
-}
-.home-feature-shade {
-  z-index: -1;
-  background: linear-gradient(
-    180deg,
-    #0b211b70 0%,
-    #0b211b30 28%,
-    #0b211bc9 65%,
-    #0b211bf0 100%
-  );
-}
-.home-page .home-feature-primary {
-  display: flex;
-  flex: 1;
-  flex-direction: column;
-  align-items: stretch;
-  min-height: 0;
-  width: 100%;
-  padding: 22px 22px 0;
-  color: inherit;
-  text-decoration: none;
-  text-align: left;
-}
-.home-feature-primary:focus-visible {
-  outline-offset: -5px;
-  border-radius: 14px;
-}
-.home-feature-label {
-  display: flex;
-  align-items: center;
-  gap: 7px;
-  font-size: 12px;
-  font-weight: 500;
-  color: #f7f9f3;
-}
-.home-feature-label svg {
-  flex: none;
-}
-.home-feature-copy {
-  margin-top: auto;
-  padding-top: 24px;
-}
-.home-feature-copy h2 {
-  display: -webkit-box;
-  -webkit-box-orient: vertical;
-  -webkit-line-clamp: 2;
-  overflow: hidden;
-  min-height: 56px;
-  font-size: 20px;
-  font-weight: 600;
-  line-height: 1.4;
-  letter-spacing: -0.3px;
-  overflow-wrap: anywhere;
-}
-.home-feature-copy p {
-  margin-top: 6px;
-  color: #f0f5e7cc;
-  font-size: 11px;
-  line-height: 1.6;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.home-feature-footer {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin: 16px 22px 10px;
-  padding-top: 5px;
-  border-top: 1px solid #ffffff26;
-}
-.home-feature-footer .home-section-link,
-.home-page .home-feature-action {
-  display: inline-flex;
-  align-items: center;
-  justify-content: flex-start;
-  gap: 7px;
-  min-height: 40px;
-  padding: 0;
-  border-radius: 4px;
-  color: #f7f9f3;
-  font-size: 11px;
-  font-weight: 500;
-  white-space: nowrap;
-  text-decoration: none;
-}
-.home-feature-footer .home-section-link:hover,
-.home-page .home-feature-action:hover {
-  color: #c9eda4;
-}
-.home-feature-footer .home-feature-secondary {
-  color: #e3ecdccc;
-}
-.home-section-heading {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 13px;
-  min-height: 22px;
-}
-.home-section-heading h2 {
-  display: flex;
-  align-items: center;
-  gap: 9px;
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-.home-section-heading h2 > span {
-  color: var(--muted);
-  font-size: 10px;
-  font-weight: 400;
-}
-.home-section-link {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  white-space: nowrap;
-  font-size: 11px;
-  color: var(--muted);
-  text-decoration: none;
-  padding: 3px 0;
-}
-.home-section-link:hover {
-  color: var(--accent);
-}
-.home-track-grid {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 13px;
-}
-.home-page .home-track {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px;
-  border-radius: 12px;
-  min-width: 0;
-}
-.home-page .home-track.is-playing {
+.music-composer-card:focus-within {
   border-color: color-mix(in srgb, var(--accent) 60%, var(--line));
 }
-.home-track-cover {
-  flex: none;
-  border-radius: 8px;
-}
-.home-track-cover .artwork {
-  border-radius: 8px;
-}
-.home-track-copy {
-  min-width: 0;
-  flex: 1;
+.simple-composer-actions {
   display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-.home-track-title {
-  display: block;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-size: 11px;
-  font-weight: 500;
-}
-.home-track-copy > span {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  color: var(--muted);
-  font-size: 9px;
-  white-space: nowrap;
-}
-.home-track-copy i {
-  width: 2px;
-  height: 2px;
-  background: var(--muted);
-  border-radius: 50%;
-}
-.home-page .home-track-play {
-  width: 25px;
-  min-width: 25px;
-  height: 25px;
-  color: var(--accent);
-  background: var(--surface-2);
-  border-radius: 50%;
-}
-.home-page .home-empty-works {
-  display: flex;
-  gap: 14px;
-  align-items: center;
-  padding: 22px;
-  border-radius: 12px;
-  color: var(--muted);
-  font-size: 12px;
-}
-.home-empty-works > span {
-  flex: 1;
-}
-.home-error-content {
-  display: flex;
-  flex-wrap: wrap;
+  justify-content: space-between;
   align-items: center;
   gap: 12px;
 }
-.home-status-footer {
+.home-generate-action {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.home-keyboard-hint {
+  display: none;
+}
+.composer-assistant {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  color: var(--muted);
+  font-size: 13px;
+}
+.composer-assistant:hover {
+  color: var(--accent);
+}
+.generate-music-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 14px;
+  background: var(--accent);
+  color: var(--accent-ink);
+  font-size: 14px;
+  font-weight: 600;
+}
+.generate-music-button:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+.generate-music-button:disabled {
+  opacity: 0.45;
+}
+.music-prompt-status {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding-top: 16px;
-  border-top: 1px solid var(--line);
+  gap: 12px;
+  margin-top: 14px;
+  font-size: 12px;
   color: var(--muted);
-  font-size: 10px;
 }
-.home-status-footer > span,
-.home-status-footer a {
-  display: inline-flex;
+.music-prompt-status button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  padding: 8px;
+  min-height: 44px;
+}
+.music-inline-error {
+  color: var(--danger);
+  font-size: 13px;
+  line-height: 1.65;
+  margin-top: 16px;
+  overflow-wrap: anywhere;
+}
+.home-inspiration {
+  width: min(100%, 720px);
+  margin: 4px auto 24px;
+}
+.home-inspiration h2 {
+  margin-bottom: 14px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+.home-inspiration-options {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.home-inspiration-choice {
+  min-width: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+  color: var(--text);
+  text-align: left;
+  transition:
+    border-color 160ms ease,
+    transform 160ms ease;
+}
+.home-inspiration-choice img {
+  display: block;
+  width: 100%;
+  height: 110px;
+  object-fit: cover;
+  object-position: 70% 50%;
+}
+.home-inspiration-choice > span {
+  display: flex;
+  justify-content: space-between;
   align-items: center;
-  gap: 7px;
+  gap: 4px;
+  padding: 11px 14px;
+  font-size: 13px;
+  font-weight: 500;
 }
-.home-status-footer a {
+.home-inspiration-choice > span svg {
   color: var(--muted);
-  text-decoration: none;
 }
-.home-status-footer i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: var(--muted);
+.home-inspiration-copy strong {
+  font-size: inherit;
+  font-weight: inherit;
 }
-.home-status-footer i.connected {
-  background: var(--accent);
+.home-inspiration-copy small {
+  display: none;
 }
-@media (min-width: 1500px) {
-  .home-create-hub {
-    padding-top: 24px;
-    padding-bottom: 10px;
-  }
-  .home-composer {
-    min-height: 198px;
-  }
-  .home-page .home-inspiration {
-    height: 104px;
+.home-inspiration-choice[aria-pressed="true"] {
+  border-color: var(--accent);
+}
+@media (hover: hover) {
+  .home-inspiration-choice:hover:not(:disabled) {
+    transform: translateY(-3px);
+    border-color: var(--accent);
   }
 }
-@media (max-width: 1200px) {
-  .home-explore-grid {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 14px;
-  }
-  .home-track-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
+.music-spinning {
+  animation: music-spin 1.5s linear infinite;
 }
-@media (max-width: 900px) {
-  .home-explore-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 14px;
-  }
-  .home-page .home-feature-card {
-    height: 260px;
+@keyframes music-spin {
+  to {
+    transform: rotate(360deg);
   }
 }
 @media (max-width: 760px) {
-  .home-page {
+  .simple-home .home-hero-grid {
+    padding: 30px 0 24px;
     gap: 24px;
   }
-  .home-create-hub {
-    padding-top: 10px;
+  .simple-home-heading {
+    gap: 12px;
   }
-  .home-greeting {
-    margin-bottom: 20px;
+  .simple-home-heading h1 {
+    font-size: 30px;
+    letter-spacing: -1.2px;
   }
-  .home-greeting h1 {
-    font-size: 25px;
+  .music-composer-card {
+    --composer-panel-height: 330px;
+    border-radius: 20px;
   }
-  .home-brand {
-    margin-bottom: 14px;
+  .music-mode-tabs {
+    padding: 12px 14px 0;
   }
-  .home-brand .brand-wordmark {
-    width: 192px;
+  .music-mode-tabs > button {
+    padding: 10px 14px;
   }
-  .home-inspiration-grid {
-    gap: 9px;
+  .simple-prompt-form {
+    padding: 10px 18px 18px;
   }
-  .home-page .home-inspiration {
-    height: 91px;
+  .simple-prompt-form textarea {
+    min-height: 132px;
+    height: 132px;
+    font-size: 16px;
   }
-  .home-inspiration-copy {
-    left: 10px;
-    bottom: 9px;
+  .simple-composer-actions {
+    gap: 8px;
   }
-  .home-inspiration-copy small {
+  .composer-assistant {
+    font-size: 12px;
+    gap: 5px;
+  }
+  .generate-music-button {
+    padding: 12px 16px;
+    gap: 7px;
+  }
+  .generate-music-button > svg:last-child {
     display: none;
   }
-  .home-inspiration-arrow {
+  .home-inspiration {
+    margin-top: 8px;
+  }
+  .home-inspiration h2 {
+    margin-bottom: 12px;
+    font-size: 12px;
+  }
+  .home-inspiration-options {
+    gap: 10px;
+  }
+  .home-inspiration-choice {
+    border-radius: 13px;
+  }
+  .home-inspiration-choice img {
+    height: 96px;
+  }
+  .home-inspiration-choice > span {
+    padding: 10px;
+    font-size: 12px;
+  }
+  .home-inspiration-choice > span svg {
     display: none;
+  }
+  .app-shell[data-keyboard-open="true"] .simple-home .home-hero-grid {
+    padding: 8px 0;
+    gap: 14px;
+  }
+  .app-shell[data-keyboard-open="true"] .simple-home-heading {
+    display: none;
+  }
+  .app-shell[data-keyboard-open="true"] .home-inspiration {
+    display: none;
+  }
+  .app-shell[data-keyboard-open="true"] .simple-prompt-form textarea {
+    min-height: 88px;
+    height: 88px;
   }
 }
-@media (max-width: 480px) {
-  .home-greeting h1 {
-    font-size: 24px;
+
+/* Every mode shares the same frame; variable content scrolls above its actions. */
+.music-input-panel {
+  height: var(--composer-panel-height);
+  min-height: 0;
+}
+.music-input-panel > :is(.simple-prompt-form, .hum-composer, .image-composer) {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  gap: 12px;
+  padding: 12px 26px 24px;
+}
+.music-input-panel .music-composer-body {
+  display: flex;
+  flex: 1 1 0;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+  gap: 16px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-gutter: stable;
+  padding: 4px;
+  margin: -4px;
+  scroll-padding-block: 6px;
+}
+.music-composer-body > * {
+  flex-shrink: 0;
+}
+.music-input-panel .simple-prompt-form textarea {
+  flex: 1 1 auto;
+  height: auto;
+  min-height: 88px;
+  max-height: none;
+}
+.music-input-panel
+  :is(.simple-composer-actions, .hum-composer-footer, .image-composer-footer) {
+  flex: 0 0 auto;
+  min-height: 48px;
+  margin-top: auto;
+}
+.music-input-panel :is(.music-prompt-status, .music-inline-error) {
+  margin: 0;
+}
+.music-input-panel > * > [role="alert"] {
+  flex: 0 0 auto;
+  max-height: 72px;
+  overflow-y: auto;
+}
+.music-input-panel .hum-recording-area {
+  gap: 6px;
+  padding: 8px 8px 4px;
+}
+.music-input-panel .hum-record-button {
+  width: 64px;
+  height: 64px;
+}
+.music-input-panel .hum-composer[data-has-audio="true"] .hum-recording-area {
+  flex-direction: row;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  padding-block: 4px;
+}
+.music-input-panel .hum-composer[data-has-audio="true"] .hum-record-button {
+  width: 44px;
+  height: 44px;
+}
+.music-input-panel .hum-composer[data-has-audio="true"] .hum-note {
+  flex-basis: 100%;
+  text-align: center;
+}
+.music-input-panel .image-music-upload,
+.music-input-panel .image-music-preview {
+  height: 180px;
+  min-height: 180px;
+}
+.music-input-panel .image-music-preview img {
+  height: 100%;
+}
+@media (max-width: 760px) {
+  .music-input-panel
+    > :is(.simple-prompt-form, .hum-composer, .image-composer) {
+    padding: 12px 18px 18px;
   }
-  .home-page .home-composer {
-    padding: 12px;
-    border-radius: 15px;
+  .music-input-panel .music-composer-body {
+    gap: 12px;
   }
-  .home-prompt .mantine-Textarea-input {
-    font-size: 13px;
-    min-height: 116px;
+  .music-input-panel .hum-record-button {
+    width: 60px;
+    height: 60px;
   }
-  .home-composer-footer {
-    gap: 8px;
-    padding-top: 10px;
+  .music-input-panel .image-music-upload,
+  .music-input-panel .image-music-preview {
+    height: 160px;
+    min-height: 160px;
   }
-  .home-composer-options {
-    gap: 9px;
+  .app-shell[data-keyboard-open="true"] .music-composer-card {
+    --composer-panel-height: clamp(
+      210px,
+      calc(var(--app-viewport-height, 100dvh) - 150px),
+      330px
+    );
   }
-  .home-composer-separator,
-  .home-custom-link svg {
-    display: none;
+}
+
+@media (min-width: 1024px) {
+  .route-home .page-container {
+    min-height: min(720px, calc(100dvh - 160px - var(--player-height, 0px)));
+    align-items: center;
   }
-  .home-custom-link {
+  .simple-home {
+    position: relative;
+    isolation: isolate;
+    display: grid;
+    grid-template-columns: minmax(0, 1.65fr) minmax(220px, 0.85fr);
+    grid-template-rows: auto auto;
+    align-items: stretch;
+    gap: 32px clamp(28px, 3.5vw, 64px);
+    max-width: 1320px;
+    padding: 22px 0 48px;
+  }
+  .simple-home .home-hero-grid {
+    display: contents;
+    position: static;
+    isolation: auto;
+    min-width: 0;
+    align-items: stretch;
+    padding: 0;
+    gap: 32px;
+  }
+  .simple-home-heading {
+    grid-column: 1;
+    grid-row: 1;
+    align-items: flex-start;
+    text-align: left;
+  }
+  .simple-home-heading h1 {
+    margin: 0;
+    font-size: clamp(38px, 3.6vw, 56px);
+    font-weight: 540;
+    letter-spacing: -2px;
+    line-height: 1.34;
+  }
+  .simple-home-heading h1 > span {
+    display: block;
+  }
+  .music-composer-card {
+    grid-column: 1;
+    grid-row: 2;
+    width: 100%;
+    border-radius: 22px;
+    box-shadow: 0 16px 70px #17312308;
+  }
+  .music-composer-toolbar {
+    flex-wrap: wrap;
+    gap: 16px;
+    padding: 20px 22px 0;
+  }
+  .simple-prompt-form {
+    padding: 18px 26px 24px;
+  }
+  .simple-prompt-form textarea {
+    height: clamp(180px, 22dvh, 260px);
+    min-height: 180px;
+    padding-top: 8px;
+    font-size: 18px;
+  }
+  .home-keyboard-hint {
+    display: inline;
+    white-space: nowrap;
+    color: var(--muted);
     font-size: 10px;
   }
-  .home-instrumental .mantine-Switch-label {
-    font-size: 11px;
-    padding-left: 6px;
+  .home-keyboard-hint kbd {
+    font-family: inherit;
   }
-  .home-page .home-create-button {
-    padding-inline: 11px;
-    min-height: 36px;
+  .simple-home .home-soundscape {
+    inset: -45px -32px -36px;
+    opacity: 0.85;
+    mask-image: linear-gradient(
+      to bottom,
+      transparent,
+      #000 12%,
+      #000 70%,
+      transparent
+    );
   }
-  .home-create-button .mantine-Button-label > svg:first-child {
-    display: none;
+  .home-inspiration {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    grid-column: 2;
+    grid-row: 2;
+    min-height: 0;
+    width: 100%;
+    margin: 0;
   }
-  .home-inspiration-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+  .home-inspiration h2 {
+    position: absolute;
+    bottom: 100%;
+    margin: 0 0 20px;
+    font-size: 13px;
+    color: var(--text);
   }
-  .home-page .home-inspiration {
-    height: 82px;
+  .home-inspiration-options {
+    flex: 1;
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: repeat(3, minmax(0, 1fr));
+    gap: 14px;
+  }
+  .home-inspiration-choice {
+    display: grid;
+    grid-template-columns: 88px minmax(0, 1fr);
+    min-height: 0;
+    border-radius: 15px;
+    background: color-mix(in srgb, var(--surface) 94%, transparent);
+  }
+  .home-inspiration-choice img {
+    width: 88px;
+    height: 100%;
+    min-height: 0;
+  }
+  .home-inspiration-choice > span {
+    min-width: 0;
+    padding: 16px 14px;
+  }
+  .home-inspiration-copy {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .home-inspiration-copy strong {
+    font-size: 14px;
+    font-weight: 550;
   }
   .home-inspiration-copy small {
     display: block;
-    font-size: 9px;
+    font-size: 11px;
+    color: var(--muted);
+    line-height: 1.6;
   }
-  .home-explore-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 12px;
+  .home-inspiration-choice > span > svg {
+    flex: none;
   }
-  .home-track-grid {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 10px;
+  .home-inspiration-choice:hover:not(:disabled) {
+    transform: translateX(3px);
   }
-  .home-track-title {
-    font-size: 12px;
+  .home-inspiration-choice:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 4px;
   }
-  .home-track-copy > span {
-    font-size: 10px;
+}
+@media (min-width: 1280px) {
+  .home-inspiration-choice {
+    grid-template-columns: 112px minmax(0, 1fr);
   }
-  .home-page .home-track {
-    padding: 12px;
-    gap: 12px;
+  .home-inspiration-choice img {
+    width: 112px;
   }
-  .home-empty-works {
-    flex-wrap: wrap;
-  }
-  .home-empty-works > span {
-    min-width: 180px;
+  .home-inspiration-choice > span {
+    padding-inline: 18px;
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .home-page *,
-  .home-page *::before {
-    transition: none !important;
+  .music-spinning {
+    animation: none;
+  }
+  .home-inspiration-choice {
+    transition: none;
+  }
+}
+
+@media (max-width: 360px) {
+  .simple-home .home-hero-grid {
+    padding-top: 20px;
+    gap: 20px;
+  }
+  .simple-prompt-form textarea {
+    min-height: 112px;
+    height: 112px;
+  }
+  .home-inspiration-options {
+    gap: 8px;
+  }
+  .home-inspiration-choice img {
+    height: 80px;
+  }
+}
+
+@media (max-width: 760px) {
+  .app-shell .workspace-content.route-home {
+    padding-bottom: calc(16px + var(--mobile-nav-height));
+  }
+  .app-shell[data-keyboard-open="true"] .workspace-content.route-home {
+    padding-bottom: 12px;
+  }
+  .app-shell[data-keyboard-open="true"] .route-home .page-container {
+    align-items: flex-start;
+  }
+}
+
+.music-composer-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 22px 0;
+}
+.music-composer-toolbar .music-mode-tabs {
+  padding: 0;
+  gap: 3px;
+}
+.music-composer-toolbar .music-mode-tabs > button {
+  padding: 10px 12px;
+}
+.home-music-kind {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+.home-music-kind > span {
+  display: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+@media (max-width: 760px) {
+  .music-composer-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+    padding: 12px 14px 0;
+    gap: 12px;
+  }
+  .music-composer-toolbar .music-mode-tabs {
+    width: 100%;
+  }
+  .music-composer-toolbar .music-mode-tabs > button {
+    flex: 1;
+    padding: 10px 8px;
+    gap: 6px;
+    font-size: 13px;
+  }
+  .home-music-kind {
+    justify-content: space-between;
+    gap: 8px;
+    padding: 0 4px;
+  }
+  .home-music-kind > span {
+    display: block;
+  }
+  .home-music-kind .music-kind-toggle {
+    width: auto;
+  }
+  .simple-prompt-form textarea {
+    min-height: 116px;
+    height: 116px;
   }
 }

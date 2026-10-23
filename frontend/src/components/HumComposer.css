@@ -1,0 +1,185 @@
+.hum-composer {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+  padding: 12px 26px 24px;
+  text-align: left;
+}
+.hum-recording-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  padding: 20px 8px 6px;
+}
+.hum-record-button {
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--accent, #b9d795);
+  color: var(--accent-ink, #18251c);
+  border: 0;
+  cursor: pointer;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.hum-record-button:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 28px #647d3d22;
+}
+.hum-recording-area[data-recording] .hum-record-button {
+  color: #a43932;
+  background: #fae8e3;
+  animation: hum-pulse 1.6s ease-in-out infinite;
+}
+.hum-record-caption {
+  font-size: 14px;
+  color: var(--text, #202b25);
+}
+.hum-upload-button,
+.hum-remove,
+.hum-cancel {
+  border: 0;
+  color: var(--muted, #7f8a81);
+  background: transparent;
+  cursor: pointer;
+  min-height: 44px;
+}
+.hum-upload-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  padding: 0 14px;
+}
+.hum-file-input {
+  display: none;
+}
+.hum-preview {
+  padding: 10px 14px 14px;
+  border: 1px solid var(--line, #e2e6dc);
+  border-radius: 16px;
+  background: var(--surface, #fff);
+  min-width: 0;
+}
+.hum-file-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+.hum-file-row span {
+  flex: 1;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 13px;
+}
+.hum-remove {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  padding: 0;
+}
+.hum-preview audio {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  height: 44px;
+}
+.hum-composer .hum-idea {
+  width: 100%;
+  min-width: 0;
+  min-height: 48px;
+  padding: 12px 14px;
+  border: 1px solid var(--line, #e2e6dc);
+  border-radius: 12px;
+  font: inherit;
+  font-size: 16px;
+  color: var(--text, #202b25);
+  background: var(--surface, #fff);
+  box-sizing: border-box;
+}
+.hum-idea::placeholder {
+  color: var(--muted, #7f8a81);
+}
+.hum-composer-footer {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 12px;
+}
+.hum-generate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 48px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 24px;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 650;
+  background: var(--accent, #b9d795);
+  color: var(--accent-ink, #18251c);
+  cursor: pointer;
+}
+.hum-composer button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.hum-composer :is(button, input):focus-visible {
+  outline: 2px solid var(--accent, #78975b);
+  outline-offset: 3px;
+}
+.hum-note,
+.hum-error {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.hum-note {
+  color: var(--muted, #7f8a81);
+}
+.hum-error {
+  color: #c05a49;
+}
+.hum-spinner {
+  animation: hum-spin 1s linear infinite;
+}
+@keyframes hum-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes hum-pulse {
+  50% {
+    box-shadow: 0 0 0 9px #d56b5010;
+  }
+}
+@media (max-width: 760px) {
+  .hum-recording-area {
+    padding-top: 12px;
+  }
+  .hum-composer {
+    gap: 12px;
+    padding: 12px 18px 18px;
+  }
+  .hum-generate {
+    flex: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .hum-record-button {
+    transition: none;
+  }
+  .hum-recording-area[data-recording] .hum-record-button {
+    animation: none;
+  }
+}

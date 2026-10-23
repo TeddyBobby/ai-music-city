@@ -185,6 +185,7 @@ class EventBus:
         self._lock = threading.Lock()
         self._subscribers: dict[str, list[asyncio.Queue]] = {}
         self._last: dict[str, dict] = {}
+        self._last_stage: dict[str, dict] = {}
 
     def bind(self, loop: asyncio.AbstractEventLoop) -> None:
         self.loop = loop
@@ -211,9 +212,16 @@ class EventBus:
         with self._lock:
             return self._last.get(job_id)
 
+    def last_stage(self, job_id: str) -> dict | None:
+        """The latest real stage-bearing event, unaffected by subsequent tokens or logs."""
+        with self._lock:
+            return self._last_stage.get(job_id)
+
     def publish(self, job_id: str, event: dict) -> None:
         with self._lock:
             self._last[job_id] = event
+            if event.get("stage"):
+                self._last_stage[job_id] = event
         self._dispatch(job_id, ("progress", event))
 
     def done(self, job_id: str, job_json: dict) -> None:
@@ -221,11 +229,13 @@ class EventBus:
         terminal progress, which the worker persists before calling this)."""
         with self._lock:
             self._last.pop(job_id, None)
+            self._last_stage.pop(job_id, None)
         self._dispatch(job_id, ("done", job_json))
 
     def forget(self, job_id: str) -> None:
         with self._lock:
             self._last.pop(job_id, None)
+            self._last_stage.pop(job_id, None)
             self._subscribers.pop(job_id, None)
 
     def _dispatch(self, job_id: str, item: tuple) -> None:
@@ -265,7 +275,9 @@ class Worker:
     """
 
     def __init__(self, store: JobStore, engine: Engine, paths: config.Paths, bus: EventBus | None = None, *,
-                 fake: bool = False):
+                 fake: bool = False, dispatcher: SharedDispatcher | None = None):
+        self.dispatcher = dispatcher
+        self._started = False
         self.store = store
         self.engine = engine
         self.paths = paths
@@ -287,27 +299,47 @@ class Worker:
         # Housekeeping run on the worker thread after each job has been announced done (never raises
         # into the loop; e.g. ``uploads.auto_prune``). The engine is idle at that point.
         self.after_job: Callable[[Job], None] | None = None
+        if dispatcher is not None:
+            dispatcher.register(self)
 
     # -- lifecycle ----------------------------------------------------------------------------
 
-    def start(self, loop: asyncio.AbstractEventLoop | None = None) -> None:
+    def start(self, loop: asyncio.AbstractEventLoop | None = None, *, start_dispatcher: bool = True) -> None:
         if loop is not None:
             self.bus.bind(loop)
-        if self._thread is not None:
+        if self._started or self._thread is not None:
             return
-        # Requeue anything left queued in the DB (e.g. after a restart); running rows are stale.
-        for job_id in self.store.queued_ids():
-            self.submit(job_id)
+        self._stopping = False
+        # Recover stale running rows before publishing queued jobs: another tenant
+        # may already have started the shared dispatcher.
         for job in self.store.list(status="running", limit=500)[0]:
             self.store.update_status(job.id, "failed", error="server restarted while the job was running")
+        self._started = True
+        for job_id in self.store.queued_ids():
+            self.submit(job_id)
+        if self.dispatcher is not None:
+            if start_dispatcher:
+                self.dispatcher.start()
+            return
         self._thread = threading.Thread(target=self._run, name="yue2-worker", daemon=True)
         self._thread.start()
 
     def stop(self, timeout: float = 30.0) -> None:
         """Stop after the current job: it is cancelled, queued rows stay ``queued`` (re-enqueued on start)."""
+        if self.dispatcher is not None:
+            self._request_stop()
+            return
         thread = self._thread
         if thread is None:
             return
+        self._request_stop()
+        self._queue.put((-1, next(self._task_sequence), None, None))
+        thread.join(timeout)
+        if not thread.is_alive():
+            self._thread = None
+            self._started = False
+
+    def _request_stop(self) -> None:
         self._stopping = True
         with self._lock:
             current = self.current_job_id
@@ -316,13 +348,11 @@ class Worker:
                 maintenance_event.set()
         if event is not None:
             event.set()
-        self._queue.put((-1, next(self._task_sequence), None, None))
-        thread.join(timeout)
-        if not thread.is_alive():
-            self._thread = None
 
     @property
     def alive(self) -> bool:
+        if self.dispatcher is not None:
+            return self.dispatcher.alive
         return self._thread is not None and self._thread.is_alive()
 
     # -- submission / cancellation (any thread) -------------------------------------------------
@@ -330,7 +360,7 @@ class Worker:
     def submit(self, job_id: str) -> None:
         with self._lock:
             self._cancels.setdefault(job_id, threading.Event())
-        self._queue.put((0, next(self._task_sequence), job_id, None))
+        self._enqueue(0, job_id, None)
 
     def submit_maintenance(self, key: str, callback: Callable[[Callable[[], bool]], None]) -> bool:
         """Run a cancellable CPU subprocess after generation, with the GPU model released.
@@ -342,8 +372,14 @@ class Worker:
             if self._stopping or key in self._maintenance:
                 return False
             self._maintenance[key] = threading.Event()
-            self._queue.put((1, next(self._task_sequence), key, callback))
+            self._enqueue(1, key, callback)
         return True
+
+    def _enqueue(self, priority: int, key: str, callback) -> None:
+        if self.dispatcher is not None:
+            self.dispatcher.submit(self, priority, key, callback)
+        else:
+            self._queue.put((priority, next(self._task_sequence), key, callback))
 
     def cancel_maintenance(self, key: str) -> None:
         with self._lock:
@@ -552,7 +588,9 @@ class Worker:
         else:
             message = f"failed: {error}"
 
-        terminal = status_event(job.id, final_status, message)
+        latest_stage = self.bus.last_stage(job.id)
+        terminal = status_event(job.id, final_status, message,
+                                stage=latest_stage.get("stage") if latest_stage is not None else None)
         self.store.update_status(job.id, final_status, error=error, progress=terminal)
         self._publish(job.id, terminal)
         with self._lock:
@@ -573,3 +611,89 @@ class Worker:
     def delete_song_dir(self, job_id: str) -> None:
         shutil.rmtree(self.paths.songs_dir / job_id, ignore_errors=True)
         self.bus.forget(job_id)
+
+
+class SharedDispatcher:
+    """One engine-owning thread across isolated user workers.
+
+    Queue entries carry their owning Worker, so identical ids in separate user
+    databases cannot collide. Generation takes priority over maintenance across
+    every account, including jobs recovered after a restart.
+    """
+
+    def __init__(self, engine: Engine):
+        self.engine = engine
+        self._queue: queue.PriorityQueue = queue.PriorityQueue()
+        self._sequence = itertools.count()
+        self._workers: list[Worker] = []
+        self._lock = threading.RLock()
+        self._thread: threading.Thread | None = None
+        self._stopping = False
+
+    def register(self, worker: Worker) -> None:
+        with self._lock:
+            self._workers.append(worker)
+
+    def start(self) -> None:
+        with self._lock:
+            if self._thread is not None:
+                return
+            self._thread = threading.Thread(target=self._run, name="yue2-worker", daemon=True)
+            self._thread.start()
+
+    @property
+    def alive(self) -> bool:
+        return self._thread is not None and self._thread.is_alive()
+
+    def submit(self, worker: Worker, priority: int, key: str, callback) -> None:
+        self._queue.put((priority, next(self._sequence), worker, key, callback))
+
+    def stop(self, timeout: float = 30.0) -> None:
+        with self._lock:
+            self._stopping = True
+            workers, thread = list(self._workers), self._thread
+        for worker in workers:
+            worker._request_stop()
+        if thread is None:
+            return
+        self._queue.put((-1, next(self._sequence), None, None, None))
+        thread.join(timeout)
+        if not thread.is_alive():
+            self._thread = None
+
+    def _run(self) -> None:
+        try:
+            while True:
+                priority, _, worker, key, maintenance = self._queue.get()
+                if worker is None or self._stopping:
+                    return
+                if worker._stopping:
+                    continue
+                if maintenance is not None:
+                    # Persisting and enqueuing a new job are separate operations.
+                    # Inspect all tenant stores before starting lower-priority work.
+                    with self._lock:
+                        workers = list(self._workers)
+                    waiting = [(owner, job_id) for owner in workers if owner._started and not owner._stopping
+                               for job_id in owner.store.queued_ids()]
+                    if waiting:
+                        for owner, job_id in waiting:
+                            owner.submit(job_id)
+                        self.submit(worker, priority, key, maintenance)
+                        continue
+                    worker._run_maintenance(key, maintenance)
+                    continue
+                job = worker.store.find(key)
+                if job is None or job.status != "queued":
+                    with worker._lock:
+                        worker._cancels.pop(key, None)
+                    continue
+                try:
+                    worker._run_job(job)
+                except Exception:
+                    log.exception("worker: unexpected error running tenant job %s", key)
+        finally:
+            try:
+                self.engine.unload()
+            except Exception:
+                log.exception("worker: engine unload failed")

@@ -1,11 +1,14 @@
+.home-hero-grid {
+  position: relative;
+  isolation: isolate;
+}
+
 .home-soundscape {
   position: absolute;
-  top: -24px;
-  left: -28px;
-  right: -28px;
-  height: 650px;
+  inset: -36px calc(0px - var(--page-gutter, 28px)) -20px;
   z-index: -1;
   overflow: hidden;
+  contain: paint;
   pointer-events: none;
   user-select: none;
   background:
@@ -32,24 +35,88 @@
     radial-gradient(ellipse at 83% 33%, #76b6a51a, transparent 52%);
 }
 
-@media (min-width: 1800px) {
-  .home-soundscape {
-    left: -40px;
-    right: -40px;
+.simple-home-heading.home-flow-heading {
+  width: 100%;
+  height: 116px;
+  min-height: 116px;
+  gap: 0;
+  flex: none;
+}
+.simple-home-heading .home-flow-title {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+  min-width: 0;
+  margin: 0;
+  padding: 0 8px;
+  color: #dceacb;
+  font-family:
+    Inter,
+    -apple-system,
+    BlinkMacSystemFont,
+    "PingFang SC",
+    "Microsoft YaHei",
+    sans-serif;
+  font-size: clamp(42px, 5vw, 52px);
+  font-weight: 550;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-align: center;
+}
+:root[data-theme="light"] .simple-home-heading .home-flow-title {
+  color: #2f503b;
+}
+.home-flow-title > .home-flow-copy {
+  display: inline;
+  white-space: nowrap;
+}
+.home-flow-title > .home-flow-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  pointer-events: none;
+  user-select: none;
+}
+.home-flow-title[data-rendered="true"] > .home-flow-canvas {
+  opacity: 1;
+}
+.home-flow-title[data-rendered="true"] > .home-flow-copy {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  border: 0;
+}
+@media (min-width: 1024px) {
+  .simple-home-heading.home-flow-heading {
+    height: 132px;
+    min-height: 132px;
+  }
+  .simple-home-heading .home-flow-title {
+    justify-content: flex-start;
+    font-size: clamp(56px, 4.5vw, 64px);
+    text-align: left;
   }
 }
-
-@media (max-width: 1050px) {
-  .home-soundscape {
-    left: -20px;
-    right: -20px;
-  }
-}
-
 @media (max-width: 760px) {
   .home-soundscape {
-    left: -16px;
-    right: -16px;
-    height: 610px;
+    top: -24px;
+    bottom: 0;
+  }
+  .simple-home-heading.home-flow-heading {
+    height: 84px;
+    min-height: 84px;
+  }
+  .simple-home-heading .home-flow-title {
+    font-size: clamp(32px, 8.6vw, 36px);
   }
 }

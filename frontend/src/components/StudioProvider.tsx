@@ -10,13 +10,13 @@ const theme = createTheme({
   defaultRadius: "md",
   fontFamily:
     'Inter,-apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft YaHei",sans-serif',
-  fontSizes: { xs: "11px", sm: "12px", md: "13px", lg: "15px", xl: "20px" },
+  fontSizes: { xs: "12px", sm: "14px", md: "16px", lg: "18px", xl: "22px" },
   headings: {
     fontFamily: "inherit",
     sizes: {
-      h1: { fontSize: "24px" },
-      h2: { fontSize: "18px" },
-      h3: { fontSize: "14px" },
+      h1: { fontSize: "32px" },
+      h2: { fontSize: "22px" },
+      h3: { fontSize: "18px" },
     },
   },
   colors: {
@@ -24,10 +24,10 @@ const theme = createTheme({
       "#f5f9ef",
       "#e7f2d9",
       "#d4e9b7",
-      "#bce889",
+      "#b9d795",
       "#9ac865",
       "#79a948",
-      "#527e30",
+      "#4b6b3c",
       "#436b29",
       "#345422",
       "#29441c",
@@ -48,7 +48,7 @@ const theme = createTheme({
   components: {
     Button: {
       defaultProps: { size: "sm", radius: "md" },
-      styles: { label: { gap: 7, fontSize: 12, fontWeight: 500 } },
+      styles: { label: { gap: 7, fontSize: 14, fontWeight: 600 } },
     },
     ActionIcon: { defaultProps: { radius: "md" } },
     TextInput: { defaultProps: { size: "sm" } },
@@ -59,7 +59,7 @@ const theme = createTheme({
       defaultProps: { size: "xs" },
       styles: {
         body: { alignItems: "center" },
-        label: { fontSize: 12, paddingLeft: 8 },
+        label: { fontSize: 14, paddingLeft: 8 },
         input: { cursor: "pointer" },
       },
     },

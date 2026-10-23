@@ -1,563 +1,496 @@
-import { usePlayerOverlay } from "../state/playerOverlay";
-import { UnstyledButton } from "@mantine/core";
-import { Input, Select } from "../components/ui";
-import { useCallback, useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useRef, useState } from "react";
+import { Link, useSearchParams } from "react-router-dom";
+import { SegmentedControl, UnstyledButton } from "@mantine/core";
+import { useMediaQuery } from "@mantine/hooks";
 import {
-  Search,
-  Plus,
-  LayoutGrid,
-  List,
-  Play,
-  Pause,
-  Check,
-  ArrowUpRight,
-  FolderPlus,
-  Trash2,
   Download,
-  RefreshCw,
-  MessageSquareText,
-  Send,
+  LoaderCircle,
+  Maximize2,
+  Music2,
+  Pause,
+  Play,
+  Share2,
+  SlidersHorizontal,
+  X,
 } from "lucide-react";
-import { useReviewSummaries } from "../hooks/useReviewSummaries";
-import { api, songUrl } from "../lib/api";
+import { api } from "../lib/api";
+import { songDownload } from "../lib/shareSong";
+import { draftFromJob } from "../lib/generationDetail";
+import type { MusicKind } from "../lib/musicCreation";
 import type { Job } from "../lib/types";
-import {
-  titleOf,
-  duration,
-  when,
-  errorMessage,
-  presetLabel,
-} from "../lib/utils";
+import { duration, errorMessage, titleOf, when } from "../lib/utils";
 import { useApp } from "../state/app";
 import { usePlayer } from "../state/player";
-import {
-  Artwork,
-  Button,
-  IconButton,
-  EmptyState,
-  Dialog,
-  Badge,
-} from "../components/ui";
-import { ProjectPicker } from "../components/ProjectPicker";
-import { UploadsPanel } from "../components/UploadsPanel";
-import { PublishDialog } from "../components/PublishDialog";
-import "./Library.css";
-export function LibraryPage() {
-  const [params] = useSearchParams(),
-    navigate = useNavigate(),
-    toast = useApp((s) => s.toast),
-    p = usePlayer();
-  const [jobs, setJobs] = useState<Job[]>([]),
-    [failed, setFailed] = useState<Job[]>([]),
-    [total, setTotal] = useState(0),
-    [query, setQuery] = useState(""),
-    [kind, setKind] = useState(""),
-    [preset, setPreset] = useState(""),
-    [layout, setLayout] = useState("grid"),
-    [busy, setBusy] = useState(false),
-    [error, setError] = useState(""),
-    [selected, setSelected] = useState<string[]>([]),
-    [selecting, setSelecting] = useState(!!params.get("attach")),
-    [attach, setAttach] = useState(false),
-    [moveConfirm, setMoveConfirm] = useState(false),
-    [target, setTarget] = useState<any>(null),
-    [remove, setRemove] = useState<Job | null>(null),
-    [batchRemove, setBatchRemove] = useState(false);
-  const [publishJob, setPublishJob] = useState<Job | "choose" | null>(null);
-  const project = params.get("project") || "",
-    group = params.get("group") || "";
-  const reviews = useReviewSummaries(jobs.map((job) => job.id));
-  const load = useCallback(
-    async (append = false) => {
-      setBusy(true);
-      setError("");
-      try {
-        const d = await api.jobs({
-          status: "done",
-          kind,
-          project,
-          group,
-          offset: append ? jobs.length : 0,
-          limit: 60,
-        });
-        setJobs((j) => (append ? [...j, ...d.jobs] : d.jobs));
-        setTotal(d.total);
-        if (!append) {
-          const bad = await api.jobs({
-            status: "failed,cancelled",
-            project,
-            limit: 100,
-          });
-          setFailed(bad.jobs);
-        }
-      } catch (e) {
-        setError(errorMessage(e));
-      } finally {
-        setBusy(false);
-      }
-    },
-    [kind, project, group, jobs.length],
+import { usePlayerOverlay } from "../state/playerOverlay";
+import { Artwork, Button, EmptyState, IconButton } from "../components/ui";
+import { ShareSongDialog } from "../components/ShareSongDialog";
+import "./SimpleLibrary.css";
+
+const STAGE_LABELS: Record<string, string> = {
+  load: "准备中",
+  transcribe: "识别旋律",
+  hum: "识别旋律",
+  plan: "编曲中",
+  semantic: "生成音乐",
+  synthesize: "合成音频",
+  decode: "完成最后处理",
+  save: "正在保存",
+};
+
+function UnfinishedSong({
+  job,
+  highlighted = false,
+}: {
+  job: Job;
+  highlighted?: boolean;
+}) {
+  const cause = String(job.error || "");
+  const reason =
+    job.status === "cancelled"
+      ? "已取消"
+      : /hum transcription has no notes|only rests/i.test(cause)
+        ? "没听清旋律，请靠近麦克风重新哼唱"
+        : /MemoryError|memory pressure|out of memory|failed to allocate|内存不足/i.test(
+              cause,
+            )
+          ? "内存不足，请关闭闲置应用后重试"
+          : /models?.*(missing|not found|unavailable|not installed|not ready)|missing.*models?|weights?.*(missing|not found)|模型.*(缺失|未安装|不可用|未就绪)|未找到.*模型|engine_unavailable/i.test(
+                cause,
+              )
+            ? "音乐服务暂未就绪"
+            : "生成未完成，请重试";
+  return (
+    <article
+      id={`song-${job.id}`}
+      className={`simple-failed-row ${highlighted ? "is-highlighted" : ""}`}
+    >
+      <Music2 size={18} />
+      <div>
+        <strong>{titleOf(job)}</strong>
+        <span>{reason}</span>
+      </div>
+      <Link to={`/generation/${encodeURIComponent(job.id)}`}>调整重试</Link>
+    </article>
   );
-  useEffect(() => {
-    load();
-  }, [kind, project, group]);
+}
+
+export function LibraryPage() {
+  const desktop = useMediaQuery("(min-width: 1024px)");
+  const [params, setParams] = useSearchParams();
+  const selectedId = params.get("job") || "";
+  const player = usePlayer();
+  const openPlayer = usePlayerOverlay((s) => s.open);
+  const mp3 = Boolean(useApp((s) => s.status?.ffmpeg));
+  const toast = useApp((s) => s.toast);
+  const [songs, setSongs] = useState<Job[]>([]);
+  const [pending, setPending] = useState<Job[]>([]);
+  const [failed, setFailed] = useState<Job[]>([]);
+  const [total, setTotal] = useState(0);
+  const [audioSeconds, setAudioSeconds] = useState(0);
+  const [musicKind, setMusicKind] = useState<MusicKind | "all">("all");
+  const [limit, setLimit] = useState(40);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [reload, setReload] = useState(0);
+  const [canceling, setCanceling] = useState("");
+  const [sharing, setSharing] = useState<Job | null>(null);
+  const focused = useRef("");
+  const selectedFailure = failed.find((job) => job.id === selectedId);
+  const previousFailures = failed.filter((job) => job.id !== selectedId);
 
   useEffect(() => {
+    let live = true;
+    let inFlight = false;
+    setLoading(true);
+    async function loadSongs() {
+      const query = {
+        status: "done",
+        music_kind: musicKind === "all" ? undefined : musicKind,
+      };
+      const first = await api.jobs({
+        ...query,
+        summary: true,
+        limit: Math.min(limit, 500),
+      });
+      const loaded: Job[] = [...first.jobs];
+      let offset = loaded.length;
+      while (live && offset < Math.min(limit, first.total)) {
+        const next = await api.jobs({
+          ...query,
+          limit: Math.min(limit - offset, 500),
+          offset,
+        });
+        if (!next.jobs.length) break;
+        loaded.push(...next.jobs);
+        offset += next.jobs.length;
+      }
+      return {
+        ...first,
+        jobs: [...new Map(loaded.map((job) => [job.id, job])).values()],
+      };
+    }
+    async function load() {
+      if (inFlight) return;
+      inFlight = true;
+      try {
+        const [done, active, unsuccessful] = await Promise.all([
+          loadSongs(),
+          api.jobs({
+            status: "queued,running",
+            music_kind: musicKind === "all" ? undefined : musicKind,
+            limit: 100,
+          }),
+          api.jobs({
+            status: "failed,cancelled",
+            music_kind: musicKind === "all" ? undefined : musicKind,
+            limit: 100,
+          }),
+        ]);
+        const all = [...done.jobs, ...active.jobs, ...unsuccessful.jobs];
+        let selected: Job | undefined;
+        if (selectedId && !all.some((job: Job) => job.id === selectedId)) {
+          try {
+            selected = (await api.job(selectedId)).job;
+            if (
+              selected &&
+              musicKind !== "all" &&
+              draftFromJob(selected).musicKind !== musicKind
+            )
+              selected = undefined;
+          } catch {
+            /* A stale link must not hide the library. */
+          }
+        }
+        if (!live) return;
+        setSongs(
+          selected?.status === "done" ? [selected, ...done.jobs] : done.jobs,
+        );
+        setPending(
+          selected && ["running", "queued"].includes(selected.status)
+            ? [selected, ...active.jobs]
+            : active.jobs,
+        );
+        setFailed(
+          selected && ["failed", "cancelled"].includes(selected.status)
+            ? [selected, ...unsuccessful.jobs]
+            : unsuccessful.jobs,
+        );
+        setTotal(done.total);
+        setAudioSeconds(done.summary?.audio_seconds || 0);
+        setError("");
+      } catch (cause) {
+        if (live) setError(errorMessage(cause));
+      } finally {
+        inFlight = false;
+        if (live) setLoading(false);
+      }
+    }
+    void load();
+    const timer = window.setInterval(load, 5000);
     const updated = () => void load();
     window.addEventListener("yue2:jobs-updated", updated);
-    return () => window.removeEventListener("yue2:jobs-updated", updated);
-  }, [load]);
+    return () => {
+      live = false;
+      window.clearInterval(timer);
+      window.removeEventListener("yue2:jobs-updated", updated);
+    };
+  }, [selectedId, limit, reload, musicKind]);
 
-  const shown = jobs.filter(
-    (j) =>
-      (!preset || j.preset === preset) &&
-      [titleOf(j), j.params?.lyrics, j.params?.style]
-        .join(" ")
-        .toLowerCase()
-        .includes(query.toLowerCase()),
-  );
-  function toggle(id: string) {
-    setSelected((s) =>
-      s.includes(id) ? s.filter((i) => i !== id) : [...s, id],
-    );
-  }
-  async function attachSelected(force = false) {
-    if (!target || !selected.length) return;
-    setBusy(true);
+  useEffect(() => {
+    if (!selectedId || focused.current === selectedId || loading) return;
+    const element = document.getElementById(`song-${selectedId}`);
+    if (element) {
+      focused.current = selectedId;
+      element.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+  }, [selectedId, loading, songs, pending, failed]);
+
+  async function cancel(job: Job) {
+    setCanceling(job.id);
     try {
-      try {
-        await api.attachTakes(target.id, selected, force);
-      } catch (e: any) {
-        if (e.status === 409 && !force) {
-          setMoveConfirm(true);
-          return;
-        }
-        throw e;
-      }
-      setMoveConfirm(false);
-      toast("作品已收录到项目。", "ok");
-      setAttach(false);
-      setSelected([]);
-      setSelecting(false);
-      navigate("/project/" + target.project_id);
-    } catch (e) {
-      toast(errorMessage(e), "err");
+      const result = await api.cancel(job.id);
+      if (result.status === 202) toast("正在停止生成…");
+      setReload((value) => value + 1);
+    } catch (cause) {
+      toast(errorMessage(cause), "err");
     } finally {
-      setBusy(false);
+      setCanceling("");
     }
   }
-  async function deleteSelected() {
-    setBusy(true);
-    try {
-      const results = await Promise.allSettled(
-        selected.map((id) => api.remove(id)),
-      );
-      const removed = selected.filter(
-        (_, i) => results[i].status === "fulfilled",
-      );
-      removed.forEach((id) => p.remove(id));
-      setSelected((ids) => ids.filter((id) => !removed.includes(id)));
-      setBatchRemove(false);
-      toast(
-        `已删除 ${removed.length} 首作品${removed.length < selected.length ? "，部分删除失败，请重试" : ""}。`,
-        removed.length === selected.length ? "ok" : "err",
-      );
-      await load();
-    } finally {
-      setBusy(false);
+
+  function filterSongs(value: string) {
+    if (value !== "all" && value !== "instrumental" && value !== "vocal")
+      return;
+    if (value === musicKind) return;
+    setMusicKind(value);
+    setLimit(40);
+    setSongs([]);
+    setPending([]);
+    setFailed([]);
+    setTotal(0);
+    setAudioSeconds(0);
+    setLoading(true);
+    if (selectedId) {
+      const next = new URLSearchParams(params);
+      next.delete("job");
+      setParams(next, { replace: true });
     }
   }
-  async function deleteJob() {
-    if (!remove) return;
-    setBusy(true);
-    try {
-      await api.remove(remove.id);
-      p.remove(remove.id);
-      setRemove(null);
-      toast("已删除作品。", "ok");
-      load();
-    } catch (e) {
-      toast(errorMessage(e), "err");
-    } finally {
-      setBusy(false);
-    }
-  }
+
   return (
-    <div>
-      <div className="library-toolbar">
-        <label className="search-field">
-          <Search size={16} />
-          <Input
-            type="search"
-            aria-label="搜索作品"
-            placeholder="搜索名称、歌词或风格"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-          />
-        </label>
-        <Select
-          aria-label="作品类型"
-          value={kind}
-          onChange={(e) => setKind(e.target.value)}
-        >
-          <option value="">全部类型</option>
-          <option value="create">歌词创作</option>
-          <option value="regenerate">乐谱再创作</option>
-          <option value="cover">音频改编</option>
-          <option value="hum">哼唱成歌</option>
-        </Select>
-        <Select
-          aria-label="生成模式"
-          value={preset}
-          onChange={(e) => setPreset(e.target.value)}
-        >
-          <option value="">全部模式</option>
-          <option value="fast">快速模式</option>
-          <option value="quality">高质量</option>
-          <option value="custom">自定义</option>
-        </Select>
-        <div className="layout-switch">
-          <IconButton
-            label="网格视图"
-            className={layout === "grid" ? "active" : ""}
-            onClick={() => setLayout("grid")}
-          >
-            <LayoutGrid size={16} />
-          </IconButton>
-          <IconButton
-            label="列表视图"
-            className={layout === "list" ? "active" : ""}
-            onClick={() => setLayout("list")}
-          >
-            <List size={16} />
-          </IconButton>
-        </div>
-        <Button
-          variant="ghost"
-          onClick={() => {
-            setSelecting(!selecting);
-            setSelected([]);
+    <div className="simple-library">
+      <header className="simple-library-toolbar">
+        <SegmentedControl
+          aria-label="筛选音乐类型"
+          className="simple-library-filter"
+          classNames={{
+            label: "simple-library-filter-label",
+            indicator: "simple-library-filter-indicator",
           }}
+          value={musicKind}
+          onChange={filterSongs}
+          data={[
+            { value: "all", label: "全部" },
+            { value: "instrumental", label: "纯音乐" },
+            { value: "vocal", label: "带歌词" },
+          ]}
+          withItemsBorders={false}
+          radius="xl"
+        />
+        <div
+          className="simple-library-summary"
+          role="status"
+          aria-live="polite"
         >
-          {selecting ? "取消选择" : "选择作品"}
-        </Button>
-        <Button onClick={() => setPublishJob("choose")}>
-          <Send size={14} />
-          发布作品
-        </Button>
-        <Link className="btn primary" to="/create">
-          <Plus size={15} />
-          新建作品
-        </Link>
-      </div>
-      {(group || project) && (
-        <div className="row library-filter-note">
-          <Badge>已按{project ? "项目" : "版本组"}筛选</Badge>
-          <Link to="/library" className="muted small">
-            查看全部
-          </Link>
+          {loading && !songs.length ? (
+            <span>正在加载…</span>
+          ) : error && !songs.length ? (
+            <span>暂时无法获取汇总</span>
+          ) : (
+            <>
+              <span>
+                共 <strong>{total}</strong> 首
+              </span>
+              <span className="simple-library-summary-dot" aria-hidden="true">
+                ·
+              </span>
+              <span>
+                总时长 <strong>{duration(audioSeconds)}</strong>
+              </span>
+            </>
+          )}
         </div>
-      )}
-      {selecting && (
-        <div className="library-selection">
-          <span>已选 {selected.length} 首</span>
-          <Button
-            variant="ghost"
-            onClick={() => setSelected(shown.map((j) => j.id))}
-          >
-            全选当前作品
-          </Button>
-          <Button variant="ghost" onClick={() => setSelected([])}>
-            取消选择
-          </Button>
-          <Button
-            variant="danger"
-            disabled={!selected.length || busy}
-            onClick={() => setBatchRemove(true)}
-          >
-            <Trash2 size={14} />
-            删除所选
-          </Button>
-          <Button
-            variant="primary"
-            disabled={!selected.length}
-            onClick={() => setAttach(true)}
-          >
-            <FolderPlus size={14} />
-            收录到项目
-          </Button>
-        </div>
-      )}
+      </header>
       {error && (
-        <div className="error-box row between">
+        <div className="simple-library-error" role="alert">
           {error}
-          <Button onClick={() => load()}>重试</Button>
+          <Button onClick={() => setReload((value) => value + 1)}>重试</Button>
         </div>
       )}
-      {busy && !jobs.length ? (
-        <div className="empty-state">正在读取作品…</div>
-      ) : !shown.length ? (
-        <EmptyState
-          title="这里还没有作品"
-          description={
-            query
-              ? "试试其他关键词。"
-              : "输入歌词和曲风，让第一首歌在这里诞生。"
-          }
-        >
-          <Link className="btn" to="/create">
-            开始创作
-          </Link>
-        </EmptyState>
-      ) : (
-        <div className={layout === "grid" ? "library-grid" : "library-list"}>
-          {shown.map((j, i) => {
-            const playing = p.current?.id === j.id && p.playing;
-            const review = reviews[j.id];
+      {pending.length > 0 && (
+        <section className="simple-pending" aria-label="正在生成">
+          {pending.map((job) => {
+            const stage =
+              job.status === "queued"
+                ? "排队中"
+                : STAGE_LABELS[job.progress?.stage] || "正在生成";
+            const progress = job.progress?.total
+              ? Math.min(
+                  100,
+                  Math.round(
+                    ((job.progress.completed || 0) / job.progress.total) * 100,
+                  ),
+                )
+              : undefined;
             return (
               <article
-                key={j.id}
-                className={`music-card ${selected.includes(j.id) ? "selected" : ""}`}
+                id={`song-${job.id}`}
+                key={job.id}
+                className={`simple-job ${job.id === selectedId ? "is-highlighted" : ""}`}
               >
-                <div className="music-card-art">
-                  <UnstyledButton
-                    className="music-cover-open"
-                    onClick={() => usePlayerOverlay.getState().open(j.id)}
-                    aria-label={`全屏播放 ${titleOf(j)}`}
-                  >
-                    <Artwork job={j} />
-                  </UnstyledButton>
-                  {!selecting && (
-                    <UnstyledButton
-                      className="music-publish"
-                      aria-label={`发布到广场 ${titleOf(j)}`}
-                      onClick={() => setPublishJob(j)}
-                    >
-                      <Send size={12} />
-                      发布
-                    </UnstyledButton>
-                  )}
-                  {selecting ? (
-                    <UnstyledButton
-                      className="select-track"
-                      aria-label={`选择 ${titleOf(j)}`}
-                      aria-pressed={selected.includes(j.id)}
-                      onClick={() => toggle(j.id)}
-                    >
-                      {selected.includes(j.id) && <Check size={15} />}
-                    </UnstyledButton>
-                  ) : (
-                    <UnstyledButton
-                      className="art-play"
-                      aria-label={`${playing ? "暂停" : "播放"} ${titleOf(j)}`}
-                      onClick={() => (playing ? p.toggle() : p.play(shown, i))}
-                    >
-                      {playing ? (
-                        <Pause size={20} fill="currentColor" />
-                      ) : (
-                        <Play size={20} fill="currentColor" />
-                      )}
-                    </UnstyledButton>
-                  )}
+                <span className="simple-job-symbol">
+                  <LoaderCircle size={22} className="spin" />
+                </span>
+                <div className="simple-job-copy">
+                  <strong>{titleOf(job)}</strong>
+                  <span role="status">
+                    {stage}
+                    {progress === undefined ? "…" : ` · ${progress}%`}
+                  </span>
+                  <progress aria-label={stage} max={100} value={progress} />
                 </div>
-                <div className="music-card-info">
-                  <UnstyledButton
-                    className="music-card-title"
-                    onClick={() => usePlayerOverlay.getState().open(j.id)}
-                  >
-                    {titleOf(j)}
-                  </UnstyledButton>
-                  <p>{j.params?.style || "原创音乐"}</p>
-                  <div className="music-card-meta">
-                    <time>{duration(j.timing?.audio_seconds)}</time>
-                    <span>{when(j.created_at)}</span>
-                  </div>
-                </div>
-                <div className="music-card-footer">
-                  <UnstyledButton
-                    className="music-review-entry"
-                    onClick={() =>
-                      usePlayerOverlay.getState().open(j.id, "reviews")
-                    }
-                    aria-label={`评分与乐评 ${titleOf(j)}`}
-                  >
-                    <MessageSquareText size={12} />
-                    {review?.manual_score != null ||
-                    review?.ai_score != null ? (
-                      <>
-                        {review.manual_score != null && (
-                          <span>
-                            我 <b>{review.manual_score.toFixed(1)}</b>
-                          </span>
-                        )}
-                        {review.ai_score != null && (
-                          <span>
-                            AI <b>{review.ai_score.toFixed(1)}</b>
-                          </span>
-                        )}
-                      </>
+                <Link
+                  className="simple-job-detail"
+                  to={`/generation/${encodeURIComponent(job.id)}`}
+                  aria-label={`查看 ${titleOf(job)} 的生成进度`}
+                >
+                  查看进度
+                </Link>
+                <IconButton
+                  label="取消生成"
+                  disabled={canceling === job.id}
+                  onClick={() => cancel(job)}
+                >
+                  <X size={18} />
+                </IconButton>
+              </article>
+            );
+          })}
+        </section>
+      )}
+      {selectedFailure && (
+        <section className="simple-failed" aria-label="本次生成未完成">
+          <UnfinishedSong job={selectedFailure} highlighted />
+        </section>
+      )}
+      {loading && !songs.length && !pending.length ? (
+        <div className="simple-library-loading" role="status">
+          <LoaderCircle size={23} className="spin" />
+          正在加载…
+        </div>
+      ) : songs.length === 0 && !error ? (
+        pending.length ? null : musicKind === "all" ? (
+          <EmptyState title="第一首歌，从你开始">
+            <Link className="btn primary" to="/home">
+              创作音乐
+            </Link>
+          </EmptyState>
+        ) : (
+          <EmptyState
+            title={`暂无${musicKind === "instrumental" ? "纯音乐" : "带歌词"}作品`}
+          />
+        )
+      ) : (
+        <div className="simple-song-list">
+          <div className="simple-song-columns" aria-hidden="true">
+            <span>#</span>
+            <span className="simple-song-column-track">作品</span>
+            <span>类型</span>
+            <span>时长</span>
+            <span>创建时间</span>
+            <span className="simple-song-column-actions">操作</span>
+          </div>
+          {songs.map((job, index) => {
+            const playing = player.current?.id === job.id && player.playing;
+            const download = songDownload(job, mp3);
+            const togglePlayback = () =>
+              playing ? player.toggle() : player.play(songs, index);
+            return (
+              <article
+                id={`song-${job.id}`}
+                key={job.id}
+                className={`simple-song ${job.id === selectedId ? "is-highlighted" : ""} ${playing ? "is-playing" : ""}`}
+              >
+                <span className="simple-song-number" aria-hidden="true">
+                  {String(index + 1).padStart(2, "0")}
+                </span>
+                <UnstyledButton
+                  className="simple-song-cover"
+                  aria-label={`${playing ? "暂停" : "播放"} ${titleOf(job)}`}
+                  onClick={togglePlayback}
+                >
+                  <Artwork job={job} size={62} />
+                  <span>
+                    {playing ? (
+                      <Pause size={22} fill="currentColor" />
                     ) : (
-                      <span>
-                        {review?.ai_status === "running"
-                          ? "AI 正在评析…"
-                          : review?.has_comment
-                            ? "查看我的评论"
-                            : "评分与乐评"}
-                      </span>
+                      <Play size={22} fill="currentColor" />
                     )}
-                  </UnstyledButton>
-                  <div className="music-card-actions">
-                    <IconButton
-                      label={`全屏播放 ${titleOf(j)}`}
-                      onClick={() => usePlayerOverlay.getState().open(j.id)}
-                    >
-                      <ArrowUpRight size={15} />
-                    </IconButton>
-                    <a
-                      href={songUrl(j.id, "audio.mp3")}
-                      download
-                      className="icon-btn"
-                      title="下载 MP3"
-                      aria-label={`下载 ${titleOf(j)}`}
-                    >
-                      <Download size={14} />
-                    </a>
-                    <IconButton
-                      label={`删除 ${titleOf(j)}`}
-                      onClick={() => setRemove(j)}
-                    >
-                      <Trash2 size={14} />
-                    </IconButton>
-                  </div>
+                  </span>
+                </UnstyledButton>
+                <UnstyledButton
+                  className="simple-song-title"
+                  onClick={() =>
+                    desktop ? togglePlayback() : openPlayer(job.id)
+                  }
+                  aria-label={`${desktop ? (playing ? "暂停" : "播放") : "打开"} ${titleOf(job)}`}
+                >
+                  <strong>{titleOf(job)}</strong>
+                  <small>
+                    {duration(job.timing?.audio_seconds)}
+                    <i>·</i>
+                    {when(job.created_at)}
+                  </small>
+                </UnstyledButton>
+                <span className="simple-song-kind simple-song-desktop-meta">
+                  {draftFromJob(job).musicKind === "instrumental"
+                    ? "纯音乐"
+                    : "带歌词"}
+                </span>
+                <span className="simple-song-duration simple-song-desktop-meta">
+                  {duration(job.timing?.audio_seconds)}
+                </span>
+                <time
+                  className="simple-song-date simple-song-desktop-meta"
+                  dateTime={job.created_at}
+                >
+                  {when(job.created_at)}
+                </time>
+                <div className="simple-song-actions">
+                  <Link
+                    className="simple-song-action simple-song-edit"
+                    to={`/generation/${encodeURIComponent(job.id)}`}
+                    aria-label={`微调 ${titleOf(job)}`}
+                    title="微调"
+                  >
+                    <SlidersHorizontal size={18} />
+                    <span>微调</span>
+                  </Link>
+                  <a
+                    className="simple-song-action"
+                    href={download.url}
+                    download={download.name}
+                    aria-label={`下载 ${titleOf(job)}`}
+                    title="下载"
+                  >
+                    <Download size={19} />
+                    <span>下载</span>
+                  </a>
+                  <button
+                    className="simple-song-action"
+                    onClick={() => setSharing(job)}
+                    aria-label={`分享 ${titleOf(job)}`}
+                    title="分享"
+                  >
+                    <Share2 size={19} />
+                    <span>分享</span>
+                  </button>
+                  <button
+                    className="simple-song-action simple-song-open"
+                    onClick={() => openPlayer(job.id)}
+                    aria-label={`打开 ${titleOf(job)} 的播放页`}
+                    title="打开播放页"
+                  >
+                    <Maximize2 size={17} />
+                  </button>
                 </div>
               </article>
             );
           })}
         </div>
       )}
-      {publishJob && (
-        <PublishDialog
-          job={publishJob === "choose" ? undefined : publishJob}
-          onClose={() => setPublishJob(null)}
-          onPublished={() => navigate("/plaza")}
-        />
-      )}
-      {jobs.length < total && (
-        <div className="library-more">
-          <Button disabled={busy} onClick={() => load(true)}>
-            加载更多 · {jobs.length} / {total}
+      {songs.length < total && (
+        <div className="simple-library-more">
+          <Button
+            disabled={loading}
+            onClick={() => setLimit((value) => value + 40)}
+          >
+            {loading ? "加载中…" : "查看更多"}
           </Button>
         </div>
       )}
-      <details
-        className="library-history"
-        open={params.get("history") === "1" || undefined}
-      >
-        <summary>
-          未完成记录 <span>{failed.length}</span>
-        </summary>
-        <div className="stack">
-          {failed.length ? (
-            failed.map((j) => (
-              <div className="history-row" key={j.id}>
-                <div>
-                  <strong>{titleOf(j)}</strong>
-                  <p>{errorMessage(j.error || "任务已取消")}</p>
-                </div>
-                <Badge tone={j.status === "failed" ? "err" : "neutral"}>
-                  {j.status === "failed" ? "失败" : "已取消"}
-                </Badge>
-                <Link className="btn ghost" to={`/create?from=${j.id}`}>
-                  <RefreshCw size={13} />
-                  重试创作
-                </Link>
-                <IconButton
-                  label={`删除记录 ${titleOf(j)}`}
-                  onClick={() => setRemove(j)}
-                >
-                  <Trash2 size={14} />
-                </IconButton>
-              </div>
-            ))
-          ) : (
-            <p className="muted">没有未完成记录。</p>
-          )}
-        </div>
-      </details>
-      <UploadsPanel />
-      {attach && (
-        <Dialog
-          title={`收录 ${selected.length} 首作品`}
-          onClose={() => {
-            if (!busy) {
-              setAttach(false);
-              setMoveConfirm(false);
-            }
-          }}
-        >
-          <ProjectPicker
-            onPick={(next) => {
-              setTarget(next);
-              setMoveConfirm(false);
-            }}
-            initialTrack={params.get("attach") || undefined}
-          />
-          {moveConfirm && (
-            <p className="library-move-notice" role="alert">
-              部分作品已属于其他曲目。继续会将它们移动到当前曲目，保留已有评价。
-            </p>
-          )}
-          <div className="dialog-actions">
-            <Button
-              disabled={busy}
-              onClick={() => {
-                setAttach(false);
-                setMoveConfirm(false);
-              }}
-            >
-              取消
-            </Button>
-            <Button
-              variant="primary"
-              disabled={!target || busy}
-              onClick={() => attachSelected(moveConfirm)}
-            >
-              {moveConfirm ? "移动并收录" : "确认收录"}
-            </Button>
+      {previousFailures.length > 0 && (
+        <details className="simple-failed-history">
+          <summary>未完成（{previousFailures.length}）</summary>
+          <div className="simple-failed">
+            {previousFailures.map((job) => (
+              <UnfinishedSong key={job.id} job={job} />
+            ))}
           </div>
-        </Dialog>
+        </details>
       )}
-      {batchRemove && (
-        <Dialog
-          title="删除所选作品"
-          onClose={() => {
-            if (!busy) setBatchRemove(false);
-          }}
-        >
-          <p>
-            删除所选的 {selected.length} 首作品及其生成文件？此操作无法撤销。
-          </p>
-          <div className="dialog-actions">
-            <Button disabled={busy} onClick={() => setBatchRemove(false)}>
-              保留
-            </Button>
-            <Button variant="danger" disabled={busy} onClick={deleteSelected}>
-              {busy ? "正在删除…" : "删除所选"}
-            </Button>
-          </div>
-        </Dialog>
-      )}
-      {remove && (
-        <Dialog title="删除作品" onClose={() => setRemove(null)}>
-          <p>删除《{titleOf(remove)}》及其生成文件？此操作无法撤销。</p>
-          <div className="dialog-actions">
-            <Button onClick={() => setRemove(null)}>保留</Button>
-            <Button variant="danger" disabled={busy} onClick={deleteJob}>
-              删除作品
-            </Button>
-          </div>
-        </Dialog>
+      {sharing && (
+        <ShareSongDialog job={sharing} onClose={() => setSharing(null)} />
       )}
     </div>
   );

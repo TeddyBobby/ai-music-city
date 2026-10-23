@@ -1,0 +1,120 @@
+.as-message-avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 34px;
+  border-radius: 50%;
+  font-size: 14px;
+  font-weight: 600;
+  user-select: none;
+}
+.as-avatar-assistant {
+  color: var(--accent-ink);
+  background: var(--accent);
+}
+.as-avatar-user {
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface));
+}
+.as-message-body {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  max-width: calc(100% - 46px);
+}
+.as-message-assistant .as-message-body {
+  flex: 1;
+}
+.as-message-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 24px;
+  margin-bottom: 7px;
+  padding-inline: 4px;
+  font-size: 12px;
+  color: var(--muted);
+}
+.as-answering {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+  font-size: 12px;
+}
+.as-message-user .as-message-avatar {
+  order: 2;
+}
+.as-message-user .as-message-body {
+  align-items: flex-end;
+  max-width: min(85%, calc(100% - 46px));
+}
+.as-message-user .as-message-body .as-message-content {
+  max-width: 100%;
+}
+.as-message-user .as-message-meta {
+  justify-content: flex-end;
+}
+.as-message-tools {
+  display: flex;
+  align-items: center;
+  margin-top: 6px;
+}
+.as-draft-topline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  min-height: 24px;
+}
+.as-draft-topline .assistant-copy-button {
+  margin-block: -8px;
+}
+@media (max-width: 760px) {
+  .as-message-avatar {
+    width: 28px;
+    height: 28px;
+    flex-basis: 28px;
+    font-size: 12px;
+  }
+  .as-message-body {
+    max-width: calc(100% - 36px);
+  }
+  .as-message-user .as-message-body {
+    max-width: calc(100% - 36px);
+  }
+  .as-message-meta {
+    min-height: 22px;
+    margin-bottom: 5px;
+    padding-inline: 0;
+    gap: 10px;
+    font-size: 11px;
+  }
+  .as-message-assistant .as-message-content {
+    padding-inline: 0;
+  }
+  .as-message-tools {
+    margin-top: 0;
+  }
+  .as-draft-topline {
+    gap: 4px;
+  }
+  .as-message-content .as-song-draft {
+    padding: 14px;
+  }
+  .as-draft-actions {
+    gap: 8px;
+  }
+  .as-draft-actions .music-kind-option > span {
+    padding-inline: 8px;
+    font-size: 12px;
+  }
+  .as-draft-actions .music-kind-option svg {
+    display: none;
+  }
+  .as-draft-actions > .btn {
+    min-height: 44px;
+  }
+}
