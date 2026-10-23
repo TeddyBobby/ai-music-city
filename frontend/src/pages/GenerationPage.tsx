@@ -79,6 +79,17 @@ function elapsed(job: Job, now: number) {
 
 export function GenerationPage() {
   const { id } = useParams();
+  // composing：点击生成后、任务提交前的占位页（AI 写词中），生命周期从这里开始展示
+  if (id === "composing")
+    return (
+      <div className="generation-empty">
+        <LoaderCircle className="spin" size={28} />
+        <h1>AI 正在创作歌词…</h1>
+        <p role="status">
+          根据你的描述补全歌词与曲风，写好后会自动进入生成队列，这里会展示每一步进度。
+        </p>
+      </div>
+    );
   return id ? <GenerationWorkspace key={id} id={id} /> : null;
 }
 

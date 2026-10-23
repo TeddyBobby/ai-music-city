@@ -102,30 +102,37 @@ export function HomePage() {
   async function generate(event: FormEvent) {
     event.preventDefault();
     if (!prompt.trim() || busy || controller.current) return;
-    const current = new AbortController();
-    controller.current = current;
-    setError("");
-    setPhase("checking");
     // 未登录（游客）：直接跳登录页，不带提示语
     const user = useAuth.getState().user;
     if (!user) {
-      controller.current = null;
-      setPhase(null);
       void navigate("/login");
       return;
     }
+    const current = new AbortController();
+    controller.current = current;
+    setError("");
+    // 立即跳到生成页（占位任务）：生命周期展示从点击那一刻开始
+    try {
+      sessionStorage.setItem("music.composing", prompt);
+    } catch {}
+    navigate("/generation/composing");
     try {
       const job = await generateFromPrompt(prompt, {
         signal: current.signal,
         musicKind,
-        onPhase: setPhase,
       });
-      if (!current.signal.aborted) created(job);
+      if (!current.signal.aborted) {
+        sessionStorage.removeItem("music.composing");
+        created(job);
+      }
     } catch (failure) {
       if (!current.signal.aborted)
         setError(
           failure instanceof Error ? failure.message : "生成失败，请重试。",
         );
+      sessionStorage.removeItem("music.composing");
+      // 失败时把人带回创作页，展示错误
+      void navigate("/home");
     } finally {
       if (controller.current === current) {
         controller.current = null;
