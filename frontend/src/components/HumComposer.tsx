@@ -4,8 +4,6 @@ import { api } from "../lib/api";
 import { accountFetch } from "../lib/accountBoundary";
 import {
   defaultMusicOptions,
-  musicDraftForEngine,
-  prepareMusicDraft,
   type MusicKind,
 } from "../lib/musicCreation";
 import type { Job } from "../lib/types";
@@ -266,25 +264,24 @@ export function HumComposer({
         throw new Error("音频上传失败，请检查文件后重试。");
       if (typeof uploaded.seconds === "number" && uploaded.seconds < 1)
         throw new Error("这段哼唱太短了，请至少录制 1 秒。");
-      const { draft, loras } = musicDraftForEngine(
-        await prepareMusicDraft(
-          idea.trim() ||
-            (musicKind === "instrumental"
-              ? "围绕哼唱旋律，创作一段温暖明亮的原声配乐"
-              : "围绕轻快明亮的旋律，创作一首温暖的中文流行歌曲"),
-          { signal: controller.signal, musicKind, onPhase: changePhase },
-        ),
-        status,
-        musicKind,
-      );
       if (!current()) return;
       changePhase("submitting");
+      // 服务端写词：只传描述（description），任务创建后 worker 先 AI 写词再生成，
+      // 生命周期页会展示“AI 写词”阶段。
       const result = await api.submit({
         kind: "hum",
         ...defaultMusicOptions(status),
-        loras,
+        loras: [],
         params: {
-          ...draft,
+          title: null,
+          style: "",
+          lyrics: "",
+          description:
+            idea.trim() ||
+            (musicKind === "instrumental"
+              ? "围绕哼唱旋律，创作一段温暖明亮的纯音乐配乐，无人声"
+              : "围绕哼唱旋律，创作一首温暖的中文流行歌曲，轻快明亮"),
+          music_kind: musicKind,
           upload_id: uploaded.upload_id,
           melody: "continue",
           adapter: status.hum.adapters?.[0] || null,

@@ -124,6 +124,7 @@ export function HomePage() {
           style: "",
           lyrics: "",
           description: prompt.trim(),
+          music_kind: musicKind,
           cot: "full",
           seed: null,
           cfg_scale: null,

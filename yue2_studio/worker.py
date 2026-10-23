@@ -270,15 +270,52 @@ def _error_text(error: BaseException) -> str:
 # ---------------------------------------------------------------------------------------------
 
 
-def _ai_complete_draft(description: str) -> dict:
+def _ai_complete_draft(description: str, music_kind: str = "vocal") -> dict:
     """用平台配置的 Agent（GLM）把一句话描述补全为完整创作方案。
 
+    music_kind="instrumental" 时不写歌词（引擎按纯音乐处理）。
     返回 {"title":…, "style":…, "lyrics":…}；失败抛异常（由 _run_job 兜底为 failed）。
     """
     import httpx
     from yue2_studio.assistant_service import provider_headers, endpoint_url
 
     cfg = _assistant_cfg()
+    if music_kind == "instrumental":
+        system = (
+            "你是专业的音乐制作人。根据用户的一句话想法，输出一段纯音乐（无人声）的创作方案。"
+            "只输出一个 JSON 对象，不要任何解释或 markdown 代码块。字段："
+            '{"title": "曲名(20字内)", "style": "英文风格标签(逗号分隔, 如 cinematic piano, ambient, warm strings, no vocals)"}'
+        )
+        body = {
+            "model": cfg.get("hermes_model") or "ZhipuAi/GLM-5.3",
+            "messages": [
+                {"role": "system", "content": system},
+                {"role": "user", "content": f"创作想法：{description}"},
+            ],
+            "stream": False,
+            "max_tokens": 600,
+        }
+        with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
+            resp = client.post(
+                endpoint_url(cfg["hermes_base_url"], "chat/completions"),
+                headers=provider_headers(cfg),
+                json=body,
+            )
+            resp.raise_for_status()
+            text = resp.json()["choices"][0]["message"]["content"].strip()
+        import re as _re
+        m = _re.search(r"\{[\s\S]*\}", text)
+        if not m:
+            raise ValueError("AI 方案返回无法解析")
+        data = json.loads(m.group(0))
+        for key in ("title", "style"):
+            if not isinstance(data.get(key), str) or not data[key].strip():
+                raise ValueError(f"AI 方案缺少字段 {key}")
+        return {
+            "title": data["title"].strip(),
+            "style": f"{data['style'].strip()}, instrumental, no vocals",
+            "lyrics": "纯音乐",
+        }
     system = (
         "你是专业的词曲创作助手。根据用户的一句话想法，输出一个可执行的歌曲创作方案。"
         "只输出一个 JSON 对象，不要任何解释或 markdown 代码块。字段："
@@ -622,14 +659,21 @@ class Worker:
         # AI 写词阶段：一句话描述（description）在任务内先补全为 style/lyrics。
         # 用户点击生成立即拿到任务 ID 并跳转详情页，写词成为任务生命周期的第一阶段。
         params = dict(job.params or {})
-        if job.kind in {"create", "regenerate"} and params.get("description") and not (params.get("lyrics") and params.get("style")):
+        if job.kind in {"create", "regenerate", "hum"} and params.get("description") and not (params.get("lyrics") and params.get("style")):
             try:
                 if cancel.is_set():
                     raise InterruptedError("Cancelled before start")
                 self._publish(job.id, normalise({
                     "type": "stage", "stage": "AI writing lyrics", "completed": 0, "total": None,
                     "status": "running", "ts": time.time()}, job.id))
-                draft = _ai_complete_draft(params["description"])
+                _desc = params["description"] or ""
+                _kind = "instrumental" if (
+                    params.get("music_kind") == "instrumental"
+                    or "纯音乐" in _desc
+                    or "instrumental" in _desc.lower()
+                    or "无人声" in _desc
+                ) else "vocal"
+                draft = _ai_complete_draft(_desc, _kind)
                 params.update({"style": draft["style"], "lyrics": draft["lyrics"]})
                 if params.get("title") is None:
                     params["title"] = draft["title"]

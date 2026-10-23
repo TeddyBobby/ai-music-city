@@ -116,7 +116,9 @@ class SemanticSamplingLimit(BaseModel):
 class CreateParams(_Params):
     # description: 用户的一句话想法。提供时 style/lyrics 可为空，
     # 由 worker 先调 AI 补全歌词（“AI 写词”阶段）再进入引擎生成。
+    # music_kind: "vocal"（带词人声）或 "instrumental"（纯音乐，AI 不写词）。
     description: str | None = None
+    music_kind: Literal["vocal", "instrumental"] | None = None
     style: str = ""
     lyrics: str = ""
     cot: Literal["full", "melody", "off"] = "full"
@@ -229,11 +231,15 @@ class CoverParams(_Params):
 
 
 class HumParams(_Params):
-    """Hum-to-song: an uploaded/recorded hum, style + lyrics, and the ``yue2_studio.hum.HumOptions``."""
+    """Hum-to-song: an uploaded/recorded hum, style + lyrics, and the ``yue2_studio.hum.HumOptions``.
+
+    提供 description 时 style/lyrics 可为空，由 worker 先 AI 写词再生成（与 create 一致）。
+    """
 
     upload_id: str
-    style: str
-    lyrics: str
+    description: str | None = None
+    style: str = ""
+    lyrics: str = ""
     seed: int | None = None
     title: str | None = None
     melody: Literal["continue", "hum_only", "ignore"] = "continue"
@@ -247,15 +253,19 @@ class HumParams(_Params):
     def _cfg(cls, v):
         return _check_cfg(v)
 
-    @field_validator("style")
+    @field_validator("style", "lyrics")
     @classmethod
-    def _style(cls, v):
-        return _non_empty(v, "style")
+    def _style_lyrics(cls, v):
+        return (v or "").strip()
 
-    @field_validator("lyrics")
+    @field_validator("description")
     @classmethod
-    def _lyrics(cls, v):
-        return _non_empty(v, "lyrics")
+    def _description(cls, v):
+        return v if v is None or v.strip() else None
+
+    def check(self) -> None:
+        if not (self.description or (self.style and self.lyrics)):
+            raise ValidationFailure("提供一句话描述（description），或同时给出风格（style）与歌词（lyrics）")
 
     @field_validator("seed")
     @classmethod
@@ -1432,6 +1442,8 @@ def _create_params_dict(p: CreateParams, seed: int) -> dict:
               "cfg_scale": p.cfg_scale, "abc": p.abc, "title": p.title}
     if p.description:
         params["description"] = p.description
+    if getattr(p, "music_kind", None):
+        params["music_kind"] = p.music_kind
     for name in ("abc_sampling", "semantic_sampling"):
         value = getattr(p, name)
         if value is not None:
