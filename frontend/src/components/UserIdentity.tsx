@@ -1,10 +1,9 @@
 import { useState } from "react";
 import { Avatar, Popover, Tooltip, UnstyledButton } from "@mantine/core";
-import { ArrowUpRight, ChevronDown, Disc3, UserRound } from "lucide-react";
-import { Link } from "react-router-dom";
+import { ArrowUpRight, ChevronDown, Disc3, LogIn, LogOut, UserRound } from "lucide-react";
+import { Link, useNavigate } from "react-router-dom";
+import { useAuth } from "../state/auth";
 import "./UserIdentity.css";
-
-const creatorName = "本机创作者";
 
 export function UserIdentity({
   withinPortal = true,
@@ -12,6 +11,9 @@ export function UserIdentity({
   withinPortal?: boolean;
 }) {
   const [opened, setOpened] = useState(false);
+  const { user, logout } = useAuth();
+  const nav = useNavigate();
+  const name = user?.email || "游客";
 
   return (
     <div className="user-identity" aria-label="用户身份">
@@ -29,7 +31,7 @@ export function UserIdentity({
         withinPortal={withinPortal}
       >
         <Tooltip
-          label={`${creatorName} · 未登录`}
+          label={user ? `${name} · 已登录` : "未登录"}
           position="bottom-end"
           openDelay={350}
           disabled={opened}
@@ -39,7 +41,7 @@ export function UserIdentity({
             <UnstyledButton
               type="button"
               className="user-identity-trigger"
-              aria-label={`用户身份：${creatorName}，未登录`}
+              aria-label={`用户身份：${name}${user ? "，已登录" : "，未登录"}`}
               onClick={() => setOpened((value) => !value)}
             >
               <Avatar
@@ -51,8 +53,8 @@ export function UserIdentity({
                 <UserRound size={17} strokeWidth={1.7} />
               </Avatar>
               <span className="user-identity-label">
-                <strong>{creatorName}</strong>
-                <small>未登录</small>
+                <strong>{user ? name.split("@")[0] : "未登录"}</strong>
+                <small>{user ? "已登录" : "点击登录"}</small>
               </span>
               <ChevronDown
                 size={13}
@@ -64,7 +66,7 @@ export function UserIdentity({
         </Tooltip>
         <Popover.Dropdown
           className="user-identity-popover"
-          aria-label="本机用户身份"
+          aria-label="用户身份"
         >
           <div className="user-identity-summary">
             <Avatar
@@ -76,13 +78,40 @@ export function UserIdentity({
               <UserRound size={21} strokeWidth={1.7} />
             </Avatar>
             <div>
-              <strong>{creatorName}</strong>
-              <span>本机身份</span>
+              <strong>{user ? name : "游客"}</strong>
+              <span>{user ? "邮箱账号" : "未登录"}</span>
             </div>
           </div>
-          <p className="user-identity-note">
-            当前使用本机工作台。账号登录将在网站版本接入。
-          </p>
+          {!user ? (
+            <>
+              <p className="user-identity-note">
+                登录后可保存作品与创作助手会话。
+              </p>
+              <UnstyledButton
+                component={Link}
+                to="/login"
+                className="user-identity-link"
+                onClick={() => setOpened(false)}
+              >
+                <LogIn size={16} aria-hidden="true" />
+                <span>邮箱快捷登录</span>
+                <ArrowUpRight size={15} aria-hidden="true" />
+              </UnstyledButton>
+            </>
+          ) : (
+            <UnstyledButton
+              type="button"
+              className="user-identity-link"
+              onClick={async () => {
+                setOpened(false);
+                await logout();
+                nav("/home");
+              }}
+            >
+              <LogOut size={16} aria-hidden="true" />
+              <span>退出登录</span>
+            </UnstyledButton>
+          )}
           <UnstyledButton
             component={Link}
             to="/plaza"

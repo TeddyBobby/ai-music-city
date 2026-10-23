@@ -627,7 +627,7 @@ function SongReviewsContent({ job }: { job: Job }) {
             disabled={saving}
           />
           <div className="song-review-comment-meta">
-            <span>仅保存在本机</span>
+            <span>保存在服务端</span>
             <span>{comment.length} / 4000</span>
           </div>
           {manualError && (

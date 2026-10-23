@@ -13,17 +13,12 @@ export interface AssistantStatus {
 }
 export interface AssistantConfig {
   hermes_base_url: string;
-  hermes_model: string;
   has_hermes_api_key: boolean;
-  image_provider: "disabled" | "hermes-codex" | "openai-compatible";
-  image_base_url: string;
-  image_model: string;
-  has_image_api_key: boolean;
 }
 export type AssistantConfigPatch = Omit<
   AssistantConfig,
-  "has_hermes_api_key" | "has_image_api_key"
-> & { hermes_api_key?: string; image_api_key?: string };
+  "has_hermes_api_key"
+> & { hermes_api_key?: string };
 export type AssistantMode = "chat" | "lyrics" | "style" | "cover_prompt";
 export interface Suggestion {
   title?: string;
@@ -119,7 +114,7 @@ async function response(
     throw new AssistantError(
       0,
       "network_error",
-      "无法连接本地工作台，请确认服务仍在运行。",
+      "连接失败，请稍后重试。",
     );
   }
   if (!result.ok) {

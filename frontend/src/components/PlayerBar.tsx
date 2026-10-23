@@ -32,6 +32,8 @@ export function PlayerBar() {
     locked: queueOpen || fullscreenOpen || pointerInside || focusInside || dragging,
     resetKey: `${location.key}:${p.current?.id ?? ""}`,
   });
+  // 无播放内容时整个播放条不渲染
+  if (!p.current && !p.queue.length) return null;
   useEffect(() => {
     if (!dragging) return;
     const release = () => setDragging(false);

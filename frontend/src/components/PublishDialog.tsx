@@ -109,7 +109,7 @@ export function PublishDialog({
       const { post } = await plazaApi.publish(chosen.id, caption.trim());
       removeStore(`plaza.draft.${chosen.id}`);
       notifyPlazaUpdated(chosen.id);
-      toast(existing ? "发布内容已更新。" : "已发布到本机广场。", "ok");
+      toast(existing ? "发布内容已更新。" : "已发布到音乐广场。", "ok");
       if (mounted.current) {
         onPublished?.(post);
         onClose();
@@ -141,8 +141,8 @@ export function PublishDialog({
           <UserRound size={16} />
         </Avatar>
         <span>
-          <strong>本机创作者</strong>
-          <small>本机身份 · 尚未连接在线账号</small>
+          <strong>创作者</strong>
+          <small>登录后显示昵称</small>
         </span>
       </div>
       {!job && (
@@ -229,7 +229,7 @@ export function PublishDialog({
       <div className="publish-scope">
         <Globe2 size={15} />
         <span>
-          <strong>本机广场预览</strong>当前仅保存在这台电脑，不会上传到互联网。
+          <strong>广场预览</strong>发布后对访问者可见。
         </span>
       </div>
       <div className="dialog-actions">

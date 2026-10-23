@@ -239,7 +239,7 @@ export function AlbumPublishDialog({
       )
         removeStore(draftKey);
       notifyPlazaUpdated(published.id);
-      toast(album ? "专辑发布已更新。" : "专辑已发布到本机广场。", "ok");
+      toast(album ? "专辑发布已更新。" : "专辑已发布到音乐广场。", "ok");
       if (
         mounted.current &&
         epoch.current === saveEpoch &&
@@ -279,8 +279,8 @@ export function AlbumPublishDialog({
           <UserRound size={16} />
         </Avatar>
         <span>
-          <strong>本机创作者</strong>
-          <small>本机身份 · 尚未连接在线账号</small>
+          <strong>创作者</strong>
+          <small>登录后显示昵称</small>
         </span>
       </div>
       <TextInput
@@ -449,7 +449,7 @@ export function AlbumPublishDialog({
       <div className="album-publish-scope">
         <Globe2 size={15} />
         <span>
-          <strong>本机广场预览</strong>当前仅保存在这台电脑，不会上传到互联网。
+          <strong>广场预览</strong>发布后对访问者可见。
         </span>
       </div>
       {saveError && (

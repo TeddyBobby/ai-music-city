@@ -129,35 +129,39 @@ class AssistantService:
 
     def public_config(self):
         cfg = self.config()
-        return {**{k: cfg[k] for k in ('hermes_base_url', 'hermes_model', 'image_provider',
-                                       'image_base_url', 'image_model')},
-                'has_hermes_api_key': bool(cfg.get('hermes_api_key')),
-                'has_image_api_key': bool(cfg.get('image_api_key'))}
+        return {**{k: cfg[k] for k in ('hermes_base_url',)},
+                'has_hermes_api_key': bool(cfg.get('hermes_api_key'))}
 
     def update_config(self, patch):
         cfg = self.config()
-        allowed = {'hermes_base_url', 'hermes_model', 'hermes_api_key', 'image_provider',
-                   'image_base_url', 'image_model', 'image_api_key'}
+        allowed = {'hermes_base_url', 'hermes_api_key'}
         if set(patch) - allowed:
             raise ApiError(400, 'validation_error', '未知配置字段')
         for k, v in patch.items():
             if not isinstance(v, str) or len(v) > 4096:
                 raise ApiError(400, 'validation_error', '配置字段必须为文本')
         new = {**cfg, **patch}
-        new['hermes_base_url'] = _safe_url(new['hermes_base_url'], local=True)
-        if new['image_provider'] not in {'disabled', 'hermes-codex', 'openai-compatible'}:
-            raise ApiError(400, 'validation_error', '不支持的图片服务')
-        if new['image_provider'] == 'openai-compatible' and new['image_base_url']:
-            new['image_base_url'] = _safe_url(new['image_base_url'])
-        if new['image_provider'] == 'hermes-codex' and new['image_model'] not in {
-            'gpt-image-2-low', 'gpt-image-2-medium', 'gpt-image-2-high',
-        }:
-            raise ApiError(400, 'validation_error', 'Hermes Codex 支持 GPT Image 2 Low / Medium / High')
-        if any(new[k] != cfg[k] for k in allowed if k.startswith('image_')):
-            new['image_verified'] = False
+        new['hermes_base_url'] = _safe_url(new['hermes_base_url'])
+        new['image_provider'] = 'disabled'
         self._save_config(new)
         self.last_chat_check = None
         return self.public_config()
+
+    async def auto_model(self, cfg):
+        """Auto-pick a chat model from the provider's /v1/models list."""
+        try:
+            async with httpx.AsyncClient(timeout=8, trust_env=False) as client:
+                response = await client.get(cfg['hermes_base_url'].removesuffix('/v1') + '/v1/models',
+                                            headers={'Authorization': 'Bearer ' + cfg['hermes_api_key']})
+                data = response.json().get('data') or []
+                ids = [m.get('id') for m in data if m.get('id')]
+                if not ids:
+                    return None
+                cfg['hermes_model'] = ids[0]
+                self._save_config(cfg)
+                return ids[0]
+        except (httpx.HTTPError, ValueError):
+            return None
 
     def model_info(self):
         try:
@@ -169,8 +173,10 @@ class AssistantService:
 
     async def status(self, *, refresh=False):
         cfg = self.config()
+        if not cfg.get('hermes_model') or cfg['hermes_model'] == 'hermes-agent':
+            await self.auto_model(cfg)
         chat = {'configured': bool(cfg['hermes_base_url'] and cfg['hermes_api_key']), 'available': False,
-                'model': cfg['hermes_model'],
+                'model': cfg.get('hermes_model') or '',
                 'provider': 'agent', 'base_url': cfg['hermes_base_url'], 'message': 'Agent 尚未连接'}
         if chat['configured']:
             if refresh or not self.last_chat_check or time.monotonic() - self.last_chat_check[0] > 20:
@@ -185,14 +191,9 @@ class AssistantService:
                 self.last_chat_check = (time.monotonic(), ok, message)
             chat.update(available=self.last_chat_check[1], message=self.last_chat_check[2])
         configured = False
-        if cfg['image_provider'] == 'hermes-codex':
-            configured = self.hermes_python().exists() and (self.hermes_home / 'auth.json').exists()
-        elif cfg['image_provider'] == 'openai-compatible':
-            configured = bool(cfg['image_base_url'] and cfg['image_api_key'] and cfg['image_model'])
-        image = {'configured': configured, 'available': configured, 'verified': bool(cfg.get('image_verified')),
-                 'model': cfg['image_model'], 'provider': cfg['image_provider'],
-                 'message': '已通过真实封面生成验证' if cfg.get('image_verified') and configured else
-                    ('凭证已配置，首次生成将验证图片能力' if configured else '尚未配置图片服务')}
+        image = {'configured': False, 'available': False, 'verified': False,
+                 'model': '', 'provider': 'disabled',
+                 'message': '图片生成暂未开放'}
         return {'chat': chat, 'image': image}
 
     def sessions(self):

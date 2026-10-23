@@ -1414,10 +1414,6 @@ function CoverPanel({ initialJob }: { initialJob: string }) {
 
 const emptyConfig: AssistantConfigPatch = {
   hermes_base_url: "",
-  hermes_model: "",
-  image_provider: "disabled",
-  image_base_url: "",
-  image_model: "",
 };
 function ConnectionsPanel() {
   const toast = useApp((state) => state.toast),
@@ -1443,10 +1439,6 @@ function ConnectionsPanel() {
         setConfig(saved.value);
         setValues({
           hermes_base_url: saved.value.hermes_base_url,
-          hermes_model: saved.value.hermes_model,
-          image_provider: saved.value.image_provider,
-          image_base_url: saved.value.image_base_url,
-          image_model: saved.value.image_model,
         });
         setNotice("凭证不回显，留空保持现有凭证。");
       } else {
@@ -1481,16 +1473,12 @@ function ConnectionsPanel() {
     setNotice(save ? "正在保存并检测…" : "正在分别检测对话与图片能力…");
     try {
       if (save) {
-        const patch: AssistantConfigPatch = {
-          ...values,
-          hermes_model: values.hermes_model.trim() || "Agent-agent",
-        };
+        const patch: AssistantConfigPatch = { ...values };
         if (!patch.hermes_api_key?.trim()) delete patch.hermes_api_key;
-        if (!patch.image_api_key?.trim()) delete patch.image_api_key;
         const saved = await assistantApi.saveConfig(patch, controller.signal);
         if (!alive.current) return;
         setConfig(saved);
-        setValues((old) => ({ ...old, hermes_api_key: "", image_api_key: "" }));
+        setValues((old) => ({ ...old, hermes_api_key: "" }));
       }
       const result = await assistantApi.check(controller.signal);
       if (alive.current) {
@@ -1539,16 +1527,6 @@ function ConnectionsPanel() {
             />
           </label>
           <label className="field">
-            对话模型
-            <Input
-              aria-label="对话模型"
-              value={values.hermes_model}
-              placeholder="留空沿用 Agent 当前模型"
-              disabled={busy}
-              onChange={(event) => update("hermes_model", event.target.value)}
-            />
-          </label>
-          <label className="field">
             访问凭证
             <Input
               type="password"
@@ -1558,105 +1536,12 @@ function ConnectionsPanel() {
               placeholder={
                 config?.has_hermes_api_key
                   ? "已保存 · 留空不修改"
-                  : "留空沿用本机凭证"
+                  : "未配置"
               }
               disabled={busy}
               onChange={(event) => update("hermes_api_key", event.target.value)}
             />
           </label>
-          <hr />
-          <strong>封面生成</strong>
-          <label className="field">
-            图片服务
-            <Select
-              aria-label="图片服务"
-              value={values.image_provider}
-              disabled={busy}
-              onChange={(event) =>
-                setValues((old) => ({
-                  ...old,
-                  image_provider: event.target
-                    .value as AssistantConfigPatch["image_provider"],
-                  image_model:
-                    event.target.value === "hermes-codex" &&
-                    !old.image_model.startsWith("gpt-image-2-")
-                      ? "gpt-image-2-low"
-                      : old.image_model,
-                }))
-              }
-            >
-              <option value="hermes-codex">Agent · ChatGPT 图片能力</option>
-              <option value="openai-compatible">自定义图片服务</option>
-              <option value="disabled">暂不启用</option>
-            </Select>
-          </label>
-          {values.image_provider === "hermes-codex" && (
-            <>
-              <label className="field">
-                图片模型
-                <Select
-                  aria-label="图片模型"
-                  value={values.image_model}
-                  disabled={busy}
-                  onChange={(event) =>
-                    update("image_model", event.target.value)
-                  }
-                >
-                  <option value="gpt-image-2-low">GPT Image 2 · 快速</option>
-                  <option value="gpt-image-2-medium">GPT Image 2 · 标准</option>
-                  <option value="gpt-image-2-high">GPT Image 2 · 高质量</option>
-                </Select>
-              </label>
-              <p className="muted small">
-                复用本机 Agent 的 ChatGPT 登录，无需另填密钥。
-              </p>
-            </>
-          )}
-          {values.image_provider === "openai-compatible" && (
-            <>
-              <label className="field">
-                服务地址
-                <Input
-                  type="url"
-                  aria-label="图片服务地址"
-                  value={values.image_base_url}
-                  disabled={busy}
-                  onChange={(event) =>
-                    update("image_base_url", event.target.value)
-                  }
-                />
-              </label>
-              <label className="field">
-                图片模型
-                <Input
-                  aria-label="自定义图片模型"
-                  value={values.image_model}
-                  disabled={busy}
-                  onChange={(event) =>
-                    update("image_model", event.target.value)
-                  }
-                />
-              </label>
-              <label className="field">
-                访问凭证
-                <Input
-                  type="password"
-                  autoComplete="new-password"
-                  aria-label="图片访问凭证"
-                  value={values.image_api_key || ""}
-                  placeholder={
-                    config?.has_image_api_key
-                      ? "已保存 · 留空不修改"
-                      : "填写图片服务凭证"
-                  }
-                  disabled={busy}
-                  onChange={(event) =>
-                    update("image_api_key", event.target.value)
-                  }
-                />
-              </label>
-            </>
-          )}
           <div className="row">
             <Button variant="primary" type="submit" disabled={busy || !config}>
               {busy ? "正在检测…" : "保存并检测"}
@@ -1678,7 +1563,6 @@ function ConnectionsPanel() {
           {(
             [
               ["对话与创作建议", status?.chat],
-              ["封面生成", status?.image],
             ] as [string, AssistantCapability | undefined][]
           ).map(([label, capability]) => (
             <section className="as-capability" key={label}>
@@ -1694,7 +1578,7 @@ function ConnectionsPanel() {
           ))}
           <p className="muted small">
             Agent
-            在本机运行。模型是否联网，取决于所选服务。凭证仅由本机服务保存，不写入对话与作品。
+            在服务在线。模型是否联网，取决于所选服务。凭证仅由本机服务保存，不写入对话与作品。
           </p>
           <p className="muted small">
             工作台会话独立保存，不导入其他 Agent 对话。

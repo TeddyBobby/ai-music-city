@@ -44,6 +44,8 @@ import { CreatePage } from "./pages/CreatePage";
 import { QueuePage } from "./pages/QueuePage";
 import { LibraryPage } from "./pages/LibraryPage";
 import { AssistantPage } from "./pages/AssistantPage";
+import { LoginPage } from "./pages/LoginPage";
+import { useAuth } from "./state/auth";
 import { ProjectsPage, ProjectPage } from "./pages/ProjectsPage";
 import { SettingsPage } from "./pages/SettingsPage";
 import { HomePage } from "./pages/HomePage";
@@ -158,7 +160,7 @@ function SidebarContent({
           title={`音乐在这台 Mac 上生成 · ${ram ? Math.round(ram) + " GB" : ""}`}
         >
           <i className={`status-dot ${connected ? "" : "off"}`} />
-          <span>{connected ? "本机运行" : "未连接"}</span>
+          <span>{connected ? "服务在线" : "未连接"}</span>
           <Link to="/settings" onClick={onNavigate}>
             {ram ? `${Math.round(ram)} GB` : "连接设置"}
             <ArrowUpRight size={10} />
@@ -218,6 +220,7 @@ function Shell() {
   useEffect(() => {
     app.refresh();
     restorePlayer();
+    useAuth.getState().refresh();
     const timer = setInterval(() => useApp.getState().refresh(), 5000);
     return () => clearInterval(timer);
   }, []);
@@ -267,7 +270,7 @@ function Shell() {
             </div>
             <div className="topbar-right">
               <div className="topbar-engine">
-                <span>YuE2 · 本地模型</span>
+                <span>创作引擎</span>
                 <i className={`status-dot ${connected ? "" : "off"}`} />
                 <span>{engineText}</span>
               </div>
@@ -279,6 +282,7 @@ function Shell() {
         <main className={`workspace-content route-${name}`} id="main-content">
           <div className="page-container">
             <Routes>
+              <Route path="/login" element={<LoginPage />} />
               <Route path="/" element={<Navigate to="/home" replace />} />
               <Route path="/home" element={<HomePage />} />
               <Route path="/plaza" element={<PlazaPage />} />
@@ -336,7 +340,7 @@ function Unavailable({ title }: { title: string }) {
   return (
     <EmptyState
       title={`${title}尚未启用`}
-      description="本机还未安装这项功能所需的附加模型。当前可以通过歌词和曲风创作音乐。"
+      description="该功能即将上线，敬请期待。"
     >
       <Link className="btn primary" to="/create">
         歌词创作

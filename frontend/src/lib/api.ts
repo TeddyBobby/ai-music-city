@@ -28,7 +28,7 @@ export async function request(
     throw new ApiError(
       0,
       "network_error",
-      "无法连接本机服务，请检查工作台是否已启动。",
+      "服务暂时不可用，请稍后重试。",
     );
   }
   if (res.status === 204) return null;
@@ -58,6 +58,8 @@ const qs = (q: Record<string, any>) =>
 export const api = {
   status: () => request("GET", "/api/status"),
   settings: () => request("GET", "/api/settings"),
+  get: (path: string) => request("GET", path),
+  post: (path: string, body?: any) => request("POST", path, body),
   saveSettings: (body: any) => request("PUT", "/api/settings", body),
   submit: (body: any) => request("POST", "/api/jobs", body),
   jobs: (q: any = {}) => request("GET", "/api/jobs?" + qs(q)),

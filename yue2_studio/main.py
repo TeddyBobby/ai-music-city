@@ -24,6 +24,7 @@ from yue2_studio import (  # noqa: E402
     __version__,
     api,
     assistant_api,
+    auth_api,
     lyric_alignment_api,
     plaza_api,
     projects,
@@ -86,6 +87,7 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
     app.state.fake = is_fake
     api.install_error_handlers(app)
     app.include_router(api.router)
+    auth_api.install(app)
     assistant_api.install(app)
     review_api.install(app)
     plaza_api.install(app)

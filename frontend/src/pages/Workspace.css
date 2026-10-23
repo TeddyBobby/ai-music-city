@@ -685,3 +685,21 @@
 .wk-chosen-title:hover {
   color: var(--accent);
 }
+
+/* product settings layout */
+.wk-settings-col {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+.wk-agent-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 10px;
+}
+.wk-account-email {
+  font-weight: 600;
+  word-break: break-all;
+}
