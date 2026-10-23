@@ -212,6 +212,7 @@ function Shell() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/admin" element={<AdminPage />} />
               <Route path="/pricing" element={<PricingPage />} />
+              <Route path="/login" element={<LoginPage />} />
               <Route
                 path="/hum"
                 element={<Navigate to="/home?mode=hum" replace />}
