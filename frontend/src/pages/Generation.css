@@ -941,3 +941,20 @@
   0%, 100% { opacity: 0.55; }
   50% { opacity: 1; }
 }
+
+/* simplified running state */
+.generation-running {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 0 4px;
+  color: var(--text-dim, #9aa4b2);
+  font-size: 0.92rem;
+}
+.generation-running .spin {
+  animation: generation-spin 1s linear infinite;
+}
+@keyframes generation-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

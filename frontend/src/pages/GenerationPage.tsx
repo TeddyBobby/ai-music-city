@@ -3,18 +3,14 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
-  AudioLines,
-  Check,
-  Clock3,
+  AudioLines,  Clock3,
   Download,
   LoaderCircle,
   Pause,
   Play,
   RefreshCw,
   Share2,
-  SlidersHorizontal,
-  X,
-} from "lucide-react";
+  SlidersHorizontal,} from "lucide-react";
 import { api } from "../lib/api";
 import {
   draftFromJob,
@@ -281,7 +277,7 @@ function GenerationWorkspace({ id }: { id: string }) {
               )}
             </div>
             <div className="generation-result-copy">
-              <h2 role="status">{progress.title}</h2>
+              <h2 role="status">{active ? statusText(job) : progress.title}</h2>
               {job.status === "failed" && <p>{progress.description}</p>}
               {active && (
                 <div className="generation-live-meta">
@@ -378,60 +374,17 @@ function GenerationWorkspace({ id }: { id: string }) {
 
           <section className="generation-process" aria-label="生成流程">
             <div className="generation-section-heading">
-              <h2>生成流程</h2>
+              <h2>{statusText(job)}</h2>
               {time && (
                 <span>
                   {active ? "已用时" : "用时"} {time}
                 </span>
               )}
             </div>
-            <ol className="generation-steps">
-              {progress.steps.map((step, index) => (
-                <li
-                  key={step.id}
-                  className={`is-${step.state}`}
-                  aria-current={step.state === "current" ? "step" : undefined}
-                >
-                  <span className="generation-step-icon">
-                    {step.state === "complete" ? (
-                      <Check size={15} />
-                    ) : step.state === "current" ? (
-                      <LoaderCircle className="spin" size={15} />
-                    ) : step.state === "failed" ||
-                      step.state === "cancelled" ? (
-                      <X size={15} />
-                    ) : (
-                      index + 1
-                    )}
-                  </span>
-                  <div>
-                    <strong>{step.label}</strong>
-                    {step.state === "current" && progress.stageDetail && (
-                      <span>{progress.stageDetail}</span>
-                    )}
-                    {step.state === "current" &&
-                      step.id === "write" &&
-                      !progress.stageDetail && (
-                        <span className="generation-writing-hint">
-                          AI 正在构思歌名、曲风与歌词，约需 20 秒…
-                        </span>
-                      )}
-                    {step.state === "failed" && <span>生成失败</span>}
-                  </div>
-                </li>
-              ))}
-            </ol>
-            {active && progress.stagePercent !== undefined && (
-              <div className="generation-stage-progress">
-                <div>
-                  <span>当前步骤</span>
-                  <strong>{progress.stagePercent}%</strong>
-                </div>
-                <progress
-                  max={100}
-                  value={progress.stagePercent}
-                  aria-label="当前步骤进度"
-                />
+            {active && (
+              <div className="generation-running">
+                <LoaderCircle className="spin" size={22} />
+                <span>正在生成你的音乐，完成后自动保存…</span>
               </div>
             )}
             {active && (
