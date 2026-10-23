@@ -36,6 +36,8 @@ export function LoginPage() {
           password,
         },
       );
+      // 登录/注册成功后回到首页（leaveAccount 会整页重载，用 hash 控制落点）
+      window.location.hash = "#/home";
       leaveAccount(result.user.id);
     } catch (reason) {
       setError(

@@ -447,9 +447,16 @@ export function CreatePage() {
           writeStore("groups", groups);
         }
         toast(`已加入 ${result.jobs.length} 个版本，按顺序生成。`, "ok");
+        // 提交成功后直接跳到生成页，看进度/结果
+        void navigate(`/generation/${result.jobs[0].id}`);
       } else {
-        await api.submit({ kind: "create", ...common, params: base });
+        const created = await api.submit({ kind: "create", ...common, params: base });
         toast("已加入队列，完成后自动保存。", "ok");
+        // 单曲也跳生成页（单曲返回 {job}，多版本返回 {jobs}）
+        const firstId = Array.isArray(created?.jobs)
+          ? created.jobs[0]?.id
+          : created?.job?.id;
+        if (firstId) void navigate(`/generation/${firstId}`);
       }
       await Promise.all([jobs.reload(), refresh()]);
     } catch (err) {
