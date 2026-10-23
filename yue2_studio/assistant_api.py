@@ -17,8 +17,9 @@ from yue2_studio.jobs import NotFound
 
 def same_origin(request: Request):
     """Keep browser cross-site forms away from local credentials and paid operations."""
-    if request.url.hostname not in {'localhost', '127.0.0.1', '::1'}:
-        raise ApiError(403, 'host_rejected', '助手仅接受本机地址访问')
+    allowed_hosts = {'localhost', '127.0.0.1', '::1', 'myzai.top', 'www.myzai.top', 'music.myzai.top'}
+    if request.url.hostname not in allowed_hosts:
+        raise ApiError(403, 'host_rejected', '助手仅接受授权域名访问')
     origin = request.headers.get('origin')
     if origin and urlsplit(origin).netloc != request.url.netloc:
         raise ApiError(403, 'origin_rejected', '只能从本机工作台访问助手接口')
