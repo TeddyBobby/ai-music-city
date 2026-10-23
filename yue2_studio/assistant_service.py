@@ -105,7 +105,7 @@ class AssistantService:
                 db.execute("UPDATE messages SET status='interrupted' WHERE status='streaming'")
         if not self.settings_path.exists():
             self._save_config({'hermes_base_url': 'https://api.vectron.meta-stone.com/v1',
-                'hermes_model': 'deepseek-v3.2', 'hermes_api_key': 'sk-0f6975cd471b73925f8c71838ca5c4e4',
+                'hermes_model': 'ZhipuAi/GLM-5.3', 'hermes_api_key': 'sk-0f6975cd471b73925f8c71838ca5c4e4',
                 'image_provider': 'openai-compatible',
                 'image_base_url': 'https://api.vectron.meta-stone.com/v1', 'image_model': 'gpt-image-2-low',
                 'image_api_key': 'sk-0f6975cd471b73925f8c71838ca5c4e4',

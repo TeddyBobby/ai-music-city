@@ -1485,12 +1485,12 @@ function ConnectionsPanel() {
           ...values,
           Agent_model: values.Agent_model.trim() || "Agent-agent",
         };
-        if (!patch.Agent_api_key?.trim()) delete patch.Agent_api_key;
+        if (!patch.hermes_api_key?.trim()) delete patch.hermes_api_key;
         if (!patch.image_api_key?.trim()) delete patch.image_api_key;
         const saved = await assistantApi.saveConfig(patch, controller.signal);
         if (!alive.current) return;
         setConfig(saved);
-        setValues((old) => ({ ...old, Agent_api_key: "", image_api_key: "" }));
+        setValues((old) => ({ ...old, hermes_api_key: "", image_api_key: "" }));
       }
       const result = await assistantApi.check(controller.signal);
       if (alive.current) {
@@ -1554,14 +1554,14 @@ function ConnectionsPanel() {
               type="password"
               autoComplete="new-password"
               aria-label="Agent 访问凭证"
-              value={values.Agent_api_key || ""}
+              value={values.hermes_api_key || ""}
               placeholder={
-                config?.has_Agent_api_key
+                config?.has_hermes_api_key
                   ? "已保存 · 留空不修改"
                   : "留空沿用本机凭证"
               }
               disabled={busy}
-              onChange={(event) => update("Agent_api_key", event.target.value)}
+              onChange={(event) => update("hermes_api_key", event.target.value)}
             />
           </label>
           <hr />
@@ -1578,19 +1578,19 @@ function ConnectionsPanel() {
                   image_provider: event.target
                     .value as AssistantConfigPatch["image_provider"],
                   image_model:
-                    event.target.value === "Agent-codex" &&
+                    event.target.value === "hermes-codex" &&
                     !old.image_model.startsWith("gpt-image-2-")
                       ? "gpt-image-2-low"
                       : old.image_model,
                 }))
               }
             >
-              <option value="Agent-codex">Agent · ChatGPT 图片能力</option>
+              <option value="hermes-codex">Agent · ChatGPT 图片能力</option>
               <option value="openai-compatible">自定义图片服务</option>
               <option value="disabled">暂不启用</option>
             </Select>
           </label>
-          {values.image_provider === "Agent-codex" && (
+          {values.image_provider === "hermes-codex" && (
             <>
               <label className="field">
                 图片模型
