@@ -22,26 +22,28 @@ def install(app):
         return require_admin(request)
 
     def _auth_db(request: Request) -> sqlite3.Connection:
-        conn = getattr(app.state, 'auth_db', None)
-        if conn is None:
-            path = Path(app.state.paths.data_dir) / 'auth' / 'auth.db'
-            conn = sqlite3.connect(path)
-            conn.row_factory = sqlite3.Row
-            app.state.auth_db = conn
+        # 每次请求新建短命连接：uvicorn 在多线程处理请求，缓存的连接
+        # 会被 sqlite3 的 check_same_thread 拒绝（ProgrammingError）。
+        path = Path(app.state.paths.data_dir) / 'auth' / 'auth.db'
+        conn = sqlite3.connect(path, timeout=15)
+        conn.row_factory = sqlite3.Row
         return conn
 
     @router.get('/overview')
     def overview(request: Request):
         _admin(request)
         db = _auth_db(request)
-        users_total = db.execute('SELECT count(*) c FROM users').fetchone()['c']
-        sessions_active = db.execute(
-            'SELECT count(*) c FROM sessions WHERE expires_at > ?', (int(time.time()),)).fetchone()['c']
-        now_day = int(time.time()) - 86400
-        users_active_1d = db.execute(
-            'SELECT count(DISTINCT user_id) c FROM sessions WHERE created_at > ?', (now_day,)).fetchone()['c']
-        users_7d = db.execute(
-            'SELECT count(DISTINCT user_id) c FROM sessions WHERE created_at > ?', (int(time.time()) - 7 * 86400,)).fetchone()['c']
+        try:
+            users_total = db.execute('SELECT count(*) c FROM users').fetchone()['c']
+            sessions_active = db.execute(
+                'SELECT count(*) c FROM sessions WHERE expires_at > ?', (int(time.time()),)).fetchone()['c']
+            now_day = int(time.time()) - 86400
+            users_active_1d = db.execute(
+                'SELECT count(DISTINCT user_id) c FROM sessions WHERE created_at > ?', (now_day,)).fetchone()['c']
+            users_7d = db.execute(
+                'SELECT count(DISTINCT user_id) c FROM sessions WHERE created_at > ?', (int(time.time()) - 7 * 86400,)).fetchone()['c']
+        finally:
+            db.close()
         return {
             'users_total': users_total,
             'sessions_active': sessions_active,
@@ -57,12 +59,15 @@ def install(app):
         if not 1 <= limit <= 500 or offset < 0:
             raise ApiError(400, 'validation_error', 'limit must be 1..500')
         db = _auth_db(request)
-        rows = db.execute(
-            '''SELECT u.id, u.email, u.is_admin, u.legacy_owner, u.created_at, u.last_login,
-                      (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active
-               FROM users u ORDER BY u.created_at DESC LIMIT ? OFFSET ?''',
-            (int(time.time()), limit, offset)).fetchall()
-        total = db.execute('SELECT count(*) c FROM users').fetchone()['c']
+        try:
+            rows = db.execute(
+                '''SELECT u.id, u.email, u.is_admin, u.legacy_owner, u.created_at, u.last_login,
+                          (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active
+                   FROM users u ORDER BY u.created_at DESC LIMIT ? OFFSET ?''',
+                (int(time.time()), limit, offset)).fetchall()
+            total = db.execute('SELECT count(*) c FROM users').fetchone()['c']
+        finally:
+            db.close()
         return {'users': [dict(r) for r in rows], 'total': total}
 
     @router.get('/jobs')
