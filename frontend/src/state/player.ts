@@ -28,6 +28,27 @@ interface State {
 const audio = new Audio();
 audio.preload = "metadata";
 audio.volume = readStore("player.volume", 0.8);
+// WebAudio 音量：iOS Safari/微信 的 HTMLMediaElement.volume 是只读的，
+// 通过 GainNode 才能程序化控制音量（其他平台同样生效）。
+let gainNode: GainNode | null = null;
+let audioCtx: AudioContext | null = null;
+function attachGain() {
+  if (gainNode || !audio.src) return;
+  try {
+    const Ctor =
+      (window as any).AudioContext || (window as any).webkitAudioContext;
+    if (!Ctor) return;
+    audioCtx = audioCtx || new Ctor();
+    if (audioCtx.state === "suspended") void audioCtx.resume();
+    const source = audioCtx.createMediaElementSource(audio);
+    gainNode = audioCtx.createGain();
+    gainNode.gain.value = usePlayer.getState().volume;
+    source.connect(gainNode).connect(audioCtx.destination);
+  } catch {
+    // 已连接过或浏览器不支持：退回 element.volume（多数平台有效）
+  }
+}
+audio.addEventListener("play", attachGain);
 // Keep deferred metadata and queue restoration behind the latest user selection.
 let selectionVersion = 0;
 let sourceVersion = 0;
@@ -137,10 +158,12 @@ export const usePlayer = create<State>((set, get) => ({
     }
     get().seek(seconds);
   },
-  setVolume: (n) => {
-    audio.volume = Math.max(0, Math.min(1, n));
-    set({ volume: audio.volume });
-    writeStore("player.volume", audio.volume);
+  setVolume: (n: number) => {
+    const value = Math.max(0, Math.min(1, n));
+    audio.volume = value;
+    if (gainNode) gainNode.gain.value = value;
+    set({ volume: value });
+    writeStore("player.volume", value);
   },
   next: () => {
     const s = get();

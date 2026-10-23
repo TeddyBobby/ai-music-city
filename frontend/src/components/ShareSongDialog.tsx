@@ -1,8 +1,8 @@
 import { useEffect, useState } from "react";
-import { Download, Share2 } from "lucide-react";
+import { Copy, Link2, Share2 } from "lucide-react";
 import type { Job } from "../lib/types";
 import { titleOf } from "../lib/utils";
-import { canShareSong, prepareSongShare, songDownload } from "../lib/shareSong";
+import { songDownload } from "../lib/shareSong";
 import { useApp } from "../state/app";
 import { Artwork, Button, Dialog } from "./ui";
 import "./ShareSongDialog.css";
@@ -15,84 +15,69 @@ export function ShareSongDialog({
   onClose: () => void;
 }) {
   const mp3 = Boolean(useApp((s) => s.status?.ffmpeg));
-  const [file, setFile] = useState<File | null>(null);
+  const toast = useApp((s) => s.toast);
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-  const [preparing, setPreparing] = useState(
-    Boolean(navigator.share && navigator.canShare),
-  );
   const download = songDownload(job, mp3);
-  useEffect(() => {
-    const controller = new AbortController();
-    setFile(null);
-    setError("");
-    if (!navigator.share || !navigator.canShare) {
-      setPreparing(false);
-      return () => controller.abort();
-    }
-    setPreparing(true);
-    prepareSongShare(job, mp3, controller.signal)
-      .then((next) => {
-        if (!controller.signal.aborted) setFile(next);
-      })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setError("暂时无法打开系统分享，可以下载后发送。");
-      })
-      .finally(() => {
-        if (!controller.signal.aborted) setPreparing(false);
-      });
-    return () => controller.abort();
-  }, [job.id, mp3]);
+  // 分享链接：落地页 /s/{id} 带 OpenGraph 卡片（微信/QQ/Telegram 识别为卡片）
+  const shareUrl = `${location.origin}/s/${job.id}`;
 
   async function share() {
-    if (!file || !canShareSong(file)) return;
+    if (busy) return;
     setBusy(true);
-    setError("");
     try {
-      // The file is prepared before this click so Safari retains user activation.
-      await navigator.share({ files: [file], title: titleOf(job) });
-      onClose();
+      if (navigator.share) {
+        await navigator.share({
+          title: `${titleOf(job)} · AI乐之城`,
+          text: titleOf(job),
+          url: shareUrl,
+        });
+        onClose();
+      } else {
+        await copyLink();
+      }
     } catch (cause: any) {
-      if (cause?.name !== "AbortError")
-        setError("分享未完成，可以下载后发送。");
+      if (cause?.name !== "AbortError") toast("分享未完成，可直接复制链接。", "error");
     } finally {
       setBusy(false);
     }
   }
 
-  const systemShare = file && canShareSong(file);
+  async function copyLink() {
+    try {
+      await navigator.clipboard.writeText(shareUrl);
+      toast("链接已复制，去微信粘贴发送吧。", "ok");
+      onClose();
+    } catch {
+      toast("复制失败，请长按链接手动复制。", "error");
+    }
+  }
+
   return (
     <Dialog title="分享音乐" onClose={onClose}>
       <div className="song-share-summary">
         <Artwork job={job} size={64} />
         <strong>{titleOf(job)}</strong>
       </div>
-      {(preparing || (!systemShare && !error)) && (
-        <p className="song-share-note" role="status">
-          {preparing
-            ? "正在准备音频…"
-            : "当前浏览器不支持直接分享，请下载音频。"}
-        </p>
-      )}
-      {error && (
-        <p className="song-share-error" role="alert">
-          {error}
-        </p>
-      )}
+      <p className="song-share-note">
+        发送链接给朋友，微信/Telegram 里会显示成歌曲卡片。
+      </p>
+      <div className="song-share-link">
+        <Link2 size={15} />
+        <span>{shareUrl}</span>
+        <button className="song-share-copy" onClick={() => void copyLink()} aria-label="复制链接">
+          <Copy size={14} />
+        </button>
+      </div>
       <div className="song-share-actions">
-        {systemShare && (
-          <Button variant="primary" disabled={busy} onClick={share}>
-            <Share2 size={17} />
-            {busy ? "正在分享…" : "选择分享方式"}
-          </Button>
-        )}
+        <Button variant="primary" disabled={busy} onClick={() => void share()}>
+          <Share2 size={17} />
+          {busy ? "正在分享…" : "分享"}
+        </Button>
         <a
-          className={`btn ${systemShare ? "" : "primary"}`}
+          className="btn"
           href={download.url}
           download={download.name}
         >
-          <Download size={17} />
           下载音频
         </a>
       </div>

@@ -840,6 +840,65 @@ def install_static(app, static_dir: Path) -> None:
     static_dir = Path(static_dir)
     app.mount("/static", _LenientStaticFiles(static_dir), name="static")
 
+    def _share_html(job) -> str:
+        """OpenGraph 卡片页：微信/QQ/Telegram 等抓取链接时渲染为卡片。"""
+        from html import escape
+        title = (job.params.get("title") or job.params.get("style", "")[:40] or "未命名作品")
+        style = (job.params.get("style") or "").strip()
+        lyrics = (job.params.get("lyrics") or "").strip()
+        summary = style if style and "纯音乐" not in style and "inst" not in style.lower() \
+            else (style or "AI 生成的音乐作品")
+        preview = lyrics.replace("\n", " / ")[:60] if lyrics and "纯音乐" not in lyrics else ""
+        description = f"{summary}" + (f" · {preview}…" if preview else "")
+        return f"""<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{escape(title)} · AI乐之城</title>
+<meta property="og:type" content="music.song">
+<meta property="og:site_name" content="AI乐之城">
+<meta property="og:title" content="{escape(title)}">
+<meta property="og:description" content="{escape(description)}">
+<meta property="og:url" content="/s/{job.id}">
+<meta name="twitter:card" content="summary">
+<style>
+body {{ margin:0; font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+       background:#0b0e14; color:#e8ecf1; display:flex; min-height:100vh;
+       align-items:center; justify-content:center; }}
+.card {{ text-align:center; padding:40px 24px; max-width:420px; }}
+.logo {{ color:#22d3ee; font-size:22px; font-weight:700; letter-spacing:2px; margin-bottom:28px; }}
+.note {{ font-size:15px; margin:18px 0 30px; color:#c5cdd8; line-height:1.7; }}
+.btn {{ display:inline-block; background:#22d3ee; color:#0b0e14; font-weight:600;
+        padding:13px 34px; border-radius:12px; text-decoration:none; font-size:15px; }}
+</style>
+<script>
+// 人类浏览器访问时跳到应用内播放页（爬虫不带 JS，留在卡片页）
+var isBot = /bot|crawl|spider|slurp|twitterbot|facebookexternalhit|whatsapp|telegram/i
+  .test(navigator.userAgent);
+if (!isBot) location.replace("/#/generation/{job.id}");
+</script>
+</head>
+<body>
+<div class="card">
+  <div class="logo">AI乐之城</div>
+  <div class="note">{escape(title)}<br><small style="color:#8b96a5">{escape(style[:60])}</small></div>
+  <a class="btn" href="/#/generation/{job.id}">播放这首歌</a>
+</div>
+</body>
+</html>"""
+
+    @app.get("/s/{job_id}", include_in_schema=False)
+    async def song_share(job_id: str, request: Request):
+        # 分享卡片页：免登录（爬虫无 cookie），只暴露标题/风格
+        try:
+            job = app.state.store.get(job_id)
+        except Exception:
+            return HTMLResponse("<h1>作品不存在或已删除</h1>", status_code=404)
+        if job.status != "done":
+            return HTMLResponse("<h1>作品尚未完成，稍后再试</h1>", status_code=404)
+        return HTMLResponse(_share_html(job), headers={"Cache-Control": "no-cache"})
+
     @app.get("/", include_in_schema=False)
     async def index():
         return spa_response(static_dir)

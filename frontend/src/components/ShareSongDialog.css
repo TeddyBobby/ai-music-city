@@ -34,3 +34,37 @@
   align-items: center;
   gap: 8px;
 }
+
+/* link card row */
+.song-share-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(127, 127, 127, 0.12);
+  font-size: 0.82rem;
+  color: var(--text-dim, #9aa4b2);
+  word-break: break-all;
+  margin: 12px 0;
+}
+.song-share-link > span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.song-share-copy {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(127, 127, 127, 0.3);
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.song-share-copy:hover { opacity: 0.8; }
