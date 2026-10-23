@@ -65,6 +65,7 @@ EVENT_FIELDS = ("type", "job_id", "ts", "stage", "label", "completed", "total", 
 
 _STAGE_KEYS = {
     "verifying model files": "load",
+    "ai writing lyrics": "writing",
     "cutting clip": "transcribe",
     "transcribing audio": "transcribe",
     "analysing hum": "hum",
@@ -264,6 +265,87 @@ class EventBus:
 def _error_text(error: BaseException) -> str:
     text = f"{type(error).__name__}: {error}".strip()
     return text[:2000]
+
+
+# ---------------------------------------------------------------------------------------------
+
+
+def _ai_complete_draft(description: str) -> dict:
+    """用平台配置的 Agent（GLM）把一句话描述补全为完整创作方案。
+
+    返回 {"title":…, "style":…, "lyrics":…}；失败抛异常（由 _run_job 兜底为 failed）。
+    """
+    import httpx
+    from yue2_studio.assistant_service import provider_headers, endpoint_url
+
+    cfg = _assistant_cfg()
+    system = (
+        "你是专业的词曲创作助手。根据用户的一句话想法，输出一个可执行的歌曲创作方案。"
+        "只输出一个 JSON 对象，不要任何解释或 markdown 代码块。字段："
+        '{"title": "歌名(20字内)", "style": "英文风格标签(逗号分隔, 如 pop ballad, female vocal, piano)", '
+        '"lyrics": "完整歌词，段落用 [verse]/[chorus]/[bridge] 标记，50-90 秒长度"}'
+    )
+    body = {
+        "model": cfg.get("hermes_model") or "ZhipuAi/GLM-5.3",
+        "messages": [
+            {"role": "system", "content": system},
+            {"role": "user", "content": f"创作想法：{description}"},
+        ],
+        "stream": False,
+        "max_tokens": 1600,
+    }
+    with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
+        resp = client.post(
+            endpoint_url(cfg["hermes_base_url"], "chat/completions"),
+            headers=provider_headers(cfg),
+            json=body,
+        )
+        resp.raise_for_status()
+        text = resp.json()["choices"][0]["message"]["content"].strip()
+    # 允许模型包一层 ```json …``` 或 <music_proposal> 标签
+    import re as _re
+    m = _re.search(r"\{[\s\S]*\}", text)
+    if not m:
+        raise ValueError("AI 写词返回无法解析")
+    data = json.loads(m.group(0))
+    for key in ("title", "style", "lyrics"):
+        if not isinstance(data.get(key), str) or not data[key].strip():
+            raise ValueError(f"AI 写词缺少字段 {key}")
+    return {"title": data["title"].strip(), "style": data["style"].strip(), "lyrics": data["lyrics"].strip()}
+
+
+_ASSISTANT_CFG_CACHE: dict = {}
+_ASSISTANT_CFG_TS = 0.0
+
+
+def _assistant_cfg() -> dict:
+    """读取 assistant 的连接配置（base_url/key/model）。缓存 30 秒避免每首歌词都读磁盘。"""
+    global _ASSISTANT_CFG_TS
+    import time as _time
+    import os as _os
+    if _time.time() - _ASSISTANT_CFG_TS > 30 or not _ASSISTANT_CFG_CACHE:
+        import os as _os
+        from yue2_studio import config as _config
+        cfg_path = Path(_config.paths_for().data_dir) / "assistant" / "settings.json"
+        data = {}
+        try:
+            data = json.loads(cfg_path.read_text())
+        except (OSError, ValueError):
+            pass
+        merged = {
+            "hermes_base_url": data.get("hermes_base_url")
+            or _os.environ.get("AMC_ASSISTANT_BASE_URL", ""),
+            "hermes_api_key": data.get("hermes_api_key")
+            or _os.environ.get("AMC_ASSISTANT_API_KEY", ""),
+            "hermes_model": data.get("hermes_model")
+            or _os.environ.get("AMC_ASSISTANT_MODEL", "ZhipuAi/GLM-5.3"),
+        }
+        if not merged["hermes_base_url"] or not merged["hermes_api_key"]:
+            raise RuntimeError("平台未配置 Agent 连接，无法 AI 写词（AMC_ASSISTANT_BASE_URL/KEY）")
+        _ASSISTANT_CFG_CACHE.clear()
+        _ASSISTANT_CFG_CACHE.update(merged)
+        _ASSISTANT_CFG_TS = _time.time()
+    return _ASSISTANT_CFG_CACHE
 
 
 class Worker:
@@ -537,6 +619,40 @@ class Worker:
             self._on_engine_event(job.id, raw)
 
         final_status, error, summary = "done", None, None
+        # AI 写词阶段：一句话描述（description）在任务内先补全为 style/lyrics。
+        # 用户点击生成立即拿到任务 ID 并跳转详情页，写词成为任务生命周期的第一阶段。
+        params = dict(job.params or {})
+        if job.kind in {"create", "regenerate"} and params.get("description") and not (params.get("lyrics") and params.get("style")):
+            try:
+                if cancel.is_set():
+                    raise InterruptedError("Cancelled before start")
+                self._publish(job.id, normalise({
+                    "type": "stage", "stage": "AI writing lyrics", "completed": 0, "total": None,
+                    "status": "running", "ts": time.time()}, job.id))
+                draft = _ai_complete_draft(params["description"])
+                params.update({"style": draft["style"], "lyrics": draft["lyrics"]})
+                if params.get("title") is None:
+                    params["title"] = draft["title"]
+                self.store.set_params(job.id, params)
+                job = self.store.get(job.id)
+                self._publish(job.id, normalise({
+                    "type": "stage", "stage": "AI writing lyrics", "completed": 1, "total": 1,
+                    "status": "completed", "ts": time.time()}, job.id))
+            except (InterruptedError, asyncio.CancelledError):
+                raise
+            except Exception as exc:  # noqa: BLE001
+                log.warning("job %s lyric-writing failed: %s", job.id, exc)
+                terminal = status_event(job.id, "failed", f"AI 写词失败：{exc}")
+                self.store.update_status(job.id, "failed", error=str(exc), progress=terminal)
+                self._publish(job.id, terminal)
+                with self._lock:
+                    self._cancels.pop(job.id, None)
+                self.current_job_id = None
+                try:
+                    self.bus.done(job.id, self.store.get(job.id).to_api())
+                except Exception:
+                    pass
+                return
         try:
             if cancel.is_set():
                 raise InterruptedError("Cancelled before start")

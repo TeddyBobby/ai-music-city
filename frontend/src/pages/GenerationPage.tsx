@@ -16,7 +16,6 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../lib/api";
-import { generateFromPrompt, type MusicKind } from "../lib/musicCreation";
 import {
   draftFromJob,
   generationProgress,
@@ -80,86 +79,8 @@ function elapsed(job: Job, now: number) {
 
 export function GenerationPage() {
   const { id } = useParams();
-  // composing：点击生成后的引导页——页面自己发起写词与提交，
-  // 词写好后 replace 到 /generation/:jobId，生命周期无缝衔接。
-  if (id === "composing") return <ComposingPage />;
-  return id ? <GenerationWorkspace key={id} id={id} /> : null;
-}
 
-function ComposingPage() {
-  const navigate = useNavigate();
-  const [error, setError] = useState("");
-  const controller = useRef<AbortController | null>(null);
-  useEffect(() => {
-    let prompt = "";
-    let musicKind: MusicKind | undefined;
-    try {
-      prompt = sessionStorage.getItem("music.composing") || "";
-      musicKind = (sessionStorage.getItem("music.composing.kind") as MusicKind) || undefined;
-    } catch {}
-    if (!prompt) {
-      void navigate("/home", { replace: true });
-      return;
-    }
-    const current = new AbortController();
-    controller.current = current;
-    let finished = false;
-    (async () => {
-      try {
-        const job = await generateFromPrompt(prompt, {
-          signal: current.signal,
-          musicKind,
-        });
-        finished = true;
-        try {
-          sessionStorage.removeItem("music.composing");
-          sessionStorage.removeItem("music.composing.kind");
-        } catch {}
-        void useApp.getState().refresh();
-        void navigate(`/generation/${encodeURIComponent(job.id)}`, {
-          replace: true,
-        });
-      } catch (failure) {
-        if (current.signal.aborted) return;
-        finished = true;
-        setError(
-          failure instanceof Error ? failure.message : "生成失败，请重试。",
-        );
-      }
-    })();
-    return () => {
-      // 仅在尚未完成且组件被卸载（如用户点取消/切走）时中止
-      if (!finished) current.abort();
-    };
-  }, [navigate]);
-  if (error)
-    return (
-      <div className="generation-empty">
-        <h1>暂时没有开始创作</h1>
-        <p role="alert">{error}</p>
-        <button className="btn" onClick={() => void navigate("/home")}>
-          返回重新创作
-        </button>
-      </div>
-    );
-  return (
-    <div className="generation-empty">
-      <LoaderCircle className="spin" size={28} />
-      <h1>AI 正在创作歌词…</h1>
-      <p role="status">
-        根据你的描述补全歌词与曲风，写好后会自动进入生成队列，这里会展示每一步进度。
-      </p>
-      <button
-        className="btn"
-        onClick={() => {
-          controller.current?.abort();
-          void navigate("/home");
-        }}
-      >
-        取消创作
-      </button>
-    </div>
-  );
+  return id ? <GenerationWorkspace key={id} id={id} /> : null;
 }
 
 function GenerationWorkspace({ id }: { id: string }) {

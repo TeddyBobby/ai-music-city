@@ -114,8 +114,11 @@ class SemanticSamplingLimit(BaseModel):
 
 
 class CreateParams(_Params):
-    style: str
-    lyrics: str
+    # description: 用户的一句话想法。提供时 style/lyrics 可为空，
+    # 由 worker 先调 AI 补全歌词（“AI 写词”阶段）再进入引擎生成。
+    description: str | None = None
+    style: str = ""
+    lyrics: str = ""
     cot: Literal["full", "melody", "off"] = "full"
     seed: int | None = None
     cfg_scale: float | None = None
@@ -124,15 +127,15 @@ class CreateParams(_Params):
     abc_sampling: AbcSamplingLimit | None = None
     semantic_sampling: SemanticSamplingLimit | None = None
 
-    @field_validator("style")
+    @field_validator("description")
     @classmethod
-    def _style(cls, v):
-        return _non_empty(v, "style")
+    def _description(cls, v):
+        return v if v is None or v.strip() else None
 
-    @field_validator("lyrics")
+    @field_validator("style", "lyrics")
     @classmethod
-    def _lyrics(cls, v):
-        return _non_empty(v, "lyrics")
+    def _style_lyrics(cls, v):
+        return (v or "").strip()
 
     @field_validator("seed")
     @classmethod
@@ -150,6 +153,10 @@ class CreateParams(_Params):
         return v if v is None or v.strip() else None
 
     def check(self) -> None:
+        # 有 description 时允许 style/lyrics 为空（worker 会先 AI 写词）；
+        # 没有 description 则必须直接给出风格与歌词。
+        if not (self.description or (self.style and self.lyrics)):
+            raise ValidationFailure("提供一句话描述（description），或同时给出风格（style）与歌词（lyrics）")
         if self.abc is not None and self.cot == "off":
             raise ValidationFailure("a supplied abc score requires cot=melody or cot=full")
 
@@ -1423,6 +1430,8 @@ def resolve_options(req: SubmitRequest, settings: dict, *, default_preset: str |
 def _create_params_dict(p: CreateParams, seed: int) -> dict:
     params = {"style": p.style, "lyrics": p.lyrics, "cot": p.cot, "seed": seed,
               "cfg_scale": p.cfg_scale, "abc": p.abc, "title": p.title}
+    if p.description:
+        params["description"] = p.description
     for name in ("abc_sampling", "semantic_sampling"):
         value = getattr(p, name)
         if value is not None:

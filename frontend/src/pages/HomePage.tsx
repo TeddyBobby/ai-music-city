@@ -13,7 +13,8 @@ import { HomeSoundscape } from "../components/HomeSoundscape";
 import { HumComposer } from "../components/HumComposer";
 import { ImageComposer } from "../components/ImageComposer";
 import { MusicKindToggle } from "../components/MusicKindToggle";
-import { generateFromPrompt, type MusicKind } from "../lib/musicCreation";
+import { generateFromPrompt, readMusicStatus, defaultMusicOptions, type MusicKind } from "../lib/musicCreation";
+import { api } from "../lib/api";
 import type { Job } from "../lib/types";
 import { useApp } from "../state/app";
 import { useAuth } from "../state/auth";
@@ -108,13 +109,39 @@ export function HomePage() {
       void navigate("/login");
       return;
     }
-    // 点击即跳生成页：prompt 存入 sessionStorage，由 /generation/composing 页面
-    // 自己发起写词与提交（HomePage 卸载时的 abort 清理不会再杀掉生成流程）
+    // 点击立即创建任务（服务端先 AI 写词再引擎生成），拿到任务 ID 直接跳详情页。
+    // 状态展示全部交给 /generation/:id 的生命周期页。
+    setError("");
+    setPhase("submitting");
     try {
-      sessionStorage.setItem("music.composing", prompt);
-      sessionStorage.setItem("music.composing.kind", musicKind);
-    } catch {}
-    void navigate("/generation/composing");
+      const status = await readMusicStatus();
+      const opts = defaultMusicOptions(status);
+      const result = await api.submit({
+        kind: "create",
+        ...opts,
+        params: {
+          title: null,
+          style: "",
+          lyrics: "",
+          description: prompt.trim(),
+          cot: "full",
+          seed: null,
+          cfg_scale: null,
+          abc: null,
+        },
+      });
+      const firstId = Array.isArray(result?.jobs)
+        ? result.jobs[0]?.id
+        : result?.job?.id;
+      if (!firstId) throw new Error("任务创建失败，请重试。");
+      void useApp.getState().refresh();
+      void navigate(`/generation/${encodeURIComponent(firstId)}`);
+    } catch (failure) {
+      setError(
+        failure instanceof Error ? failure.message : "生成失败，请重试。",
+      );
+      setPhase(null);
+    }
   }
 
   return (

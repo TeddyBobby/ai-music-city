@@ -24,7 +24,7 @@ export function defaultMusicOptions(status: Status) {
   return { preset: "fast" };
 }
 
-async function readMusicStatus(signal?: AbortSignal): Promise<Status> {
+export async function readMusicStatus(signal?: AbortSignal): Promise<Status> {
   checkAborted(signal);
   const status = await api.status();
   checkAborted(signal);

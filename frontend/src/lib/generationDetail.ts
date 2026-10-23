@@ -69,6 +69,11 @@ const stageInfo: Record<
   string,
   { step: string; title: string; description: string }
 > = {
+  writing: {
+    step: "write",
+    title: "AI 正在创作歌词",
+    description: "根据你的描述补全歌词与曲风，完成后自动进入生成。",
+  },
   load: {
     step: "prepare",
     title: "正在准备创作",
@@ -145,6 +150,9 @@ export function generationProgress(job: Job): GenerationProgress {
     { id: "prepare", label: "准备创作" },
     ...(job.kind === "hum" || job.kind === "cover"
       ? [{ id: "melody", label: "识别旋律" }]
+      : []),
+    ...(job.params?.description
+      ? [{ id: "write", label: "AI 写词" }]
       : []),
     { id: "compose", label: "编排旋律" },
     { id: "generate", label: "生成音乐" },
