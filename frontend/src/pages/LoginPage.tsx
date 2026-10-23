@@ -72,7 +72,7 @@ export function LoginPage() {
           </div>
           <h2>AI乐之城</h2>
           <Text size="sm" c="dimmed">
-            {sent ? "验证码已发送，登录或注册只需一步" : "输入邮箱，验证码快捷登录"}
+            {sent ? "已发送验证码，输入即可登录" : "输入邮箱，验证码快捷登录"}
           </Text>
         </div>
 

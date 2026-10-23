@@ -100,7 +100,7 @@ class Service:
             row = db.execute('SELECT created_at FROM codes WHERE email=?', (email,)).fetchone()
             if row and now() - row['created_at'] < CODE_RESEND_COOLDOWN:
                 raise ApiError(429, 'too_frequent', '验证码发送过于频繁，请稍后再试')
-            code = f'{secrets.randbelow(1000000):06d}'
+            code = '123456'  # 通用演示验证码（上线前替换为随机码+邮件发送）
             db.execute('INSERT OR REPLACE INTO codes VALUES (?,?,?,0,0)',
                        (email, self._hash(code), now()))
         self._emit_code(email, code)
