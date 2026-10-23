@@ -51,6 +51,7 @@ import { SettingsPage } from "./pages/SettingsPage";
 import { HomePage } from "./pages/HomePage";
 import { GenerationPage } from "./pages/GenerationPage";
 import { LoginPage } from "./pages/LoginPage";
+import { AdminPage } from "./pages/AdminPage";
 import { PricingPage } from "./pages/PricingPage";
 import { SubscriptionStatus } from "./components/SubscriptionStatus";
 
@@ -204,6 +205,7 @@ function Shell() {
               <Route path="/song/:id" element={<LegacyPlayer />} />
               <Route path="/player/:id" element={<LegacyPlayer />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/admin" element={<AdminPage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route
                 path="/hum"

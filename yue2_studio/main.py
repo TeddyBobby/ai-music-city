@@ -22,6 +22,7 @@ from fastapi import FastAPI  # noqa: E402
 
 from yue2_studio import (  # noqa: E402
     __version__,
+    admin_api,
     api,
     assistant_api,
     auth_api,
@@ -43,6 +44,13 @@ def _real_engine(paths: config.Paths):
     return Engine(converted_dir=paths.converted_dir, vae_dir=paths.vae_dir, loras_dir=paths.loras_dir)
 
 
+def _acestep_engine():
+    from yue2_studio.acestep_engine import ACEStepEngine
+
+    checkpoint = os.environ.get("AMC_ACESTEP_CHECKPOINTS") or "/home/teddy/projects/ACE-Step/checkpoints"
+    return ACEStepEngine(checkpoint_dir=checkpoint)
+
+
 def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool = False,
                fake_delay: float = 0.05, static_dir: Path | None = None) -> FastAPI:
     paths = config.paths_for(home)
@@ -53,7 +61,10 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
         engine = FakeEngine(delay=fake_delay)
     is_fake = fake or (engine is not None and type(engine).__name__ == "FakeEngine")
     if engine is None:
-        engine = _real_engine(paths)
+        if os.environ.get("AMC_ENGINE") == "acestep":
+            engine = _acestep_engine()
+        else:
+            engine = _real_engine(paths)
 
     store = JobStore(paths.db_path, paths.songs_dir)
     bus = EventBus()
@@ -79,6 +90,7 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
     api.install_error_handlers(app)
     app.include_router(api.router)
     auth_api.install(app)
+    admin_api.install(app)
     assistant_api.install(app)
     review_api.install(app)
     plaza_api.install(app)
