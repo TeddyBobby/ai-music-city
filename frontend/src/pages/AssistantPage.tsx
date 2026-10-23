@@ -1413,8 +1413,8 @@ function CoverPanel({ initialJob }: { initialJob: string }) {
 }
 
 const emptyConfig: AssistantConfigPatch = {
-  Agent_base_url: "",
-  Agent_model: "",
+  hermes_base_url: "",
+  hermes_model: "",
   image_provider: "disabled",
   image_base_url: "",
   image_model: "",
@@ -1442,8 +1442,8 @@ function ConnectionsPanel() {
       if (saved.status === "fulfilled") {
         setConfig(saved.value);
         setValues({
-          Agent_base_url: saved.value.Agent_base_url,
-          Agent_model: saved.value.Agent_model,
+          hermes_base_url: saved.value.hermes_base_url,
+          hermes_model: saved.value.hermes_model,
           image_provider: saved.value.image_provider,
           image_base_url: saved.value.image_base_url,
           image_model: saved.value.image_model,
@@ -1470,7 +1470,7 @@ function ConnectionsPanel() {
   }
   async function check(save: boolean) {
     if (busy || !config) return;
-    if (save && !values.Agent_base_url.trim()) {
+    if (save && !values.hermes_base_url.trim()) {
       setError("请填写 Agent 服务地址。");
       return;
     }
@@ -1483,7 +1483,7 @@ function ConnectionsPanel() {
       if (save) {
         const patch: AssistantConfigPatch = {
           ...values,
-          Agent_model: values.Agent_model.trim() || "Agent-agent",
+          hermes_model: values.hermes_model.trim() || "Agent-agent",
         };
         if (!patch.hermes_api_key?.trim()) delete patch.hermes_api_key;
         if (!patch.image_api_key?.trim()) delete patch.image_api_key;
@@ -1530,11 +1530,11 @@ function ConnectionsPanel() {
             <Input
               type="url"
               aria-label="Agent 服务地址"
-              value={values.Agent_base_url}
+              value={values.hermes_base_url}
               placeholder="http://127.0.0.1:8642"
               disabled={busy}
               onChange={(event) =>
-                update("Agent_base_url", event.target.value)
+                update("hermes_base_url", event.target.value)
               }
             />
           </label>
@@ -1542,10 +1542,10 @@ function ConnectionsPanel() {
             对话模型
             <Input
               aria-label="对话模型"
-              value={values.Agent_model}
+              value={values.hermes_model}
               placeholder="留空沿用 Agent 当前模型"
               disabled={busy}
-              onChange={(event) => update("Agent_model", event.target.value)}
+              onChange={(event) => update("hermes_model", event.target.value)}
             />
           </label>
           <label className="field">
