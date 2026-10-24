@@ -72,7 +72,8 @@
   overflow-y: auto;
 }
 .as-workspace.is-empty .as-messages {
-  display: none;
+  /* 空会话：欢迎语在消息区顶部展示 */
+  display: block;
 }
 .as-workspace.is-empty .as-compose-wrap {
   max-height: none;
@@ -772,7 +773,7 @@ button.as-connect-notice {
     padding-block: 8px;
   }
   .app-shell[data-keyboard-open="true"] .as-welcome,
-  .app-shell[data-keyboard-open="true"] .as-starters {
+  .app-shell[data-keyboard-open="true"] .as-quick-choices {
     display: none;
   }
 }
@@ -799,3 +800,41 @@ button.as-connect-notice {
     padding-inline: 10px;
   }
 }
+
+/* empty-state layout: welcome at top, quick choices above the composer */
+.as-welcome-top {
+  align-items: flex-start;
+  text-align: left;
+  margin: 0 0 24px;
+  gap: 8px;
+}
+.as-welcome-sub {
+  margin: 0;
+  color: var(--text-dim, #9aa4b2);
+  font-size: 14px;
+  line-height: 1.6;
+}
+.as-quick-choices {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+.as-quick-choices button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 36px;
+  padding: 6px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 127, 127, 0.25);
+  background: transparent;
+  color: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.as-quick-choices button:hover:not(:disabled) {
+  border-color: var(--accent, #22d3ee);
+  color: var(--accent, #22d3ee);
+}
+.as-quick-choices button:disabled { opacity: 0.5; }

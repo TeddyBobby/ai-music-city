@@ -349,7 +349,18 @@ export function AssistantPage() {
                 <Loader size="sm" />
               </div>
             ) : (
-              messages.map((message) => (
+              <>
+            {empty && (
+              <div className="as-welcome as-welcome-top">
+                <h1 className="as-welcome-title">
+                  {lyricsMode ? "把想法，写成歌词" : "聊聊你的音乐灵感"}
+                </h1>
+                <p className="as-welcome-sub">
+                  描述一个场景、一种情绪，或直接把歌词交给它。
+                </p>
+              </div>
+            )}
+            {messages.map((message) => (
                 <article
                   key={message.id}
                   className={`as-message as-message-${message.role}`}
@@ -455,32 +466,28 @@ export function AssistantPage() {
                       )}
                   </div>
                 </article>
-              ))
+              ))}
+              </>
             )}
           </div>
         </div>
 
         <div className="as-compose-wrap">
           {empty && !audio && !image && (
-            <div className="as-welcome">
-              <svg
-                className="as-welcome-wave"
-                width="80"
-                height="30"
-                viewBox="0 0 80 30"
-                aria-hidden="true"
-              >
-                <path
-                  d="M4 13v4M12 9v12M20 4v22M28 10v10M36 1v28M44 6v18M52 11v8M60 5v20M68 10v10M76 13v4"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                />
-              </svg>
-              <h1 className="as-welcome-title">
-                {lyricsMode ? "把想法，写成歌词" : "聊聊你的音乐灵感"}
-              </h1>
+            <div className="as-quick-choices" aria-label="快捷选择">
+              {starters[lyricsMode ? "lyrics" : "chat"].map(
+                ({ title, prompt, mode: nextMode, icon: Icon }) => (
+                  <button
+                    key={title}
+                    type="button"
+                    onClick={() => fillPrompt(prompt, nextMode)}
+                    disabled={disabled}
+                  >
+                    <Icon size={15} aria-hidden="true" />
+                    {title}
+                  </button>
+                ),
+              )}
             </div>
           )}
           {modelsError && (
@@ -706,23 +713,6 @@ export function AssistantPage() {
             <p className="as-uploading" role="status">
               上传中…
             </p>
-          )}
-          {empty && !audio && !image && (
-            <div className="as-starters" aria-label="快捷灵感">
-              {starters[lyricsMode ? "lyrics" : "chat"].map(
-                ({ title, prompt, mode: nextMode, icon: Icon }) => (
-                  <button
-                    key={title}
-                    type="button"
-                    onClick={() => fillPrompt(prompt, nextMode)}
-                    disabled={disabled}
-                  >
-                    <Icon size={16} aria-hidden="true" />
-                    {title}
-                  </button>
-                ),
-              )}
-            </div>
           )}
         </div>
       </div>
