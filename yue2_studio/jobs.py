@@ -1648,6 +1648,8 @@ def engine_request(job: Job) -> dict:
     p = job.params
     request = {"style": p["style"], "lyrics": p["lyrics"], "cot": p.get("cot", "full"), "seed": job.seed,
                "id": job.id}
+    if p.get("duration"):
+        request["duration"] = float(p["duration"])
     if p.get("cfg_scale") is not None:
         request["cfg_scale"] = float(p["cfg_scale"])
     for name in ("abc_sampling", "semantic_sampling"):

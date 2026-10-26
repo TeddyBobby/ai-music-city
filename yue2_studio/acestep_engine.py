@@ -20,7 +20,7 @@ from yue2_studio.config import EngineOptions, loras_to_api
 
 CHECKPOINT_DIR = Path("/home/teddy/projects/ACE-Step/checkpoints")
 SAMPLE_RATE = 44100
-DEFAULT_DURATION = 180.0
+DEFAULT_DURATION = 90.0
 MAX_DURATION = 240.0
 
 

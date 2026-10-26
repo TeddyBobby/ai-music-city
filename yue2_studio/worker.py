@@ -690,6 +690,12 @@ class Worker:
                 params.update({"style": draft["style"], "lyrics": draft["lyrics"]})
                 if params.get("title") is None:
                     params["title"] = draft["title"]
+                # 时长与歌词匹配：60 步扩散对 180s 去噪不足（人声电音）。
+                # 每行约 4.2s + 8s 前奏尾奏余量，钳在 60–120s。
+                lines = [ln for ln in draft["lyrics"].splitlines() if ln.strip() and not ln.strip().startswith("[")]
+                estimated = min(120.0, max(60.0, len(lines) * 4.2 + 8.0))
+                if not params.get("duration"):
+                    params["duration"] = estimated
                 self.store.set_params(job.id, params)
                 job = self.store.get(job.id)
                 self._publish(job.id, normalise({
