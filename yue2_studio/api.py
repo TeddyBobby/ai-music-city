@@ -825,9 +825,10 @@ class _LenientStaticFiles:
                 response = await super().get_response(path, scope)
                 # Vite 产物带内容 hash（index-Ab12Cd.js）：文件名即指纹，可永久缓存。
                 # 入口 HTML 由 spa_response 下发 no-cache，保证发版后 hash 更新立刻可见。
+                # s-maxage 让 Cloudflare 边缘也缓存（家宽回源仅 ~80KB/s，880KB JS 走 CDN 后秒开）。
                 if "/assets/" in path:
                     response.headers["Cache-Control"] = (
-                        "public, max-age=31536000, immutable"
+                        "public, max-age=31536000, s-maxage=2592000, immutable"
                     )
                 else:
                     response.headers["Cache-Control"] = "no-cache"
