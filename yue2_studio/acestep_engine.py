@@ -160,13 +160,24 @@ class ACEStepEngine:
             seed = int(request.get("seed") or 0) % (2**31)
 
             _emit_stage(on_event, "Diffusion", completed=0, total=60, unit="steps")
+            # 官方推荐参数（examples/default）：APG CFG + 动态 guidance 衰减（15→3）+ ERG 降噪。
+            # 硬 CFG 15 会让中文人声出现金属电音；guidance_interval 衰减是人声自然的关键。
+            cfg = request.get("cfg_scale")
             result = pipeline(
                 audio_duration=duration,
                 prompt=tags,
                 lyrics=lyrics,
                 infer_step=60,
-                guidance_scale=15.0,
+                guidance_scale=float(cfg) if cfg else 15.0,
                 scheduler_type="euler",
+                cfg_type="apg",
+                omega_scale=10.0,
+                guidance_interval=0.5,
+                guidance_interval_decay=0.0,
+                min_guidance_scale=3.0,
+                use_erg_tag=True,
+                use_erg_lyric=True,
+                use_erg_diffusion=True,
                 manual_seeds=[seed],
             )
             self._check_cancelled(cancelled)
