@@ -155,13 +155,21 @@ def _models_present(request: Request) -> bool:
     state = _state(request)
     if state.fake:
         return True
-    if isinstance(getattr(state, "engine", None), object) and type(state.engine).__name__ == "ACEStepEngine":
+    engine_name = type(getattr(state, "engine", None)).__name__
+    if engine_name == "ACEStepEngine":
         import os as _os
 
         from pathlib import Path as _Path
 
         checkpoint = _os.environ.get("AMC_ACESTEP_CHECKPOINTS") or "/home/teddy/projects/ACE-Step/checkpoints"
         return (_Path(checkpoint) / "ace_step_transformer" / "diffusion_pytorch_model.safetensors").is_file()
+    if engine_name == "ACEStep15Engine":
+        from pathlib import Path as _Path
+
+        return (_Path("/home/teddy/projects/ACE-Step-1.5/checkpoints/acestep-v15-turbo")
+                / "model.safetensors").is_file()
+    if engine_name == "SunoEngine":
+        return True  # cloud engine: presence checked at submit time via api key
     models = config.models_available(state.paths)
     return bool(models["converted"] and models["vae"])
 

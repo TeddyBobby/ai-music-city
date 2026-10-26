@@ -61,7 +61,13 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
         engine = FakeEngine(delay=fake_delay)
     is_fake = fake or (engine is not None and type(engine).__name__ == "FakeEngine")
     if engine is None:
-        if os.environ.get("AMC_ENGINE") == "acestep":
+        if os.environ.get("AMC_ENGINE") == "acestep15":
+            from yue2_studio.acestep15_engine import ACEStep15Engine
+            engine = ACEStep15Engine(
+                use_sft=os.environ.get("AMC_ACE15_SFT", "") == "1",
+                lm_model=os.environ.get("AMC_ACE15_LM", "acestep-5Hz-lm-1.7B"),
+            )
+        elif os.environ.get("AMC_ENGINE") == "acestep":
             engine = _acestep_engine()
         elif os.environ.get("AMC_ENGINE") == "suno":
             from yue2_studio.suno_engine import SunoEngine
