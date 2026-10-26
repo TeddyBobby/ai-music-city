@@ -1,92 +1,17 @@
 .auth-page {
-  display: grid;
-  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
-  min-height: min(740px, calc(100dvh - 150px));
-  max-width: 1160px;
+  display: block;
+  max-width: 440px;
   margin: 0 auto;
-  overflow: hidden;
-  border: 1px solid var(--line);
-  border-radius: 24px;
-  background: var(--surface);
 }
-.auth-story {
-  display: flex;
-  flex-direction: column;
-  position: relative;
-  min-width: 0;
-  padding: clamp(28px, 4vw, 52px);
-  overflow: hidden;
-  color: #f6f6ec;
-  background: #344b36;
-}
-.auth-brand {
-  display: inline-flex;
-  align-items: center;
-  gap: 11px;
-  align-self: flex-start;
-  font-size: 17px;
-  font-weight: 650;
-  color: inherit;
-  text-decoration: none;
-}
-.auth-story-copy {
-  position: relative;
-  z-index: 1;
-  margin-top: 40px;
-}
-.auth-story h1 {
-  margin: 0;
-  font-size: clamp(30px, 3.3vw, 45px);
-  font-weight: 600;
-  line-height: 1.45;
-  letter-spacing: -0.045em;
-}
-.auth-sound-art {
-  position: relative;
-  flex: 1;
-  min-height: 210px;
-  margin: 26px 0 18px;
-  display: flex;
-  align-items: center;
-}
-.auth-sound-disc {
-  width: 200px;
-  height: 200px;
-  border-radius: 50%;
-  flex: none;
-  display: grid;
-  place-items: center;
-  background: repeating-radial-gradient(
-    circle,
-    #263c2a 0,
-    #263c2a 2px,
-    #3c5340 3px,
-    #263c2a 4px
-  );
-  border: 1px solid #ffffff18;
-  box-shadow: 0 14px 30px #14221933;
-}
-.auth-sound-disc > span {
-  width: 73px;
-  height: 73px;
-  display: grid;
-  place-items: center;
-  border-radius: 50%;
-  background: #c6d1a7;
-  color: #344b36;
-}
-.auth-features {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 12px 24px;
-  font-size: 12px;
-  color: #e4e9db;
-}
-.auth-features > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-}
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
+/* removed legacy auth-story style */
 .auth-form-area {
   min-width: 0;
   display: flex;
@@ -115,16 +40,7 @@
   color: var(--text);
   font-weight: 600;
 }
-.auth-logo {
-  width: 46px;
-  height: 46px;
-  border-radius: 14px;
-  display: grid;
-  place-items: center;
-  background: var(--surface-2);
-  color: var(--accent);
-  border: 1px solid var(--line);
-}
+/* removed legacy auth-story style */
 .auth-card .mantine-TextInput-input {
   min-height: 48px;
   font-size: 16px;
@@ -168,271 +84,7 @@
 .auth-return:hover {
   color: var(--accent);
 }
-@media (max-width: 900px) {
-  .auth-page {
-    grid-template-columns: minmax(0, 0.9fr) minmax(0, 1fr);
-  }
-  .auth-story {
-    padding: 30px;
-  }
-  .auth-story-copy {
-    margin-top: 40px;
-  }
-}
-@media (max-width: 680px) {
-  .auth-page {
-    grid-template-columns: minmax(0, 1fr);
-    border-radius: 18px;
-    min-height: 0;
-  }
-  .auth-story {
-    padding: 26px 24px;
-  }
-  .auth-brand {
-    font-size: 15px;
-  }
-  .auth-story-copy {
-    margin-top: 27px;
-  }
-  .auth-story h1 {
-    font-size: 30px;
-    line-height: 1.4;
-    margin: 11px 0;
-  }
-  .auth-sound-art,
-  .auth-features,
-  .auth-form-area {
-    padding: 30px 24px 20px;
-  }
-  .auth-card {
-    max-width: none;
-    gap: 17px;
-  }
-  .auth-head {
-    margin-bottom: 4px;
-  }
-  .auth-logo {
-    display: none;
-  }
-  .auth-head h2 {
-    margin-top: 0;
-    font-size: 22px;
-  }
-}
-
-.auth-screen {
-  --auth-gutter: clamp(16px, 3dvh, 32px);
-  min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: var(--auth-gutter) clamp(20px, 4vw, 60px);
-  background: var(--bg);
-}
-.auth-screen .auth-page {
-  width: 100%;
-  min-height: min(740px, calc(100dvh - 2 * var(--auth-gutter)));
-}
-.auth-card .mantine-PasswordInput-input {
-  min-height: 48px;
-  border-radius: 12px;
-  border-color: var(--line);
-  background: var(--bg);
-}
-.auth-card .mantine-PasswordInput-innerInput {
-  font-size: 16px;
-  color: var(--text);
-}
-.auth-card .mantine-PasswordInput-label {
-  margin-bottom: 8px;
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 500;
-}
-.auth-setup-note {
-  margin: -6px 0 0;
-  padding: 13px 15px;
-  background: var(--surface-2);
-  border-radius: 11px;
-  color: var(--muted);
-  font-size: 12px;
-  line-height: 1.8;
-}
-.auth-error {
-  color: #ca5e51;
-  line-height: 1.6;
-  font-size: 13px;
-}
-.auth-switch {
-  margin: 0;
-  text-align: center;
-  color: var(--muted);
-  font-size: 13px;
-}
-.auth-switch button {
-  margin-left: 5px;
-  padding: 10px 4px;
-  border: 0;
-  background: none;
-  color: var(--accent);
-  font: inherit;
-  cursor: pointer;
-}
-.auth-loading {
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-direction: column;
-  gap: 16px;
-  color: var(--muted);
-  padding: 24px;
-  text-align: center;
-}
-.account-menu-trigger {
-  width: 36px;
-  height: 36px;
-  padding: 0;
-  border: 1px solid var(--line);
-  border-radius: 50%;
-  background: var(--surface-2);
-  color: var(--accent);
-  cursor: pointer;
-  display: grid;
-  place-items: center;
-  font-weight: 600;
-}
-.account-menu-email {
-  padding: 8px 12px 10px;
-  color: var(--text);
-  overflow-wrap: anywhere;
-  font-size: 12px;
-}
-@media (min-width: 681px) and (max-height: 760px) {
-  .auth-story,
-  .auth-form-area {
-    padding: 24px 28px;
-  }
-  .auth-story-copy {
-    margin-top: 24px;
-  }
-  .auth-story h1 {
-    margin: 12px 0;
-    font-size: 36px;
-    line-height: 1.35;
-  }
-  .auth-sound-art {
-    min-height: 160px;
-    margin: 16px 0 12px;
-  }
-  .auth-sound-disc {
-    width: 160px;
-    height: 160px;
-  }
-  .auth-card {
-    gap: 12px;
-  }
-  .auth-head {
-    gap: 6px;
-    margin-bottom: 0;
-  }
-  .auth-head h2 {
-    margin-top: 0;
-  }
-  .auth-logo {
-    width: 34px;
-    height: 34px;
-    border-radius: 10px;
-  }
-  .auth-setup-note {
-    padding: 10px 12px;
-  }
-  .auth-card .mantine-TextInput-label,
-  .auth-card .mantine-PasswordInput-label {
-    margin-bottom: 4px;
-  }
-  .auth-card .mantine-TextInput-input,
-  .auth-card .mantine-PasswordInput-input,
-  .auth-card .mantine-Button-root {
-    min-height: 44px;
-  }
-}
-@media (max-width: 680px) {
-  .auth-screen {
-    display: block;
-    padding: 0;
-  }
-  .auth-screen .auth-page {
-    min-height: 100dvh;
-    grid-template-rows: auto 1fr;
-    border: 0;
-    border-radius: 0;
-  }
-  .auth-story {
-    padding: max(20px, env(safe-area-inset-top)) 24px 18px;
-  }
-  .auth-story-copy {
-    margin-top: 12px;
-  }
-  .auth-story h1 {
-    margin: 0;
-    font-size: 26px;
-    line-height: 1.4;
-  }
-  .auth-story h1 br,
-  .auth-form-area {
-    padding: 20px max(24px, env(safe-area-inset-right))
-      max(20px, env(safe-area-inset-bottom))
-      max(24px, env(safe-area-inset-left));
-  }
-  .auth-card {
-    max-width: 420px;
-    gap: 14px;
-  }
-  .auth-head {
-    gap: 6px;
-    margin-bottom: 0;
-  }
-  .auth-setup-note {
-    padding: 10px 12px;
-  }
-}
-@media (max-height: 700px) and (max-width: 680px) {
-  .auth-story {
-    padding-top: max(14px, env(safe-area-inset-top));
-    padding-bottom: 14px;
-  }
-  .auth-story-copy {
-    margin-top: 8px;
-  }
-  .auth-story h1 {
-    font-size: 24px;
-  }
-  .auth-story h1 br {
-    display: none;
-  }
-  .auth-card {
-    gap: 10px;
-  }
-  .auth-form-area {
-    padding-top: 16px;
-    padding-bottom: max(16px, env(safe-area-inset-bottom));
-  }
-  .auth-card .mantine-TextInput-label,
-  .auth-card .mantine-PasswordInput-label {
-    margin-bottom: 4px;
-  }
-  .auth-card .mantine-TextInput-input,
-  .auth-card .mantine-PasswordInput-input,
-  .auth-card .mantine-Button-root {
-    min-height: 44px;
-  }
-}
-@media (max-height: 580px) and (max-width: 680px) {
-  .auth-story-copy {
-    display: none;
-  }
-}
-
+/* 900px layout retired: single centered card */
 /* branded boot screen */
 .auth-loading {
   background: var(--bg, #0b0e14);
@@ -487,3 +139,20 @@
 }
 .account-guest-login:hover { opacity: 0.85; }
 .account-guest-login .account-name { font-size: 0.85rem; }
+
+@media (max-width: 680px) {
+  .auth-screen {
+    display: grid;
+    padding: clamp(16px, 4dvh, 28px) 18px;
+  }
+  .auth-screen .auth-page {
+    max-width: none;
+    padding: 26px 22px;
+    border-radius: 22px;
+  }
+  .auth-ambient-wave { gap: 9px; height: 34dvh; }
+  .auth-brand-center strong { font-size: 19px; }
+  .auth-card .mantine-TextInput-input,
+  .auth-card .mantine-PasswordInput-input,
+  .auth-card .mantine-Button-root { min-height: 46px; }
+}

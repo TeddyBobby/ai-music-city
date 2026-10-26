@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, PasswordInput, TextInput } from "@mantine/core";
-import { ArrowRight, AudioLines, LockKeyhole } from "lucide-react";
+import { ArrowRight, AudioLines } from "lucide-react";
 import { api } from "../lib/api";
 import { leaveAccount } from "../lib/accountBoundary";
 import { useAuth } from "../state/auth";
@@ -49,33 +49,31 @@ export function LoginPage() {
 
   return (
     <main className="auth-screen">
+      {/* 背景：品牌深色 + 声波层 */}
+      <div className="auth-ambient" aria-hidden="true">
+        <div className="auth-ambient-wave">
+          {Array.from({ length: 24 }).map((_, i) => (
+            <i key={i} style={{ animationDelay: `${(i % 12) * 0.13}s` }} />
+          ))}
+        </div>
+        <div className="auth-ambient-glow" />
+      </div>
+
       <div className="auth-page">
-        <section className="auth-story" aria-label="欢迎来到 AI乐之城">
-          <span className="auth-brand">
-            <AudioLines size={23} /> AI乐之城
-          </span>
-          <div className="auth-story-copy">
-            <h1>
-              让想象，
-              <br />
-              有回响。
-            </h1>
-          </div>
-          <div className="auth-sound-art" aria-hidden="true">
-            <div className="auth-sound-disc">
-              <span>
-                <AudioLines size={32} strokeWidth={1.5} />
-              </span>
-            </div>
-          </div>
-        </section>
         <div className="auth-form-area">
           <form className="auth-card" onSubmit={submit}>
-            <div className="auth-head">
-              <span className="auth-logo">
-                <LockKeyhole size={21} />
+            <div className="auth-brand-center">
+              <span className="auth-brand-icon">
+                <AudioLines size={24} strokeWidth={1.8} />
               </span>
-              <h2>{creating ? "创建账号" : "登录"}</h2>
+              <strong>AI乐之城</strong>
+              <span className="auth-brand-sub">让想象，有回响</span>
+            </div>
+            <div className="auth-head">
+              <h2>{creating ? "创建账号" : "欢迎回来"}</h2>
+              <p className="auth-head-sub">
+                {creating ? "注册后即可生成属于你的音乐" : "登录后继续你的创作"}
+              </p>
             </div>
             {setupRequired && (
               <p className="auth-setup-note">
