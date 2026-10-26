@@ -380,6 +380,9 @@ function AccountMenu({ showName = false }: { showName?: boolean }) {
 
 function AuthGate() {
   const { user, loading, error, refresh } = useAuth();
+  const location = useLocation();
+  // 登录页是独立全屏页：不进 Shell（无侧边栏/顶栏/播放条），登录后再回到应用。
+  const onLoginPage = location.pathname.startsWith("/login");
   useEffect(() => {
     const unregister = registerAccountCleanup(() => {
       resetPlayerForAccount();
@@ -441,6 +444,12 @@ function AuthGate() {
         <button className="btn" onClick={() => void refresh()}>
           重新连接
         </button>
+      </div>
+    );
+  if (onLoginPage)
+    return (
+      <div className="app-shell" data-standalone="true">
+        <LoginPage />
       </div>
     );
   // 游客可浏览：未登录也进入主界面，需要登录的操作（生成等）由后端 401 引导跳转登录。
