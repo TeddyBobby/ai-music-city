@@ -63,6 +63,10 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
     if engine is None:
         if os.environ.get("AMC_ENGINE") == "acestep":
             engine = _acestep_engine()
+        elif os.environ.get("AMC_ENGINE") == "suno":
+            from yue2_studio.suno_engine import SunoEngine
+            engine = SunoEngine(api_key=os.environ.get("AMC_SUNO_API_KEY") or "",
+                                base_url=os.environ.get("AMC_SUNO_BASE_URL", "https://api.sunoapi.org"))
         else:
             engine = _real_engine(paths)
 
