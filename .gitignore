@@ -43,3 +43,6 @@ htmlcov/
 *.ckpt
 *.pt
 *.pth
+
+checkpoints/
+checkpoints_old/
