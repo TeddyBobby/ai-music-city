@@ -622,3 +622,44 @@
     opacity: 1;
   }
 }
+
+/* 批量管理模式 */
+.simple-library-manage {
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.simple-library-batch {
+  margin-left: auto;
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  flex-shrink: 0;
+}
+.simple-song.is-selecting {
+  cursor: pointer;
+  user-select: none;
+}
+.simple-song.is-selecting:hover {
+  background: color-mix(in srgb, var(--accent, #22d3ee) 6%, transparent);
+}
+.simple-song.is-selecting.is-checked {
+  background: color-mix(in srgb, var(--accent, #22d3ee) 10%, transparent);
+}
+.simple-song-check {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 2px solid var(--line, #ccc);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: var(--accent, #22d3ee);
+}
+.simple-song.is-selecting .simple-song-check[aria-pressed="true"] {
+  border-color: var(--accent, #22d3ee);
+  background: color-mix(in srgb, var(--accent, #22d3ee) 15%, transparent);
+}
+.simple-song-check-empty {
+  display: block;
+}

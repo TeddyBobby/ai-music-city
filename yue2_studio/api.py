@@ -474,6 +474,41 @@ async def delete_job(request: Request, job_id: str):
     return Response(status_code=204)
 
 
+@router.post("/jobs/batch-delete")
+async def batch_delete_jobs(request: Request, body: dict):
+    """删除多首歌曲：已完成/失败/取消的任务可删，运行中自动跳过（不报错）。"""
+    ids = body.get("ids") or []
+    if not isinstance(ids, list) or not ids or len(ids) > 200 or \
+            any(not isinstance(i, str) or len(i) > 64 for i in ids):
+        raise ApiError(400, "validation_error", "无效的任务 ID 列表")
+    store = _store(request)
+    worker = _worker(request)
+    deleted, skipped = [], []
+    for job_id in ids:
+        try:
+            job = store.get(job_id)
+        except Exception:
+            continue
+        if job is None:
+            continue
+        if job.status == "running":
+            skipped.append(job_id)
+            continue
+        if job.status == "queued":
+            try:
+                worker.cancel(job_id)
+                job = store.get(job_id)
+                if job and job.status == "running":
+                    skipped.append(job_id)
+                    continue
+            except Exception:
+                pass
+        store.delete(job_id)
+        await asyncio.to_thread(worker.delete_song_dir, job_id)
+        deleted.append(job_id)
+    return {"deleted": deleted, "skipped": skipped}
+
+
 @router.post("/jobs/{job_id}/cancel")
 async def cancel_job(request: Request, job_id: str):
     job = _get_job(request, job_id)

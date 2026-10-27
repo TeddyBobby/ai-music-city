@@ -79,6 +79,8 @@ export const api = {
   remove: (id: string) => request("DELETE", `/api/jobs/${id}`),
   cancel: (id: string) =>
     request("POST", `/api/jobs/${id}/cancel`, undefined, { withStatus: true }),
+  batchRemoveSongs: (ids: string[]) =>
+    request("POST", "/api/jobs/batch-delete", { ids }),
   patchJob: (id: string, patch: any) =>
     request("PATCH", `/api/jobs/${id}`, patch),
   projects: () => request("GET", "/api/projects"),

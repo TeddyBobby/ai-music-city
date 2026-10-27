@@ -3,6 +3,7 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Menu, SegmentedControl, UnstyledButton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
+  Check,
   Download,
   LoaderCircle,
   Maximize2,
@@ -12,6 +13,7 @@ import {
   Play,
   Share2,
   SlidersHorizontal,
+  Trash2,
   X,
 } from "lucide-react";
 import { api } from "../lib/api";
@@ -95,6 +97,10 @@ export function LibraryPage() {
   const [reload, setReload] = useState(0);
   const [canceling, setCanceling] = useState("");
   const [sharing, setSharing] = useState<Job | null>(null);
+  // 批量管理：selecting 模式开关，selectedIds 勾选集合，removing 删除进行中
+  const [selecting, setSelecting] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [removing, setRemoving] = useState(false);
   const focused = useRef("");
   const selectedFailure = failed.find((job) => job.id === selectedId);
   const previousFailures = failed.filter((job) => job.id !== selectedId);
@@ -219,6 +225,59 @@ export function LibraryPage() {
     }
   }
 
+  function toggleSelected(id: string) {
+    setSelectedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  }
+
+  function exitSelecting() {
+    setSelecting(false);
+    setSelectedIds([]);
+  }
+
+  async function removeOne(job: Job) {
+    if (removing) return;
+    if (!window.confirm(`确定删除《${titleOf(job)}》？删除后无法恢复。`)) return;
+    setRemoving(true);
+    try {
+      await api.remove(job.id);
+      toast("已删除");
+      setReload((value) => value + 1);
+    } catch (cause) {
+      toast(errorMessage(cause), "err");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
+  async function removeSelected() {
+    if (removing || !selectedIds.length) return;
+    if (
+      !window.confirm(
+        `确定删除选中的 ${selectedIds.length} 首歌曲？删除后无法恢复。`,
+      )
+    )
+      return;
+    setRemoving(true);
+    try {
+      const result = await api.batchRemoveSongs(selectedIds);
+      const done = (result?.deleted || []).length;
+      const skipped = (result?.skipped || []).length;
+      toast(
+        skipped
+          ? `已删除 ${done} 首，${skipped} 首生成中已跳过`
+          : `已删除 ${done} 首`,
+      );
+      exitSelecting();
+      setReload((value) => value + 1);
+    } catch (cause) {
+      toast(errorMessage(cause), "err");
+    } finally {
+      setRemoving(false);
+    }
+  }
+
   function filterSongs(value: string) {
     if (value !== "all" && value !== "instrumental" && value !== "vocal")
       return;
@@ -281,6 +340,43 @@ export function LibraryPage() {
             </>
           )}
         </div>
+        {songs.length > 0 && !selecting && (
+          <Button
+            className="simple-library-manage"
+            onClick={() => setSelecting(true)}
+          >
+            管理
+          </Button>
+        )}
+        {selecting && (
+          <div className="simple-library-batch">
+            <Button
+              onClick={() =>
+                setSelectedIds((prev) =>
+                  prev.length === songs.length
+                    ? []
+                    : songs.map((job) => job.id),
+                )
+              }
+            >
+              {selectedIds.length === songs.length ? "取消全选" : "全选"}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={!selectedIds.length || removing}
+              onClick={() => void removeSelected()}
+            >
+              {removing
+                ? "删除中…"
+                : selectedIds.length
+                  ? `删除 (${selectedIds.length})`
+                  : "删除"}
+            </Button>
+            <Button variant="ghost" onClick={exitSelecting}>
+              完成
+            </Button>
+          </div>
+        )}
       </header>
       {error && (
         <div className="simple-library-error" role="alert">
@@ -380,11 +476,31 @@ export function LibraryPage() {
               <article
                 id={`song-${job.id}`}
                 key={job.id}
-                className={`simple-song ${job.id === selectedId ? "is-highlighted" : ""} ${playing ? "is-playing" : ""}`}
+                className={`simple-song ${job.id === selectedId ? "is-highlighted" : ""} ${playing ? "is-playing" : ""} ${selecting ? "is-selecting" : ""} ${selecting && selectedIds.includes(job.id) ? "is-checked" : ""}`}
+                onClick={
+                  selecting
+                    ? () => toggleSelected(job.id)
+                    : undefined
+                }
               >
-                <span className="simple-song-number" aria-hidden="true">
-                  {String(index + 1).padStart(2, "0")}
-                </span>
+                {selecting ? (
+                  <UnstyledButton
+                    className="simple-song-check"
+                    aria-label={`选择 ${titleOf(job)}`}
+                    aria-pressed={selectedIds.includes(job.id)}
+                    tabIndex={0}
+                  >
+                    {selectedIds.includes(job.id) ? (
+                      <Check size={18} />
+                    ) : (
+                      <span className="simple-song-check-empty" />
+                    )}
+                  </UnstyledButton>
+                ) : (
+                  <span className="simple-song-number" aria-hidden="true">
+                    {String(index + 1).padStart(2, "0")}
+                  </span>
+                )}
                 <UnstyledButton
                   className="simple-song-cover"
                   aria-label={`${playing ? "暂停" : "播放"} ${titleOf(job)}`}
@@ -482,6 +598,13 @@ export function LibraryPage() {
                         onClick={() => setSharing(job)}
                       >
                         分享
+                      </Menu.Item>
+                      <Menu.Item
+                        color="red"
+                        leftSection={<Trash2 size={18} />}
+                        onClick={() => void removeOne(job)}
+                      >
+                        删除
                       </Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
