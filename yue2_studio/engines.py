@@ -35,6 +35,12 @@ def current():
         return _ENGINES.get(_ACTIVE)["factory"]() if _ACTIVE in _ENGINES else None
 
 
+def current_id() -> str | None:
+    """Key of the active engine (e.g. 'local' / 'suno'), or None before install_default."""
+    with _LOCK:
+        return _ACTIVE
+
+
 def switch(key: str) -> str:
     """Switch the active engine. Returns the new key; raises KeyError for unknown keys."""
     with _LOCK:

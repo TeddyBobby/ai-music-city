@@ -194,11 +194,22 @@ def _loras(request: Request) -> dict:
 
 
 def _hum_status(request: Request) -> dict:
-    """Whether hum-to-song can run (cover prerequisites + librosa) and the hum adapters found."""
+    """Whether hum-to-song can run. Local engines need cover prerequisites + librosa;
+    the Suno cloud engine only needs the API key (recording is uploaded as a reference)."""
     state = _state(request)
     adapters = [a.name for a in lora.list_hum_adapters(state.paths.loras_dir)]
     if state.fake:
         return {"available": True, "reasons": [], "adapters": adapters}
+    # Cloud engine: hum runs as an audioUrls reference — no local models required.
+    try:
+        import yue2_studio.engines as _engines
+        active = _engines.current_id()
+    except Exception:
+        active = None
+    if active == "suno":
+        ok = bool(os.environ.get("AMC_SUNO_API_KEY"))
+        return {"available": ok, "reasons": [] if ok else ["Suno API key not configured"],
+                "adapters": adapters, "engine": "suno"}
     info = config.hum_available(state.paths)
     reasons = []
     if not info["ffmpeg"]:

@@ -50,6 +50,7 @@ export function HumComposer({
   const [idea, setIdea] = useState("");
   const [seconds, setSeconds] = useState(0);
   const [available, setAvailable] = useState<boolean | null>(null);
+  const [statusHumEngine, setStatusHumEngine] = useState<string | null>(null);
   const [error, setError] = useState("");
   const busy = phase !== "idle";
   const recordingSupported =
@@ -103,7 +104,10 @@ export function HumComposer({
     api
       .status()
       .then((status) => {
-        if (current) setAvailable(!!status.hum?.available);
+        if (current) {
+          setAvailable(!!status.hum?.available);
+          setStatusHumEngine((status.hum?.engine as string) || null);
+        }
       })
       .catch(() => {});
     return () => {
@@ -249,7 +253,11 @@ export function HumComposer({
       if (status.models?.present === false)
         throw new Error("音乐模型尚未就绪，请先完成模型配置后重试。");
       if (!status.hum?.available)
-        throw new Error("哼唱生成暂未启用，录音和试听可用。");
+        throw new Error(
+          status.hum?.engine === "suno"
+            ? "云端哼唱尚未接入，请先在设置中配置 Suno。"
+            : "哼唱生成暂未启用，录音和试听可用。",
+        );
       changePhase("uploading");
       const body = new FormData();
       body.append("file", file, file.name);
@@ -415,7 +423,11 @@ export function HumComposer({
           onChange={(event) => setIdea(event.currentTarget.value)}
         />
         {!error && available === false && (
-          <p className="hum-note">哼唱生成暂未启用，录音和试听可用。</p>
+          <p className="hum-note">
+            {statusHumEngine === "suno"
+              ? "哼唱生成尚未配置，请先在设置中接入云引擎。"
+              : "哼唱生成暂未启用，录音和试听可用。"}
+          </p>
         )}
       </div>
       {error && (
