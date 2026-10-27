@@ -1,8 +1,7 @@
-"""Suno cloud engine adapter (commercial-quality generation via Suno API).
+"""Suno cloud engine adapter (commercial-quality generation via sunoapi.org v1 API).
 
-Wiring: set AMC_ENGINE=suno, AMC_SUNO_API_KEY=<key>, and (optional)
-AMC_SUNO_BASE_URL=<provider endpoint>. Jobs follow the same contract as
-ACEStepEngine: create_song(request, out_dir, options, on_event, cancelled).
+Wiring: set AMC_ENGINE=suno, AMC_SUNO_API_KEY=<key>. Jobs follow the same
+contract as ACEStepEngine: create_song(request, out_dir, options, on_event, cancelled).
 """
 from __future__ import annotations
 
@@ -20,8 +19,8 @@ SAMPLE_RATE = 44100
 
 
 class SunoEngine:
-    """Cloud engine: submits (style, lyrics) to a Suno-compatible API and polls
-    until the audio is ready, then downloads it into the song directory."""
+    """Cloud engine: submits (style, lyrics) to sunoapi.org and polls
+    record-info until the audio is ready, then downloads it."""
 
     def __init__(self, *, api_key: str | None = None, base_url: str = "https://api.sunoapi.org"):
         self.api_key = api_key
@@ -66,19 +65,27 @@ class SunoEngine:
 
         emit("Submitting to cloud")
         with httpx.Client(timeout=httpx.Timeout(30, connect=10), trust_env=False) as client:
+            # v1 协议：customMode=true 时 prompt=歌词，tags=风格
             payload = {
-                "prompt": tags,
-                "make_instrumental": not lyrics,
-                "wait_audio": False,
+                "customMode": bool(lyrics),
+                "instrumental": not lyrics,
+                "model": "V5",
+                "callBackUrl": "https://music.myzai.top/s/ping",
             }
             if lyrics:
-                payload["lyrics"] = lyrics
-            resp = client.post(f"{self.base_url}/api/v2/generate", json=payload, headers=self._headers())
-            resp.raise_for_status()
-            clips = resp.json() or []
-            if not clips:
-                raise RuntimeError("Suno returned no clips")
-            clip_id = clips[0].get("id")
+                payload["prompt"] = lyrics
+                payload["tags"] = tags
+                payload["title"] = (request.get("title") or "")[:60] or None
+            else:
+                payload["prompt"] = tags
+            payload = {k: v for k, v in payload.items() if v is not None}
+            resp = client.post(f"{self.base_url}/api/v1/generate", json=payload, headers=self._headers())
+            data = resp.json()
+            if data.get("code") != 200:
+                raise RuntimeError(f"Suno submit failed: {data.get('msg')}")
+            task_id = (data.get("data") or {}).get("taskId")
+            if not task_id:
+                raise RuntimeError(f"Suno returned no taskId: {data}")
 
             emit("Cloud generation", total=100)
             audio_url = None
@@ -86,16 +93,19 @@ class SunoEngine:
                 if cancelled and cancelled():
                     raise InterruptedError("Cancelled")
                 time.sleep(5)
-                poll = client.get(f"{self.base_url}/api/v2/generate/{clip_id}", headers=self._headers())
-                poll.raise_for_status()
-                data = poll.json() or [{}]
-                clip = data[0] if isinstance(data, list) else data
-                status = (clip.get("status") or "").lower()
-                if status == "completed":
-                    audio_url = clip.get("audio_url")
+                poll = client.get(f"{self.base_url}/api/v1/generate/record-info",
+                                  params={"taskId": task_id}, headers=self._headers())
+                pdata = poll.json()
+                clips = (pdata.get("data") or {}).get("clips") or []
+                if not clips:
+                    continue
+                clip = clips[0]
+                status = (pdata.get("data") or {}).get("status") or clip.get("status") or ""
+                audio_url = clip.get("audio_url") or clip.get("source_audio_url")
+                if audio_url:
                     break
-                if status == "error":
-                    raise RuntimeError(f"Suno clip failed: {clip.get('error_message', 'unknown')}")
+                if "ERROR" in str(status).upper() or clip.get("error_message"):
+                    raise RuntimeError(f"Suno clip failed: {clip.get('error_message', status)}")
                 emit("Cloud generation", completed=min(90, i * 8), total=100)
 
             if not audio_url:
@@ -106,11 +116,10 @@ class SunoEngine:
             audio.raise_for_status()
             song_dir.mkdir(parents=True, exist_ok=True)
             final_audio = song_dir / "audio.flac"
-            suffix = ".mp3" if "mp3" in audio_url else ".flac"
+            suffix = ".mp3" if ".mp3" in audio_url else (".wav" if ".wav" in audio_url else ".mp3")
             raw = song_dir / f"audio{suffix}"
             raw.write_bytes(audio.content)
             if suffix != ".flac":
-                # convert to flac via ffmpeg for a uniform contract
                 import subprocess
                 subprocess.run(["ffmpeg", "-y", "-v", "quiet", "-i", str(raw),
                                 "-c:a", "flac", str(final_audio)], check=True)
