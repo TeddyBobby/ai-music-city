@@ -310,7 +310,7 @@ def _ai_complete_draft(description: str, music_kind: str = "vocal", *, context: 
         "stream": False,
         # 推理模型思考内容计入 max_tokens：给足思考+正文空间，
         # 否则 finish_reason=length 时正文被截成碎片（曾致“方案无法解析”）。
-        "max_tokens": 2048 if instrumental else 6144,
+        "max_tokens": 131072,
     }
     try:
         with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
@@ -328,7 +328,7 @@ def _ai_complete_draft(description: str, music_kind: str = "vocal", *, context: 
     match = re.search(r"\{[\s\S]*\}", text) if text else None
     if not match:
         retry = dict(body)
-        retry["max_tokens"] = 4096
+        retry["max_tokens"] = 131072
         retry["thinking"] = {"type": "disabled"}
         retry["messages"] = [
             {"role": "system", "content": system + "\n直接输出结果，不要思考过程。"},
