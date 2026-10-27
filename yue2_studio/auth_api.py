@@ -371,13 +371,14 @@ class AuthenticationMiddleware:
             )
             return
         tenants = getattr(request.app.state, "tenants", None)
-        if user is not None and tenants is not None:
+        admin_request = path == "/api/admin" or path.startswith("/api/admin/")
+        if user is not None and tenants is not None and not admin_request:
             state["runtime"] = tenants.for_user(user)
         await self.app(scope, receive, private_send)
 
 
 def require_admin(request: Request) -> dict | None:
-    """Only the local owner may read or change shared provider credentials."""
+    """Restrict platform administration and shared settings to administrators."""
     user = getattr(request.state, "user", None)
     # Small router-only unit apps have no authentication service. Production installs
     # this service before serving any route, so there is no unauthenticated bypass.

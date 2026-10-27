@@ -96,7 +96,9 @@ function Shell() {
         ? "个人设置"
         : route === "pricing"
           ? "订阅与定价"
-          : "音乐");
+          : route === "admin"
+            ? "管理控制台"
+            : "音乐");
 
   useEffect(() => {
     // Portal dialogs and the composer use the same visible keyboard bounds.

@@ -3,7 +3,6 @@ import { Link, useSearchParams } from "react-router-dom";
 import { Checkbox as MantineCheckbox, Menu, SegmentedControl, UnstyledButton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
-  CheckCheck,
   ListChecks,
   Download,
   LoaderCircle,
@@ -14,7 +13,6 @@ import {
   Play,
   Share2,
   SlidersHorizontal,
-  Square,
   Trash2,
   X,
 } from "lucide-react";
@@ -99,15 +97,15 @@ export function LibraryPage() {
   const [reload, setReload] = useState(0);
   const [canceling, setCanceling] = useState("");
   const [sharing, setSharing] = useState<Job | null>(null);
-  // 批量管理：selecting 模式开关，selectedIds 勾选集合
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
-  // 删除确认（单首/批量共用一个 Dialog）：pending 为 null 时关闭
-  const [confirmDelete, setConfirmDelete] = useState<
-    { ids: string[]; label: string } | null
-  >(null);
+  const [confirmDelete, setConfirmDelete] = useState<Job[] | null>(null);
   const [removing, setRemoving] = useState(false);
+  const deleting = useRef(false);
+  const loadVersion = useRef(0);
   const focused = useRef("");
+  const selectedSongs = songs.filter((job) => selectedIds.includes(job.id));
+  const allSelected = songs.length > 0 && selectedSongs.length === songs.length;
   const selectedFailure = failed.find((job) => job.id === selectedId);
   const previousFailures = failed.filter((job) => job.id !== selectedId);
 
@@ -143,8 +141,9 @@ export function LibraryPage() {
       };
     }
     async function load() {
-      if (inFlight) return;
+      if (inFlight || deleting.current) return;
       inFlight = true;
+      const version = loadVersion.current;
       try {
         const [done, active, unsuccessful] = await Promise.all([
           loadSongs(),
@@ -174,10 +173,10 @@ export function LibraryPage() {
             /* A stale link must not hide the library. */
           }
         }
-        if (!live) return;
-        setSongs(
-          selected?.status === "done" ? [selected, ...done.jobs] : done.jobs,
-        );
+        if (!live || version !== loadVersion.current) return;
+        const visibleSongs = selected?.status === "done" ? [selected, ...done.jobs] : done.jobs;
+        setSongs(visibleSongs);
+        setSelectedIds((previous) => previous.filter((id) => visibleSongs.some((job) => job.id === id)));
         setPending(
           selected && ["running", "queued"].includes(selected.status)
             ? [selected, ...active.jobs]
@@ -192,10 +191,10 @@ export function LibraryPage() {
         setAudioSeconds(done.summary?.audio_seconds || 0);
         setError("");
       } catch (cause) {
-        if (live) setError(errorMessage(cause));
+        if (live && version === loadVersion.current) setError(errorMessage(cause));
       } finally {
         inFlight = false;
-        if (live) setLoading(false);
+        if (live && version === loadVersion.current) setLoading(false);
       }
     }
     void load();
@@ -232,61 +231,79 @@ export function LibraryPage() {
   }
 
   function toggleSelected(id: string) {
+    if (removing) return;
     setSelectedIds((prev) =>
       prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
     );
   }
 
   function exitSelecting() {
+    if (removing) return;
     setSelecting(false);
     setSelectedIds([]);
   }
 
-  /** 打开删除确认对话框（单首/批量共用） */
-  function askDelete(ids: string[], label: string) {
-    if (removing || !ids.length) return;
-    setConfirmDelete({ ids, label });
+  function askDelete(jobs: Job[]) {
+    if (removing || !jobs.length) return;
+    setConfirmDelete(jobs);
   }
 
-  async function removeOne(job: Job) {
-    askDelete([job.id], `《${titleOf(job)}》`);
-  }
-
-  async function removeSelected() {
-    askDelete(selectedIds, `选中的 ${selectedIds.length} 首歌曲`);
-  }
-
-  /** Dialog 确认后真正执行删除 */
   async function doDelete() {
-    if (!confirmDelete || removing) return;
+    if (!confirmDelete || deleting.current) return;
+    deleting.current = true;
+    loadVersion.current += 1;
     setRemoving(true);
+    const deleted = new Set<string>();
+    const skipped = new Set<string>();
     try {
-      const ids = confirmDelete.ids;
-      const result =
-        ids.length === 1
+      const ids = confirmDelete.map((job) => job.id);
+      // The batch endpoint accepts at most 200 IDs; keep larger libraries manageable.
+      for (let offset = 0; offset < ids.length; offset += 200) {
+        const batch = ids.slice(offset, offset + 200);
+        const result = ids.length === 1
           ? (await api.remove(ids[0]), { deleted: ids, skipped: [] })
-          : await api.batchRemoveSongs(ids);
-      const done = (result?.deleted || []).length;
-      const skipped = (result?.skipped || []).length;
+          : await api.batchRemoveSongs(batch);
+        for (const id of result.deleted) {
+          deleted.add(id);
+          usePlayer.getState().remove(id);
+        }
+        for (const id of result.skipped) skipped.add(id);
+        setSongs((previous) => previous.filter((job) => !deleted.has(job.id)));
+        setSelectedIds((previous) => previous.filter((id) => !deleted.has(id)));
+      }
       toast(
-        skipped
-          ? `已删除 ${done} 首，${skipped} 首生成中已跳过`
-          : `已删除 ${done} 首`,
+        skipped.size
+          ? `已删除 ${deleted.size} 首，${skipped.size} 首生成中已跳过`
+          : `已删除 ${deleted.size} 首`,
       );
       setConfirmDelete(null);
-      exitSelecting();
-      setReload((value) => value + 1);
+      if (selectedSongs.every((job) => deleted.has(job.id))) {
+        setSelecting(false);
+        setSelectedIds([]);
+      }
     } catch (cause) {
-      toast(errorMessage(cause), "err");
+      // A later batch can fail after earlier batches succeeded. Retrying must
+      // only include the remaining songs, and successful deletions stay removed.
+      setConfirmDelete((previous) => previous?.filter((job) => !deleted.has(job.id)) || null);
+      toast(`${deleted.size ? `已删除 ${deleted.size} 首，其余删除失败：` : ""}${errorMessage(cause)}`, "err");
     } finally {
+      if (deleted.has(selectedId)) {
+        const next = new URLSearchParams(params);
+        next.delete("job");
+        setParams(next, { replace: true });
+      }
+      setReload((value) => value + 1);
+      deleting.current = false;
       setRemoving(false);
     }
   }
 
   function filterSongs(value: string) {
+    if (removing) return;
     if (value !== "all" && value !== "instrumental" && value !== "vocal")
       return;
     if (value === musicKind) return;
+    setSelectedIds([]);
     setMusicKind(value);
     setLimit(40);
     setSongs([]);
@@ -303,7 +320,7 @@ export function LibraryPage() {
   }
 
   return (
-    <div className="simple-library">
+    <div className="simple-library" data-selecting={selecting}>
       <header className="simple-library-toolbar">
         <SegmentedControl
           aria-label="筛选音乐类型"
@@ -313,6 +330,7 @@ export function LibraryPage() {
             indicator: "simple-library-filter-indicator",
           }}
           value={musicKind}
+          disabled={removing}
           onChange={filterSongs}
           data={[
             { value: "all", label: "全部" },
@@ -322,75 +340,64 @@ export function LibraryPage() {
           withItemsBorders={false}
           radius="xl"
         />
-        <div
-          className="simple-library-summary"
-          role="status"
-          aria-live="polite"
-        >
-          {loading && !songs.length ? (
-            <span>正在加载…</span>
-          ) : error && !songs.length ? (
-            <span>暂时无法获取汇总</span>
+        <div className="simple-library-tools">
+          {selecting ? (
+            <div className="simple-library-selection">
+              <MantineCheckbox
+                label="全选"
+                checked={allSelected}
+                indeterminate={selectedSongs.length > 0 && !allSelected}
+                disabled={removing || !songs.length}
+                onChange={() => setSelectedIds(allSelected ? [] : songs.map((job) => job.id))}
+              />
+              <span className="simple-library-selection-count" role="status" aria-live="polite">
+                已选 <strong>{selectedSongs.length}</strong> 首
+              </span>
+            </div>
           ) : (
-            <>
-              <span>
-                共 <strong>{total}</strong> 首
-              </span>
-              <span className="simple-library-summary-dot" aria-hidden="true">
-                ·
-              </span>
-              <span>
-                总时长 <strong>{duration(audioSeconds)}</strong>
-              </span>
-            </>
+            <div className="simple-library-summary" role="status" aria-live="polite">
+              {loading && !songs.length ? (
+                <span>正在加载…</span>
+              ) : error && !songs.length ? (
+                <span>暂时无法获取汇总</span>
+              ) : (
+                <>
+                  <span><strong>{total}</strong> 首作品</span>
+                  <span className="simple-library-summary-dot" aria-hidden="true">·</span>
+                  <span><strong>{duration(audioSeconds)}</strong></span>
+                </>
+              )}
+            </div>
           )}
-        </div>
-        {songs.length > 0 && !selecting && (
-          <Button
-            className="simple-library-manage"
-            variant="default"
-            leftSection={<ListChecks size={16} />}
-            onClick={() => setSelecting(true)}
-          >
-            管理
-          </Button>
-        )}
-        {selecting && (
-          <div className="simple-library-batch">
-            <Button
-              variant="default"
-              leftSection={
-                selectedIds.length === songs.length ? (
-                  <Square size={16} />
-                ) : (
-                  <CheckCheck size={16} />
-                )
-              }
-              onClick={() =>
-                setSelectedIds((prev) =>
-                  prev.length === songs.length
-                    ? []
-                    : songs.map((job) => job.id),
-                )
-              }
-            >
-              {selectedIds.length === songs.length ? "取消全选" : "全选"}
-            </Button>
-            <Button
-              variant="danger"
-              color="red"
-              disabled={!selectedIds.length || removing}
-              leftSection={<Trash2 size={16} />}
-              loading={removing}
-              onClick={() => void removeSelected()}
-            >
-              删除{selectedIds.length ? ` (${selectedIds.length})` : ""}
-            </Button>
-            <Button variant="ghost" onClick={exitSelecting}>
-              完成
-            </Button>
+          <div className="simple-library-toolbar-actions">
+            {selecting ? (
+              <>
+                <Button
+                  variant="danger"
+                  color="red"
+                  disabled={!selectedSongs.length || removing}
+                  leftSection={<Trash2 size={16} />}
+                  loading={removing}
+                  onClick={() => askDelete(selectedSongs)}
+                >
+                  删除
+                </Button>
+                <Button variant="ghost" disabled={removing} onClick={exitSelecting}>
+                  完成
+                </Button>
+              </>
+            ) : songs.length > 0 && (
+              <Button
+                className="simple-library-manage"
+                variant="default"
+                leftSection={<ListChecks size={16} />}
+                onClick={() => setSelecting(true)}
+              >
+                管理
+              </Button>
+            )}
           </div>
-        )}
+        </div>
       </header>
       {error && (
         <div className="simple-library-error" role="alert">
@@ -498,13 +505,15 @@ export function LibraryPage() {
                 }
               >
                 {selecting ? (
-                  <MantineCheckbox
-                    className="simple-song-check"
-                    aria-label={`选择 ${titleOf(job)}`}
-                    checked={selectedIds.includes(job.id)}
-                    onChange={() => toggleSelected(job.id)}
-                    size="lg"
-                  />
+                  <div className="simple-song-select-cell" onClick={(event) => event.stopPropagation()}>
+                    <MantineCheckbox
+                      className="simple-song-check"
+                      aria-label={`选择 ${titleOf(job)}`}
+                      checked={selectedIds.includes(job.id)}
+                      disabled={removing}
+                      onChange={() => toggleSelected(job.id)}
+                    />
+                  </div>
                 ) : (
                   <span className="simple-song-number" aria-hidden="true">
                     {String(index + 1).padStart(2, "0")}
@@ -512,36 +521,47 @@ export function LibraryPage() {
                 )}
                 <UnstyledButton
                   className="simple-song-cover"
-                  aria-label={`${playing ? "暂停" : "播放"} ${titleOf(job)}`}
-                  onClick={togglePlayback}
+                  aria-label={`${selecting ? "选择" : playing ? "暂停" : "播放"} ${titleOf(job)}`}
+                  disabled={removing}
+                  tabIndex={selecting ? -1 : 0}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (selecting) toggleSelected(job.id);
+                    else togglePlayback();
+                  }}
                 >
-                  <Artwork job={job} size={62} />
-                  <span>
+                  <Artwork job={job} />
+                  {!selecting && <span>
                     {playing ? (
                       <Pause size={22} fill="currentColor" />
                     ) : (
                       <Play size={22} fill="currentColor" />
                     )}
-                  </span>
+                  </span>}
                 </UnstyledButton>
                 <UnstyledButton
                   className="simple-song-title"
-                  onClick={() =>
-                    desktop ? togglePlayback() : openPlayer(job.id)
-                  }
-                  aria-label={`${desktop ? (playing ? "暂停" : "播放") : "打开"} ${titleOf(job)}`}
+                  disabled={removing}
+                  tabIndex={selecting ? -1 : 0}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    if (selecting) toggleSelected(job.id);
+                    else if (desktop) togglePlayback();
+                    else openPlayer(job.id);
+                  }}
+                  aria-label={`${selecting ? "选择" : desktop ? (playing ? "暂停" : "播放") : "打开"} ${titleOf(job)}`}
                 >
                   <strong>{titleOf(job)}</strong>
                   <small>
-                    {duration(job.timing?.audio_seconds)}
+                    {draftFromJob(job).musicKind === "instrumental" ? "纯音乐" : "带歌词"}
                     <i>·</i>
-                    {when(job.created_at)}
+                    {duration(job.timing?.audio_seconds)}
                   </small>
                 </UnstyledButton>
                 <span className="simple-song-kind simple-song-desktop-meta">
-                  {draftFromJob(job).musicKind === "instrumental"
-                    ? "纯音乐"
-                    : "带歌词"}
+                  <span className="simple-song-kind-label">
+                    {draftFromJob(job).musicKind === "instrumental" ? "纯音乐" : "带歌词"}
+                  </span>
                 </span>
                 <span className="simple-song-duration simple-song-desktop-meta">
                   {duration(job.timing?.audio_seconds)}
@@ -552,7 +572,7 @@ export function LibraryPage() {
                 >
                   {when(job.created_at)}
                 </time>
-                <div className="simple-song-actions">
+                {!selecting && <div className="simple-song-actions">
                   {desktop && (
                     <Link
                       className="simple-song-action simple-song-edit"
@@ -608,16 +628,18 @@ export function LibraryPage() {
                       >
                         分享
                       </Menu.Item>
+                      <Menu.Divider />
                       <Menu.Item
+                        className="simple-song-delete"
                         color="red"
                         leftSection={<Trash2 size={18} />}
-                        onClick={() => void removeOne(job)}
+                        onClick={() => askDelete([job])}
                       >
                         删除
                       </Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
-                </div>
+                </div>}
               </article>
             );
           })}
@@ -648,25 +670,29 @@ export function LibraryPage() {
       )}
       {confirmDelete && (
         <Dialog
-          title="删除歌曲"
-          onClose={() => setConfirmDelete(null)}
+          title={confirmDelete.length > 1 ? `删除 ${confirmDelete.length} 首歌曲` : "删除歌曲"}
+          onClose={() => { if (!removing) setConfirmDelete(null); }}
         >
-          <p className="simple-delete-confirm">
-            确定删除{confirmDelete.label}吗？删除后歌曲与音频将无法恢复。
-          </p>
-          <div className="simple-delete-actions">
-            <Button variant="ghost" onClick={() => setConfirmDelete(null)}>
-              取消
-            </Button>
-            <Button
-              variant="danger"
-              color="red"
-              leftSection={<Trash2 size={16} />}
-              loading={removing}
-              onClick={() => void doDelete()}
-            >
-              确认删除
-            </Button>
+          <div className="simple-delete-dialog">
+            <p className="simple-delete-confirm">删除后，歌曲与音频将无法恢复。</p>
+            <ul className="simple-delete-songs">
+              {confirmDelete.slice(0, 3).map((job) => <li key={job.id}>{titleOf(job)}</li>)}
+              {confirmDelete.length > 3 && <li>另 {confirmDelete.length - 3} 首</li>}
+            </ul>
+            <div className="simple-delete-actions">
+              <Button variant="ghost" disabled={removing} onClick={() => setConfirmDelete(null)}>
+                取消
+              </Button>
+              <Button
+                variant="danger"
+                color="red"
+                leftSection={<Trash2 size={16} />}
+                loading={removing}
+                onClick={() => void doDelete()}
+              >
+                确认删除
+              </Button>
+            </div>
           </div>
         </Dialog>
       )}

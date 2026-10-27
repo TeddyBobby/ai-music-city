@@ -1,97 +1,72 @@
-"""Admin console API: platform usage, active users, job statistics."""
+"""Read-only administrator views over registered accounts and their music."""
+
 from __future__ import annotations
 
-import json
-import sqlite3
-import time
-from pathlib import Path
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import FileResponse
 
-from fastapi import APIRouter, Request
-
-from yue2_studio.api import ApiError
+from yue2_studio.admin_service import AdminReader
 from yue2_studio.auth_api import require_admin
 
-router = APIRouter(prefix='/api/admin', dependencies=[])  # per-route admin guard
+router = APIRouter(prefix="/api/admin", dependencies=[Depends(require_admin)])
 
 
 def install(app):
-    app.state.auth  # ensure auth installed first
+    if getattr(app.state, "auth", None) is None:
+        raise RuntimeError("Authentication must be installed before the admin API")
     app.include_router(router)
 
-    def _admin(request: Request) -> dict:
-        return require_admin(request)
 
-    def _auth_db(request: Request) -> sqlite3.Connection:
-        # 每次请求新建短命连接：uvicorn 在多线程处理请求，缓存的连接
-        # 会被 sqlite3 的 check_same_thread 拒绝（ProgrammingError）。
-        path = Path(app.state.paths.data_dir) / 'auth' / 'auth.db'
-        conn = sqlite3.connect(path, timeout=15)
-        conn.row_factory = sqlite3.Row
-        return conn
+def reader(request: Request) -> AdminReader:
+    return AdminReader(request.app.state.paths.data_dir)
 
-    @router.get('/overview')
-    def overview(request: Request):
-        _admin(request)
-        db = _auth_db(request)
-        try:
-            users_total = db.execute('SELECT count(*) c FROM users').fetchone()['c']
-            sessions_active = db.execute(
-                'SELECT count(*) c FROM sessions WHERE expires_at > ?', (int(time.time()),)).fetchone()['c']
-            now_day = int(time.time()) - 86400
-            users_active_1d = db.execute(
-                'SELECT count(DISTINCT user_id) c FROM sessions WHERE created_at > ?', (now_day,)).fetchone()['c']
-            users_7d = db.execute(
-                'SELECT count(DISTINCT user_id) c FROM sessions WHERE created_at > ?', (int(time.time()) - 7 * 86400,)).fetchone()['c']
-        finally:
-            db.close()
-        return {
-            'users_total': users_total,
-            'sessions_active': sessions_active,
-            'users_active_1d': users_active_1d,
-            'users_active_7d': users_7d,
-            'engine': type(app.state.engine).__name__,
-            'fake': bool(app.state.fake),
-        }
 
-    @router.get('/users')
-    def users(request: Request, limit: int = 100, offset: int = 0):
-        _admin(request)
-        if not 1 <= limit <= 500 or offset < 0:
-            raise ApiError(400, 'validation_error', 'limit must be 1..500')
-        db = _auth_db(request)
-        try:
-            rows = db.execute(
-                '''SELECT u.id, u.email, u.is_admin, u.legacy_owner, u.created_at, u.last_login,
-                          (SELECT count(*) FROM sessions s WHERE s.user_id = u.id AND s.expires_at > ?) AS active
-                   FROM users u ORDER BY u.created_at DESC LIMIT ? OFFSET ?''',
-                (int(time.time()), limit, offset)).fetchall()
-            total = db.execute('SELECT count(*) c FROM users').fetchone()['c']
-        finally:
-            db.close()
-        return {'users': [dict(r) for r in rows], 'total': total}
+@router.get("/overview")
+def overview(request: Request):
+    return {
+        **reader(request).overview(),
+        "engine": type(request.app.state.engine).__name__,
+        "fake": bool(request.app.state.fake),
+    }
 
-    @router.get('/jobs')
-    def jobs_stats(request: Request):
-        _admin(request)
-        # aggregate across tenant stores: the legacy store plus every user's db
-        root = Path(app.state.paths.data_dir)
-        totals = {'done': 0, 'failed': 0, 'running': 0, 'queued': 0, 'cancelled': 0}
-        per_user = []
-        candidates = [root] + list((root / 'users').glob('*')) if (root / 'users').exists() else [root]
-        for base in candidates:
-            db_path = base / 'app.db' if base.name != 'auth' else None
-            if db_path is None or not db_path.is_file():
-                continue
-            try:
-                conn = sqlite3.connect(db_path)
-                conn.row_factory = sqlite3.Row
-                rows = conn.execute('SELECT status, count(*) c FROM jobs GROUP BY status').fetchall()
-                counts = {r['status']: r['c'] for r in rows}
-                for k, v in counts.items():
-                    totals[k] = totals.get(k, 0) + v
-                if any(counts.values()):
-                    per_user.append({'user': 'legacy' if base == root else base.name, **counts})
-                conn.close()
-            except sqlite3.Error:
-                continue
-        return {'totals': totals, 'per_user': per_user}
+
+@router.get("/users")
+def users(request: Request, q: str = "", limit: int = 20, offset: int = 0):
+    return reader(request).users(q=q, limit=limit, offset=offset)
+
+
+@router.get("/users/{user_id}")
+def user(request: Request, user_id: str):
+    return {"user": reader(request).user(user_id)}
+
+
+@router.get("/users/{user_id}/jobs")
+def user_jobs(
+    request: Request,
+    user_id: str,
+    q: str = "",
+    status: str | None = None,
+    music_kind: str | None = None,
+    limit: int = 20,
+    offset: int = 0,
+):
+    return reader(request).jobs(
+        user_id, q=q, status=status, music_kind=music_kind, limit=limit, offset=offset
+    )
+
+
+@router.api_route("/users/{user_id}/jobs/{job_id}/audio", methods=["GET", "HEAD"])
+def user_audio(request: Request, user_id: str, job_id: str, download: bool = False):
+    path = reader(request).audio(user_id, job_id)
+    return FileResponse(
+        path,
+        media_type="audio/flac",
+        filename=f"{job_id}.flac" if download else None,
+        headers={"Cache-Control": "no-store", "X-Content-Type-Options": "nosniff"},
+    )
+
+
+@router.get("/jobs")
+def jobs_stats(request: Request):
+    # Compatibility for the former overview; enumerate auth accounts, never arbitrary folders.
+    return reader(request).job_totals()
