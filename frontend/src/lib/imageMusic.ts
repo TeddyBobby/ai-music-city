@@ -12,6 +12,8 @@ export interface ImageMood {
   summary: string;
   mood: string;
   style: string;
+  /** Suno 引擎可用时后端附带的图片参考 URL（imageUrls） */
+  ref_image_url?: string;
 }
 export type ImageCreationPhase = "analyzing" | CreationPhase;
 export type ImageCreationOptions = Omit<CreationOptions, "onPhase"> & {
@@ -91,7 +93,7 @@ export async function generateFromImage(
   };
   if (options.musicKind === "instrumental")
     return generateFromSuggestion(
-      { title: analysis.title, description: analysis.style },
+      { title: analysis.title, description: analysis.style, ref_image_url: analysis.ref_image_url },
       musicOptions,
     );
   const prompt = [
@@ -104,5 +106,5 @@ export async function generateFromImage(
   ]
     .filter(Boolean)
     .join("\n");
-  return generateFromPrompt(prompt, musicOptions);
+  return generateFromPrompt(prompt, musicOptions, analysis.ref_image_url);
 }

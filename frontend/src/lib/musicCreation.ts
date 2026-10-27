@@ -130,7 +130,9 @@ export function musicDraftForEngine(
   }
   const draft = validateMusicDraft(suggestion);
   if (musicKind === "vocal") draft.style = vocalStyle(draft.style);
-  return { draft, loras: [] };
+  const result: { draft: { title: string; style: string; lyrics: string; ref_image_url?: string }, loras: { name: string; scale: number }[] } = { draft, loras: [] };
+  if (suggestion.ref_image_url) result.draft.ref_image_url = suggestion.ref_image_url;
+  return result;
 }
 
 export async function prepareMusicDraft(
@@ -206,7 +208,7 @@ export async function prepareMusicDraft(
 
 /** Submission is intentionally attempted once: a failed response must not create duplicates. */
 async function submitDraft(
-  draft: { title: string; style: string; lyrics: string },
+  draft: { title: string; style: string; lyrics: string; ref_image_url?: string },
   status: Status,
   loras: { name: string; scale: number }[] = [],
 ): Promise<Job> {
@@ -214,7 +216,15 @@ async function submitDraft(
     kind: "create",
     ...defaultMusicOptions(status),
     loras,
-    params: { ...draft, cot: "full", seed: null, cfg_scale: null, abc: null },
+    params: {
+      ...draft,
+      cot: "full",
+      seed: null,
+      cfg_scale: null,
+      abc: null,
+      // 图片参考（Suno imageUrls）：由图片分析接口附带
+      ref_image_url: draft.ref_image_url || null,
+    },
   });
   if (!result?.job?.id)
     throw new Error("未收到生成结果，请先到「我的音乐」查看，避免重复生成。");
@@ -248,12 +258,14 @@ export async function generateFromSuggestion(
 export async function generateFromPrompt(
   prompt: string,
   options: CreationOptions = {},
+  refImage?: string,
 ): Promise<Job> {
   const content = prompt.trim();
   if (!content) throw new Error("写下你想要的音乐。");
   // One snapshot covers readiness, memory defaults and instrumental adapters.
   const status = await readMusicStatus(options.signal);
   const draft = await prepareMusicDraft(content, options);
+  if (refImage) draft.ref_image_url = refImage;
   // Once submitted, the music library owns the engine job's lifetime.
   return submitSuggestion(draft, status, options);
 }

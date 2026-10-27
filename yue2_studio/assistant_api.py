@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from typing import Literal
 from urllib.parse import urlsplit
 
@@ -143,7 +144,33 @@ async def image_mood(request: Request, file: UploadFile | None = None,
 
     watcher = asyncio.create_task(watch_disconnect())
     try:
-        return await task
+        result = await task
+        # Suno 引擎可用时：把原图传到 Suno 临时存储，作为 imageUrls 参考
+        suno_key = os.environ.get('AMC_SUNO_API_KEY') or ''
+        if suno_key:
+            try:
+                file.file.seek(0)
+                raw = await file.read(11 * 1024 * 1024)
+                if len(raw) <= 10 * 1024 * 1024:
+                    import base64 as _b64
+                    import httpx as _httpx
+                    kind = (file.content_type or 'image/png').split('/')[-1].replace('jpg', 'jpeg')
+                    body = {
+                        'base64Data': f'data:image/{kind};base64,' + _b64.b64encode(raw).decode(),
+                        'uploadPath': 'amc/image-ref',
+                        'fileName': f'ref.{kind}',
+                    }
+                    async with _httpx.AsyncClient(timeout=30, trust_env=False) as client:
+                        resp = await client.post('https://sunoapiorg.redpandaai.co/api/file-base64-upload',
+                                                 json=body, headers={'Authorization': f'Bearer {suno_key}',
+                                                                    'Content-Type': 'application/json'})
+                        data = resp.json()
+                    url = (data.get('data') or {}).get('downloadUrl')
+                    if url:
+                        result['ref_image_url'] = url
+            except Exception:
+                pass  # 参考上传失败不影响文字分析流程
+        return result
     finally:
         watcher.cancel()
         await asyncio.gather(watcher, return_exceptions=True)

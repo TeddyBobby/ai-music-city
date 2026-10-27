@@ -68,6 +68,8 @@ export interface Suggestion {
   description?: string;
   style?: string;
   cover_prompt?: string;
+  /** Suno 图片参考（imageUrls） */
+  ref_image_url?: string;
 }
 export interface AssistantMessage {
   id: string;

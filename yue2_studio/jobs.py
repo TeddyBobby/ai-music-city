@@ -117,8 +117,10 @@ class CreateParams(_Params):
     # description: 用户的一句话想法。提供时 style/lyrics 可为空，
     # 由 worker 先调 AI 补全歌词（“AI 写词”阶段）再进入引擎生成。
     # music_kind: "vocal"（带词人声）或 "instrumental"（纯音乐，AI 不写词）。
+    # ref_image_url: Suno 引擎的图片参考（imageUrls），由图片分析接口附带。
     description: str | None = None
     music_kind: Literal["vocal", "instrumental"] | None = None
+    ref_image_url: str | None = None
     style: str = ""
     lyrics: str = ""
     cot: Literal["full", "melody", "off"] = "full"
@@ -1444,6 +1446,8 @@ def _create_params_dict(p: CreateParams, seed: int) -> dict:
         params["description"] = p.description
     if getattr(p, "music_kind", None):
         params["music_kind"] = p.music_kind
+    if getattr(p, "ref_image_url", None):
+        params["ref_image_url"] = p.ref_image_url
     for name in ("abc_sampling", "semantic_sampling"):
         value = getattr(p, name)
         if value is not None:
@@ -1650,6 +1654,10 @@ def engine_request(job: Job) -> dict:
                "id": job.id}
     if p.get("duration"):
         request["duration"] = float(p["duration"])
+    if p.get("description"):
+        request["description"] = p["description"]
+    if p.get("ref_image_url"):
+        request["ref_image_url"] = p["ref_image_url"]
     if p.get("cfg_scale") is not None:
         request["cfg_scale"] = float(p["cfg_scale"])
     for name in ("abc_sampling", "semantic_sampling"):
