@@ -11,8 +11,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 48px 0 28px;
-  gap: 28px;
+  padding: 26px 0 16px;
+  gap: 18px;
 }
 .simple-home-heading {
   display: flex;
@@ -152,7 +152,7 @@
 }
 .home-inspiration {
   width: min(100%, 720px);
-  margin: 4px auto 24px;
+  margin: 2px auto 14px;
 }
 .home-inspiration-options {
   display: grid;
@@ -232,18 +232,18 @@
 }
 @media (max-width: 760px) {
   .simple-home .home-hero-grid {
-    padding: 30px 0 24px;
-    gap: 24px;
+    padding: 16px 0 12px;
+    gap: 14px;
   }
   .simple-home-heading {
-    gap: 12px;
+    gap: 8px;
   }
   .simple-home-heading h1 {
     font-size: 30px;
     letter-spacing: -1.2px;
   }
   .music-composer-card {
-    --composer-panel-height: 330px;
+    --composer-panel-height: 300px;
     border-radius: 20px;
   }
   .music-mode-tabs {
@@ -256,8 +256,8 @@
     padding: 10px 18px 18px;
   }
   .simple-prompt-form textarea {
-    min-height: 132px;
-    height: 132px;
+    min-height: 108px;
+    height: 108px;
     font-size: 16px;
   }
   .simple-composer-actions {
@@ -287,7 +287,7 @@
     border-radius: 13px;
   }
   .home-inspiration-choice img {
-    height: 96px;
+    height: 72px;
   }
   .home-inspiration-choice > span {
     padding: 10px;
@@ -425,7 +425,7 @@
 
 @media (min-width: 1024px) {
   .route-home .page-container {
-    min-height: min(720px, calc(100dvh - 160px - var(--player-height, 0px)));
+    min-height: 0;
     align-items: center;
   }
   .simple-home {
