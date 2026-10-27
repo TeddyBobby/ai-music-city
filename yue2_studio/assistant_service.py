@@ -710,7 +710,7 @@ class AssistantService:
                           'stream': True,
                           # 推理模型思考计入 max_tokens：预算太小会被思考烧光，正文
                           # 只剩一两个 token（曾致“输出一半就中断”）。给足思考+正文空间。
-                          'max_tokens': 131072}) as response:
+                          'max_tokens': 32768}) as response:
                     run['response'] = response
                     if response.status_code != 200:
                         if has_images and response.status_code in {400, 415, 422}:
@@ -755,7 +755,7 @@ class AssistantService:
                             endpoint_url(cfg['hermes_base_url'], 'chat/completions'),
                             headers={**provider_headers(cfg), 'X-Hermes-Session-Key': 'yue2-' + sid},
                             json={**(model or {'model': cfg['hermes_model']}), 'messages': messages,
-                                  'stream': False, 'max_tokens': 131072,
+                                  'stream': False, 'max_tokens': 32768,
                                   'thinking': {'type': 'disabled'}})
                         retry.raise_for_status()
                         payload = retry.json()
