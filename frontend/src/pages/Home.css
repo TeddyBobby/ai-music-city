@@ -645,3 +645,34 @@
     height: 116px;
   }
 }
+
+/* engine selector (local / cloud) */
+.engine-toggle {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.engine-choice {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+  padding: 4px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(127, 127, 127, 0.28);
+  background: transparent;
+  color: var(--text-dim, #9aa4b2);
+  font-size: 13px;
+  cursor: pointer;
+}
+.engine-choice.is-active {
+  border-color: var(--accent, #22d3ee);
+  color: var(--accent, #22d3ee);
+  background: rgba(34, 211, 238, 0.08);
+}
+.engine-choice:disabled { opacity: 0.6; cursor: default; }
+.engine-choice .spin { animation: engine-spin 1s linear infinite; }
+@keyframes engine-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}

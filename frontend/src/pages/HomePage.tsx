@@ -13,6 +13,7 @@ import { HomeSoundscape } from "../components/HomeSoundscape";
 import { HumComposer } from "../components/HumComposer";
 import { ImageComposer } from "../components/ImageComposer";
 import { MusicKindToggle } from "../components/MusicKindToggle";
+import { EngineToggle } from "../components/EngineToggle";
 import { generateFromPrompt, readMusicStatus, defaultMusicOptions, type MusicKind } from "../lib/musicCreation";
 import { api } from "../lib/api";
 import type { Job } from "../lib/types";
@@ -203,6 +204,7 @@ export function HomePage() {
                 disabled={busy}
               />
             </div>
+            <EngineToggle disabled={busy} />
           </div>
           <div
             id="music-input-panel"

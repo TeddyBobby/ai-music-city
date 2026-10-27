@@ -81,6 +81,45 @@ def create_app(engine=None, *, home: str | os.PathLike | None = None, fake: bool
     dispatcher = SharedDispatcher(engine)
     worker = Worker(store, engine, paths, bus, fake=is_fake, dispatcher=dispatcher)
 
+    # engine registry (runtime switchable): cache instances on a mutable holder
+    import yue2_studio.engines as engines
+    _instances = {"local": None, "suno": None, "legacy": None}
+
+    class _EngineHolder:
+        """Keeps one instance per engine kind; workers fetch via engines.current()."""
+
+    holder = _EngineHolder()
+
+    def _factory_local():
+        from yue2_studio.acestep15_engine import ACEStep15Engine
+        if _instances["local"] is None:
+            _instances["local"] = ACEStep15Engine(
+                use_sft=os.environ.get("AMC_ACE15_SFT", "") == "1",
+                lm_model=os.environ.get("AMC_ACE15_LM", "acestep-5Hz-lm-1.7B"))
+        return _instances["local"]
+
+    def _factory_suno():
+        from yue2_studio.suno_engine import SunoEngine
+        if _instances["suno"] is None:
+            _instances["suno"] = SunoEngine(
+                api_key=os.environ.get("AMC_SUNO_API_KEY") or "",
+                base_url=os.environ.get("AMC_SUNO_BASE_URL", "https://api.sunoapi.org"))
+        return _instances["suno"]
+
+    def _factory_legacy():
+        if _instances["legacy"] is None:
+            _instances["legacy"] = _acestep_engine()
+        return _instances["legacy"]
+
+    engines.register("local", _factory_local, "标准（本地）",
+                     "本地 ACE-Step 1.5 生成，免费，约 2-3 分钟一首", "local")
+    if os.environ.get("AMC_SUNO_API_KEY"):
+        engines.register("suno", _factory_suno, "高品质（云端）",
+                         "Suno V5 云端生成，商业级质量，约 1-2 分钟一首", "cloud")
+    if engines._ACTIVE is None:
+        engines.switch("suno" if (os.environ.get("AMC_ENGINE") == "suno"
+                                  and os.environ.get("AMC_SUNO_API_KEY")) else "local")
+
     @contextlib.asynccontextmanager
     async def lifespan(app: FastAPI):
         await app.state.tenants.start(asyncio.get_running_loop())

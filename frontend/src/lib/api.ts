@@ -67,6 +67,8 @@ export const api = {
   get: (path: string) => request("GET", path),
   post: (path: string, body?: any) => request("POST", path, body),
   saveSettings: (body: any) => request("PUT", "/api/settings", body),
+  engines: () => request("GET", "/api/engines"),
+  switchEngine: (engine: string) => request("PUT", "/api/engines", { engine }),
   submit: (body: any) => request("POST", "/api/jobs", body),
   jobs: (q: any = {}) => request("GET", "/api/jobs?" + qs(q)),
   job: (id: string) => request("GET", `/api/jobs/${id}`),

@@ -393,12 +393,24 @@ class Worker:
     job's cancel flag, ``stop()`` drains and unloads the engine on the worker thread.
     """
 
+    # 引擎注册表存在时每个任务动态取当前引擎（支持运行时切换）。
+    @property
+    def engine(self):
+        try:
+            import yue2_studio.engines as _engines
+            current = _engines.current()
+            if current is not None:
+                self._engine = current
+        except Exception:
+            pass
+        return self._engine
+
     def __init__(self, store: JobStore, engine: Engine, paths: config.Paths, bus: EventBus | None = None, *,
                  fake: bool = False, dispatcher: SharedDispatcher | None = None):
         self.dispatcher = dispatcher
         self._started = False
         self.store = store
-        self.engine = engine
+        self._engine = engine  # property `engine` resolves the registry's active engine
         self.paths = paths
         self.bus = bus or EventBus()
         self.fake = fake
@@ -802,8 +814,19 @@ class SharedDispatcher:
     every account, including jobs recovered after a restart.
     """
 
+    @property
+    def engine(self):
+        try:
+            import yue2_studio.engines as _engines
+            current = _engines.current()
+            if current is not None:
+                self._engine = current
+        except Exception:
+            pass
+        return self._engine
+
     def __init__(self, engine: Engine):
-        self.engine = engine
+        self._engine = engine
         self._queue: queue.PriorityQueue = queue.PriorityQueue()
         self._sequence = itertools.count()
         self._workers: list[Worker] = []

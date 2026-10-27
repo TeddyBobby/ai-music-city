@@ -296,6 +296,32 @@ async def put_settings(request: Request):
     return _public_settings(_store(request).update_settings(body))
 
 
+@router.get("/engines")
+async def get_engines(request: Request):
+    """Engine list + active engine. Every user may read (frontend selector)."""
+    import yue2_studio.engines as engines
+    info = engines.available()
+    info["engine_status"] = _state(request).worker.engine_status()
+    return info
+
+
+@router.put("/engines")
+async def put_engine(request: Request):
+    """Switch the active engine (admin only)."""
+    from yue2_studio.auth_api import require_admin
+    require_admin(request)
+    body = await _json_body(request)
+    key = body.get("engine") if isinstance(body, dict) else None
+    if not key:
+        raise ApiError(400, "validation_error", "body must be {\"engine\": \"local\"|\"suno\"}")
+    import yue2_studio.engines as engines
+    try:
+        engines.switch(key)
+    except KeyError:
+        raise ApiError(400, "validation_error", f"unknown engine: {key}") from None
+    return engines.available()
+
+
 # ---------------------------------------------------------------------------------------------
 # assist ("Ask Claude")
 # ---------------------------------------------------------------------------------------------
