@@ -3,12 +3,13 @@ import { Button, PasswordInput, TextInput } from "@mantine/core";
 import { ArrowRight, AudioLines } from "lucide-react";
 import { useViewportLayout } from "../hooks/useViewportLayout";
 import { api } from "../lib/api";
-import { leaveAccount } from "../lib/accountBoundary";
+import { adoptAccount } from "../lib/accountBoundary";
 import { useAuth } from "../state/auth";
 import "./Auth.css";
 
 export function LoginPage() {
   const setupRequired = useAuth((s) => s.setupRequired);
+  const setAuthUser = useAuth((s) => s.setAuthUser);
   const [register, setRegister] = useState(setupRequired);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -44,9 +45,13 @@ export function LoginPage() {
           password,
         },
       );
-      // 登录/注册成功后回到首页（leaveAccount 会整页重载，用 hash 控制落点）
+      // 游客 → 登录是“无个人数据 → 有个人数据”的方向：软切换即可，
+      // 不整页重载（慢链路下重载要重新下载 JS，体感 3-6 秒）。
+      adoptAccount(result.user.id);
+      setAuthUser(result.user);
       window.location.hash = "#/home";
-      leaveAccount(result.user.id);
+      // 原位软刷新各业务 store（音乐/设置/助手）拉取登录后的数据
+      useAuth.getState().refreshAfterLogin();
     } catch (reason) {
       setError(
         reason instanceof Error ? reason.message : "暂时无法登录，请稍后重试。",

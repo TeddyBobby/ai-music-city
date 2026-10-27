@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { api } from "../lib/api";
-import { adoptAccount, leaveAccount } from "../lib/accountBoundary";
+import { accountChangeKey, adoptAccount, leaveAccount } from "../lib/accountBoundary";
 
 export interface AuthUser {
   id: string;
@@ -14,6 +14,10 @@ interface AuthState {
   setupRequired: boolean;
   error: string;
   refresh: () => Promise<void>;
+  /** 登录页软切换：游客 → 用户，无需整页重载 */
+  setAuthUser: (user: AuthUser) => void;
+  /** 软切换后通知各业务 store 重新拉取登录态数据 */
+  refreshAfterLogin: () => void;
   logout: () => Promise<void>;
 }
 let pending: Promise<void> | null = null;
@@ -56,6 +60,19 @@ export const useAuth = create<AuthState>((set, get) => ({
       }
     })();
     return pending;
+  },
+  setAuthUser: (user: AuthUser) => {
+    set({ user, loading: false, setupRequired: false, error: "" });
+  },
+  refreshAfterLogin: () => {
+    // 广播账号纪元变化：让游客会话的在途请求作废、各业务 store 重新拉数据。
+    try {
+      localStorage.setItem(
+        accountChangeKey,
+        JSON.stringify({ user: get().user?.id || null, nonce: `${Date.now()}-${Math.random()}` }),
+      );
+    } catch {}
+    window.dispatchEvent(new Event("storage"));
   },
   logout: async () => {
     // A failed logout must not pretend the HttpOnly session was revoked.
