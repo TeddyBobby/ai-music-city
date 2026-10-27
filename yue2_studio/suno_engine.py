@@ -96,16 +96,25 @@ class SunoEngine:
                 poll = client.get(f"{self.base_url}/api/v1/generate/record-info",
                                   params={"taskId": task_id}, headers=self._headers())
                 pdata = poll.json()
-                clips = (pdata.get("data") or {}).get("clips") or []
+                data = pdata.get("data") or {}
+                # v1 record-info: clips live under data.response.sunoData (list);
+                # some deployments also expose data.clips directly.
+                clips = (data.get("clips")
+                         or ((data.get("response") or {}).get("sunoData"))
+                         or [])
                 if not clips:
+                    # v1 task-level status: 30%+ queued/running, 100% complete
+                    progress = data.get("taskProgress") or 0
+                    emit("Cloud generation", completed=int(min(90, float(progress) * 0.9)), total=100)
                     continue
                 clip = clips[0]
-                status = (pdata.get("data") or {}).get("status") or clip.get("status") or ""
-                audio_url = clip.get("audio_url") or clip.get("source_audio_url")
+                audio_url = (clip.get("audio_url") or clip.get("audioUrl")
+                             or clip.get("source_audio_url") or clip.get("sourceAudioUrl"))
                 if audio_url:
                     break
-                if "ERROR" in str(status).upper() or clip.get("error_message"):
-                    raise RuntimeError(f"Suno clip failed: {clip.get('error_message', status)}")
+                status = str(data.get("taskStatus") or clip.get("status") or "")
+                if "ERROR" in status.upper() or clip.get("errorMessage"):
+                    raise RuntimeError(f"Suno clip failed: {clip.get('errorMessage', status)}")
                 emit("Cloud generation", completed=min(90, i * 8), total=100)
 
             if not audio_url:
