@@ -308,16 +308,40 @@ def _ai_complete_draft(description: str, music_kind: str = "vocal", *, context: 
             {"role": "user", "content": content},
         ],
         "stream": False,
-        "max_tokens": 600 if instrumental else 1600,
+        # 推理模型思考内容计入 max_tokens：给足思考+正文空间，
+        # 否则 finish_reason=length 时正文被截成碎片（曾致“方案无法解析”）。
+        "max_tokens": 2048 if instrumental else 6144,
     }
-    with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
-        resp = client.post(
-            endpoint_url(cfg["hermes_base_url"], "chat/completions"),
-            headers=provider_headers(cfg),
-            json=body,
-        )
-        resp.raise_for_status()
-        text = resp.json()["choices"][0]["message"]["content"].strip()
+    try:
+        with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
+            resp = client.post(
+                endpoint_url(cfg["hermes_base_url"], "chat/completions"),
+                headers=provider_headers(cfg),
+                json=body,
+            )
+            resp.raise_for_status()
+            payload = resp.json()
+            text = payload["choices"][0]["message"]["content"].strip()
+    except Exception:
+        text = ""
+    # 解析失败（截断/空内容）时重试一次：强制关闭思考，只留输出预算
+    match = re.search(r"\{[\s\S]*\}", text) if text else None
+    if not match:
+        retry = dict(body)
+        retry["max_tokens"] = 4096
+        retry["thinking"] = {"type": "disabled"}
+        retry["messages"] = [
+            {"role": "system", "content": system + "\n直接输出结果，不要思考过程。"},
+            body["messages"][1],
+        ]
+        with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
+            resp = client.post(
+                endpoint_url(cfg["hermes_base_url"], "chat/completions"),
+                headers=provider_headers(cfg),
+                json=retry,
+            )
+            resp.raise_for_status()
+            text = resp.json()["choices"][0]["message"]["content"].strip()
     # Tolerate a JSON fence or proposal wrapper without mixing style and sung text.
     match = re.search(r"\{[\s\S]*\}", text)
     if not match:
