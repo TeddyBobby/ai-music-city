@@ -707,7 +707,10 @@ class AssistantService:
                 async with client.stream('POST', endpoint_url(cfg['hermes_base_url'], 'chat/completions'),
                     headers={**provider_headers(cfg), 'X-Hermes-Session-Key': 'yue2-' + sid},
                     json={**(model or {'model': cfg['hermes_model']}), 'messages': messages,
-                          'stream': True, 'max_tokens': 2400}) as response:
+                          'stream': True,
+                          # 推理模型思考计入 max_tokens：预算太小会被思考烧光，正文
+                          # 只剩一两个 token（曾致“输出一半就中断”）。给足思考+正文空间。
+                          'max_tokens': 8192}) as response:
                     run['response'] = response
                     if response.status_code != 200:
                         if has_images and response.status_code in {400, 415, 422}:
@@ -743,6 +746,26 @@ class AssistantService:
             if run['stop'].is_set():
                 state = 'stopped'
             proposal = music_proposal(raw_result) if conversational else None
+            # 正文极短且无方案 = 思考烧光了输出预算：关思考重试一次，补全回复。
+            if (state == 'complete' and len(result.strip()) < 8
+                    and not proposal and not run['stop'].is_set()):
+                try:
+                    async with httpx.AsyncClient(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
+                        retry = await client.post(
+                            endpoint_url(cfg['hermes_base_url'], 'chat/completions'),
+                            headers={**provider_headers(cfg), 'X-Hermes-Session-Key': 'yue2-' + sid},
+                            json={**(model or {'model': cfg['hermes_model']}), 'messages': messages,
+                                  'stream': False, 'max_tokens': 4096,
+                                  'thinking': {'type': 'disabled'}})
+                        retry.raise_for_status()
+                        payload = retry.json()
+                        retry_text = (payload.get('choices') or [{}])[0].get('message', {}).get('content', '')
+                    if isinstance(retry_text, str) and retry_text.strip():
+                        result = retry_text.strip()
+                        raw_result = result
+                        yield 'delta', {'text': result}
+                except Exception:
+                    pass  # 重试失败则维持原结果
             if conversational and PROPOSAL_OPEN in raw_result and not proposal and state == 'complete':
                 raise ApiError(502, 'invalid_proposal', '音乐提案尚未整理完整，请重试')
             if not result.strip() and not proposal and state == 'complete':
