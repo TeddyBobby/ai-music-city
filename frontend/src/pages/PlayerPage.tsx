@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { Slider, UnstyledButton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
@@ -19,6 +19,7 @@ import { api } from "../lib/api";
 import { songDownload } from "../lib/shareSong";
 import type { Job } from "../lib/types";
 import { duration, titleOf, errorMessage } from "../lib/utils";
+import { buildLyricTimeline } from "../lib/lyricTimeline";
 import { useApp } from "../state/app";
 import { usePlayer } from "../state/player";
 import { Artwork, Button, EmptyState, IconButton } from "../components/ui";
@@ -43,13 +44,22 @@ export function PlayerPage({
 }) {
   const p = usePlayer();
   const mp3 = Boolean(useApp((s) => s.status?.ffmpeg));
-  const mobile = useMediaQuery("(max-width: 760px)");
+  const mobile = useMediaQuery(
+    "(max-width: 760px), (max-width: 1023px) and (max-height: 520px)",
+  );
   const desktop = useMediaQuery("(min-width: 1024px)");
   const [job, setJob] = useState<Job | null>(null);
   const [error, setError] = useState("");
   const [sharing, setSharing] = useState(false);
   const [showLyrics, setShowLyrics] = useState(false);
   const { alignment, requestAlignment } = useLyricsAlignment(job);
+  const hasLyrics = useMemo(
+    () =>
+      buildLyricTimeline(job?.params?.lyrics || "", 0, alignment).lines.length >
+      0,
+    [job?.params?.lyrics, alignment],
+  );
+  const lyricsView = mobile && showLyrics && hasLyrics;
 
   useEffect(() => {
     let live = true;
@@ -143,7 +153,8 @@ export function PlayerPage({
   return (
     <div
       className="listening-page simple-listening"
-      data-view={mobile && showLyrics ? "lyrics" : "cover"}
+      data-view={lyricsView ? "lyrics" : "cover"}
+      data-has-lyrics={hasLyrics}
     >
       <header className="listening-top">
         <UnstyledButton
@@ -157,13 +168,13 @@ export function PlayerPage({
           <ChevronDown size={22} />
           <span>收起</span>
         </UnstyledButton>
-        {mobile ? (
+        {mobile && hasLyrics ? (
           <IconButton
             className="player-view-toggle"
-            label={showLyrics ? "返回封面" : "切换到歌词"}
+            label={lyricsView ? "返回封面" : "切换到歌词"}
             onClick={() => setShowLyrics((value) => !value)}
           >
-            {showLyrics ? <Disc3 size={20} /> : <ListMusic size={20} />}
+            {lyricsView ? <Disc3 size={20} /> : <ListMusic size={20} />}
           </IconButton>
         ) : (
           <span className="simple-listening-top-spacer" aria-hidden="true" />
@@ -184,19 +195,19 @@ export function PlayerPage({
       <div className="listening-layout">
         <section className="listening-record">
           <div className="simple-listening-media">
-            {mobile && showLyrics ? (
+            {lyricsView ? (
               lyrics
             ) : (
               <Artwork job={job} className="simple-listening-cover" />
             )}
           </div>
           <div className="record-transport">
-            {(!mobile || !showLyrics) && (
+            {!lyricsView && (
               <div className="record-info">
                 <h1>{titleOf(job)}</h1>
               </div>
             )}
-            {mobile && !showLyrics && (
+            {mobile && !lyricsView && hasLyrics && (
               <LyricPreview
                 lyrics={job.params?.lyrics || ""}
                 alignment={alignment}
@@ -284,7 +295,7 @@ export function PlayerPage({
             )}
           </div>
         </section>
-        {!mobile && (
+        {!mobile && hasLyrics && (
           <section className="listening-lyrics" aria-label="歌曲歌词">
             {lyrics}
           </section>

@@ -350,123 +350,117 @@ export function AssistantPage() {
               </div>
             ) : (
               <>
-            {empty && (
-              <div className="as-welcome as-welcome-top">
-                <h1 className="as-welcome-title">
-                  {lyricsMode ? "把想法，写成歌词" : "聊聊你的音乐灵感"}
-                </h1>
-                <p className="as-welcome-sub">
-                  描述一个场景、一种情绪，或直接把歌词交给它。
-                </p>
-              </div>
-            )}
-            {messages.map((message) => (
-                <article
-                  key={message.id}
-                  className={`as-message as-message-${message.role}`}
-                  aria-busy={
-                    message.role === "assistant" &&
-                    message.status === "streaming"
-                  }
-                >
-                  <span
-                    className={`as-message-avatar as-avatar-${message.role}`}
-                    role="img"
-                    aria-label={
-                      message.role === "assistant" ? "AI 助手头像" : "你的头像"
+                {messages.map((message) => (
+                  <article
+                    key={message.id}
+                    className={`as-message as-message-${message.role}`}
+                    aria-busy={
+                      message.role === "assistant" &&
+                      message.status === "streaming"
                     }
                   >
-                    {message.role === "assistant" ? (
-                      <AudioLines size={19} aria-hidden="true" />
-                    ) : (
-                      userInitial
-                    )}
-                  </span>
-                  <div className="as-message-body">
-                    {message.role === "assistant" &&
-                      message.status === "streaming" && (
-                        <div className="as-message-meta">
-                          <span className="as-answering" role="status">
-                            <Loader size={11} />
-                            正在回答…
-                          </span>
-                        </div>
+                    <span
+                      className={`as-message-avatar as-avatar-${message.role}`}
+                      role="img"
+                      aria-label={
+                        message.role === "assistant"
+                          ? "AI 助手头像"
+                          : "你的头像"
+                      }
+                    >
+                      {message.role === "assistant" ? (
+                        <AudioLines size={19} aria-hidden="true" />
+                      ) : (
+                        userInitial
                       )}
-                    <div className="as-message-content">
-                      {message.image && (
-                        <img
-                          className="as-message-image"
-                          src={message.image.url}
-                          alt={message.image.filename || "参考图片"}
-                          loading="lazy"
-                        />
-                      )}
-                      {message.audio && (
-                        <div className="as-message-audio">
-                          <div>
-                            <Mic size={15} />
-                            <span>{message.audio.filename || "语音消息"}</span>
+                    </span>
+                    <div className="as-message-body">
+                      {message.role === "assistant" &&
+                        message.status === "streaming" && (
+                          <div className="as-message-meta">
+                            <span className="as-answering" role="status">
+                              <Loader size={11} />
+                              正在回答…
+                            </span>
                           </div>
-                          <audio
-                            controls
-                            preload="metadata"
-                            src={message.audio.url}
-                            aria-label="播放语音消息"
+                        )}
+                      <div className="as-message-content">
+                        {message.image && (
+                          <img
+                            className="as-message-image"
+                            src={message.image.url}
+                            alt={message.image.filename || "参考图片"}
+                            loading="lazy"
                           />
-                          {message.audio.transcript && (
-                            <details>
-                              <summary>语音文字</summary>
-                              <p>{message.audio.transcript}</p>
-                            </details>
-                          )}
-                          {message.audio.transcription_status ===
-                            "no_speech" && (
-                            <p className="as-audio-note">
-                              音频灵感 · 补充描述更容易理解
-                            </p>
-                          )}
-                        </div>
-                      )}
-                      {message.pendingStructured &&
-                      message.status === "streaming" ? null : (
-                        <>
-                          {messageText(message) && (
-                            <div className="as-message-text">
-                              {message.role === "assistant" ? (
-                                <AssistantMarkdown>
-                                  {messageText(message)}
-                                </AssistantMarkdown>
-                              ) : (
-                                messageText(message)
-                                  .split(/\n{2,}/)
-                                  .map((paragraph, index) => (
-                                    <p key={index}>{paragraph}</p>
-                                  ))
-                              )}
+                        )}
+                        {message.audio && (
+                          <div className="as-message-audio">
+                            <div>
+                              <Mic size={15} />
+                              <span>
+                                {message.audio.filename || "语音消息"}
+                              </span>
                             </div>
-                          )}
-                          {message.suggestion && (
-                            <SongDraft suggestion={message.suggestion} />
-                          )}
-                        </>
-                      )}
+                            <audio
+                              controls
+                              preload="metadata"
+                              src={message.audio.url}
+                              aria-label="播放语音消息"
+                            />
+                            {message.audio.transcript && (
+                              <details>
+                                <summary>语音文字</summary>
+                                <p>{message.audio.transcript}</p>
+                              </details>
+                            )}
+                            {message.audio.transcription_status ===
+                              "no_speech" && (
+                              <p className="as-audio-note">
+                                音频灵感 · 补充描述更容易理解
+                              </p>
+                            )}
+                          </div>
+                        )}
+                        {message.pendingStructured &&
+                        message.status === "streaming" ? null : (
+                          <>
+                            {messageText(message) && (
+                              <div className="as-message-text">
+                                {message.role === "assistant" ? (
+                                  <AssistantMarkdown>
+                                    {messageText(message)}
+                                  </AssistantMarkdown>
+                                ) : (
+                                  messageText(message)
+                                    .split(/\n{2,}/)
+                                    .map((paragraph, index) => (
+                                      <p key={index}>{paragraph}</p>
+                                    ))
+                                )}
+                              </div>
+                            )}
+                            {message.suggestion && (
+                              <SongDraft suggestion={message.suggestion} />
+                            )}
+                          </>
+                        )}
+                      </div>
+                      {message.status !== "streaming" &&
+                        messageCopyText(message) && (
+                          <div className="as-message-tools">
+                            <AssistantCopyButton
+                              value={messageCopyText(message)}
+                              label={
+                                message.role === "assistant"
+                                  ? "复制回复"
+                                  : "复制文字"
+                              }
+                            />
+                          </div>
+                        )}
                     </div>
-                    {message.status !== "streaming" &&
-                      messageCopyText(message) && (
-                        <div className="as-message-tools">
-                          <AssistantCopyButton
-                            value={messageCopyText(message)}
-                            label={
-                              message.role === "assistant"
-                                ? "复制回复"
-                                : "复制文字"
-                            }
-                          />
-                        </div>
-                      )}
-                  </div>
-                </article>
-              ))}
+                  </article>
+                ))}
               </>
             )}
           </div>
@@ -474,7 +468,24 @@ export function AssistantPage() {
 
         <div className="as-compose-wrap">
           {empty && !audio && !image && (
-            <div className="as-quick-choices" aria-label="快捷选择">
+            <div className="as-welcome">
+              <div className="as-welcome-wave" aria-hidden="true">
+                {[8, 14, 23, 32, 20, 38, 28, 18, 30, 21, 12, 6].map(
+                  (height, index) => (
+                    <span
+                      key={index}
+                      style={{ height, animationDelay: `${index * -0.13}s` }}
+                    />
+                  ),
+                )}
+              </div>
+              <h1 className="as-welcome-title">
+                {lyricsMode ? "把想法，写成歌词" : "聊聊你的音乐灵感"}
+              </h1>
+            </div>
+          )}
+          {empty && !audio && !image && (
+            <div className="as-quick-choices" aria-label="快捷灵感">
               {starters[lyricsMode ? "lyrics" : "chat"].map(
                 ({ title, prompt, mode: nextMode, icon: Icon }) => (
                   <button

@@ -40,6 +40,7 @@ import { assistantConversation } from "./lib/assistantConversation";
 import { ThemeToggle } from "./components/ThemeToggle";
 import { BrandWordmark } from "./components/BrandWordmark";
 import { useViewportLayout } from "./hooks/useViewportLayout";
+import { scrollFocusedField } from "./lib/scrollFocusedField";
 import { MobileNavigation } from "./components/MobileNavigation";
 import { FullscreenPlayer } from "./components/FullscreenPlayer";
 import { usePlayerOverlay } from "./state/playerOverlay";
@@ -83,7 +84,8 @@ function Shell() {
   const hasPlayer = usePlayer((s) => !!s.current || s.queue.length > 0);
   const showPlayerBar = !standalone && !(compact && route === "home");
   const reservePlayer = hasPlayer && showPlayerBar;
-  const { keyboardOpen, viewportHeight, keyboardInset } = useViewportLayout();
+  const { keyboardOpen, viewportHeight, viewportOffsetTop, keyboardInset } =
+    useViewportLayout();
   const taskCount =
     (app.status?.queue?.queued || 0) + (app.status?.queue?.running ? 1 : 0);
   const pageTitle =
@@ -104,17 +106,14 @@ function Shell() {
     const frame = requestAnimationFrame(() => {
       const field = document.activeElement;
       if (!keyboardOpen || !(field instanceof HTMLElement)) return;
-      const bounds = field.getBoundingClientRect();
-      if (bounds.bottom > viewportHeight - 12 || bounds.top < 0) {
-        field.scrollIntoView({ block: "nearest", inline: "nearest" });
-      }
+      scrollFocusedField(field, viewportOffsetTop, viewportHeight);
     });
     return () => {
       cancelAnimationFrame(frame);
       root.style.removeProperty("--app-viewport-height");
       delete root.dataset.keyboardOpen;
     };
-  }, [keyboardOpen, viewportHeight]);
+  }, [keyboardOpen, viewportHeight, viewportOffsetTop]);
 
   useEffect(() => {
     void useApp.getState().refresh();
@@ -135,12 +134,15 @@ function Shell() {
     <div
       className="app-shell"
       data-layout={desktop ? "desktop" : compact ? "mobile" : "tablet"}
+      data-route={route}
       data-keyboard-open={keyboardOpen}
+      data-keyboard-compact={keyboardOpen && viewportHeight <= 500}
       data-has-player={reservePlayer}
       data-standalone={standalone}
       style={
         {
           "--app-viewport-height": `${viewportHeight}px`,
+          "--app-viewport-offset-top": `${viewportOffsetTop}px`,
           "--keyboard-inset": `${keyboardInset}px`,
           "--player-height": reservePlayer ? "var(--dock)" : "0px",
         } as CSSProperties

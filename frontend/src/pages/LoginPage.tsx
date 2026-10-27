@@ -1,6 +1,7 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type CSSProperties, type FormEvent } from "react";
 import { Button, PasswordInput, TextInput } from "@mantine/core";
-import { ArrowRight, AudioLines, LockKeyhole } from "lucide-react";
+import { ArrowRight, AudioLines } from "lucide-react";
+import { useViewportLayout } from "../hooks/useViewportLayout";
 import { api } from "../lib/api";
 import { leaveAccount } from "../lib/accountBoundary";
 import { useAuth } from "../state/auth";
@@ -14,8 +15,15 @@ export function LoginPage() {
   const [confirm, setConfirm] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [visualPaused, setVisualPaused] = useState(false);
+  const { keyboardOpen, viewportHeight } = useViewportLayout();
   useEffect(() => {
     document.title = "登录 · AI乐之城";
+    const updateVisibility = () => setVisualPaused(document.hidden);
+    updateVisibility();
+    document.addEventListener("visibilitychange", updateVisibility);
+    return () =>
+      document.removeEventListener("visibilitychange", updateVisibility);
   }, []);
   const creating = setupRequired || register;
 
@@ -48,33 +56,85 @@ export function LoginPage() {
   }
 
   return (
-    <main className="auth-screen">
+    <main
+      className="auth-screen"
+      data-keyboard-open={keyboardOpen}
+      data-motion-paused={visualPaused}
+      style={
+        {
+          "--auth-viewport-height": keyboardOpen
+            ? `${viewportHeight}px`
+            : "100dvh",
+        } as CSSProperties
+      }
+    >
       <div className="auth-page">
         <section className="auth-story" aria-label="欢迎来到 AI乐之城">
-          <span className="auth-brand">
+          <a
+            className="auth-brand"
+            href="#/home"
+            aria-label="AI乐之城，返回首页"
+          >
             <AudioLines size={23} /> AI乐之城
-          </span>
-          <div className="auth-story-copy">
-            <h1>
-              让想象，
-              <br />
-              有回响。
-            </h1>
+          </a>
+          <div className="auth-sound-field" aria-hidden="true">
+            <svg viewBox="0 0 900 1000" preserveAspectRatio="xMidYMid slice">
+              <defs>
+                <linearGradient
+                  id="auth-wave-color"
+                  x1="0"
+                  y1="0"
+                  x2="1"
+                  y2="1"
+                >
+                  <stop offset="0%" stopColor="#6a965e" stopOpacity="0.14" />
+                  <stop offset="48%" stopColor="#507e56" stopOpacity="0.7" />
+                  <stop offset="100%" stopColor="#45887c" stopOpacity="0.16" />
+                </linearGradient>
+              </defs>
+              <g className="auth-wave-ribbon auth-wave-ribbon-back">
+                {Array.from({ length: 26 }, (_, index) => (
+                  <path
+                    key={index}
+                    d={`M -200 ${315 + index * 12} C 110 ${520 + index * 9}, 190 ${900 - index * 9}, 465 ${650 - index * 5} S 790 ${200 + index * 10}, 1100 ${360 + index * 13}`}
+                  />
+                ))}
+              </g>
+              <g className="auth-wave-ribbon auth-wave-ribbon-front">
+                {Array.from({ length: 22 }, (_, index) => (
+                  <path
+                    key={index}
+                    d={`M -180 ${760 + index * 8} C 100 ${470 + index * 5}, 300 ${440 + index * 13}, 550 ${720 + index * 7} S 870 ${1080 - index * 8}, 1100 ${670 + index * 10}`}
+                  />
+                ))}
+              </g>
+            </svg>
           </div>
-          <div className="auth-sound-art" aria-hidden="true">
-            <div className="auth-sound-disc">
-              <span>
-                <AudioLines size={32} strokeWidth={1.5} />
-              </span>
-            </div>
+          <div className="auth-story-copy">
+            <h1 aria-label="让想象，有回响。">
+              {["让想象，", "有回响。"].map((line, lineIndex) => (
+                <span className="auth-title-line" key={line} aria-hidden="true">
+                  {Array.from(line).map((letter, index) => (
+                    <span
+                      className="auth-title-letter"
+                      key={`${letter}-${index}`}
+                      style={
+                        {
+                          "--letter-index": lineIndex * 4 + index,
+                        } as CSSProperties
+                      }
+                    >
+                      {letter}
+                    </span>
+                  ))}
+                </span>
+              ))}
+            </h1>
           </div>
         </section>
         <div className="auth-form-area">
           <form className="auth-card" onSubmit={submit}>
             <div className="auth-head">
-              <span className="auth-logo">
-                <LockKeyhole size={21} />
-              </span>
               <h2>{creating ? "创建账号" : "登录"}</h2>
             </div>
             {setupRequired && (

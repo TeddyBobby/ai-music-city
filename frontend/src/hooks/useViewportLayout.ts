@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 export type ViewportLayout = {
   keyboardOpen: boolean;
   viewportHeight: number;
+  viewportOffsetTop: number;
   keyboardInset: number;
 };
 
@@ -37,6 +38,7 @@ export function useViewportLayout(): ViewportLayout {
   const [layout, setLayout] = useState<ViewportLayout>(() => ({
     keyboardOpen: false,
     viewportHeight: typeof window === "undefined" ? 0 : window.innerHeight,
+    viewportOffsetTop: 0,
     keyboardInset: 0,
   }));
 
@@ -102,11 +104,17 @@ export function useViewportLayout(): ViewportLayout {
       const next = {
         keyboardOpen,
         viewportHeight: visualHeight,
+        // WebKit can pan the visual viewport without resizing the layout
+        // viewport. Height alone leaves the shell above the keyboard with a gap.
+        viewportOffsetTop: keyboardOpen
+          ? Math.max(0, viewport?.offsetTop || 0)
+          : 0,
         keyboardInset: keyboardOpen ? inset : 0,
       };
       setLayout((previous) =>
         previous.keyboardOpen === next.keyboardOpen &&
         previous.viewportHeight === next.viewportHeight &&
+        previous.viewportOffsetTop === next.viewportOffsetTop &&
         previous.keyboardInset === next.keyboardInset
           ? previous
           : next,

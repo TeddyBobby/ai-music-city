@@ -96,7 +96,7 @@
 .pricing-plan-tag {
   margin-left: auto;
   color: var(--accent);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.6;
   white-space: nowrap;
 }
@@ -155,7 +155,7 @@
   align-items: center;
   gap: 9px;
   color: var(--muted);
-  font-size: 12px;
+  font-size: 14px;
   line-height: 1.6;
 }
 .pricing-features svg {
@@ -164,7 +164,7 @@
 }
 .pricing-features .pricing-quota {
   color: var(--text);
-  font-size: 13px;
+  font-size: 15px;
 }
 .pricing-quota strong {
   font-weight: 600;
@@ -175,7 +175,7 @@
   justify-content: space-between;
   gap: 12px;
   color: var(--muted);
-  font-size: 11px;
+  font-size: 12px;
   line-height: 1.8;
 }
 .pricing-notes p {
@@ -319,7 +319,7 @@
     letter-spacing: -1px;
   }
   .pricing-price > span {
-    font-size: 11px;
+    font-size: 12px;
   }
   .pricing-price > .pricing-currency {
     font-size: 15px;
@@ -328,7 +328,7 @@
   .pricing-billing {
     grid-area: billing;
     margin: 2px 0 0;
-    font-size: 11px;
+    font-size: 12px;
     line-height: 1.5;
   }
   .pricing-page .pricing-plan .pricing-plan-button {
@@ -351,7 +351,7 @@
   }
   .pricing-features li,
   .pricing-features .pricing-quota {
-    font-size: 11px;
+    font-size: 13px;
     line-height: 1.5;
   }
   .pricing-features svg {
@@ -369,7 +369,7 @@
   }
   .pricing-page .pricing-details-button {
     padding: 0 2px;
-    font-size: 11px;
+    font-size: 12px;
     gap: 4px;
   }
 }

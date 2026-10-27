@@ -48,7 +48,7 @@ function setup() {
     readOnly = false;
     disabled = false;
   }
-  const viewport = surface({ height: 760, scale: 1 });
+  const viewport = surface({ height: 760, offsetTop: 0, scale: 1 });
   const mobile = surface({ matches: true });
   const document = surface({ activeElement: null });
   const window = surface({
@@ -151,6 +151,55 @@ test("keyboard follows both iOS visual viewport and Android layout resizing", ()
     );
     h.cleanup();
   }
+});
+
+test("iOS keyboard panning preserves the visible viewport origin, including scroll-only changes", () => {
+  const h = setup();
+  h.focus();
+  // iOS can leave the layout viewport unchanged while shrinking and panning
+  // the visual viewport to bring the focused field above the keyboard.
+  h.viewport.offsetTop = 180;
+  h.resize({ innerHeight: 760 }, 440);
+  assert.equal(h.state().keyboardOpen, true);
+  assert.equal(h.state().viewportHeight, 440);
+  assert.equal(
+    h.state().viewportOffsetTop,
+    180,
+    "the app needs the visual origin as well as its height to cover the visible area",
+  );
+
+  h.viewport.offsetTop = 215;
+  h.viewport.emit("scroll");
+  h.flush();
+  assert.equal(h.state().viewportOffsetTop, 215);
+  assert.equal(h.state().viewportHeight, 440);
+
+  // Native keyboard dismissal can restore height before WebKit finishes its
+  // pan animation. The closed shell must not retain a stale keyboard offset.
+  h.resize({ innerHeight: 760 }, 760);
+  assert.equal(h.state().keyboardOpen, false);
+  assert.equal(h.state().viewportOffsetTop, 0);
+  h.cleanup();
+});
+
+test("visual panning is not applied to desktop, pinch zoom, or unfocused layouts", () => {
+  const h = setup();
+  h.focus();
+  h.viewport.offsetTop = 180;
+  h.resize({ innerHeight: 760 }, 440);
+  assert.equal(h.state().viewportOffsetTop, 180);
+
+  h.viewport.scale = 2;
+  h.resize({ innerHeight: 760 }, 380);
+  assert.equal(h.state().viewportOffsetTop, 0);
+  h.viewport.scale = 1;
+  h.mobile.matches = false;
+  h.resize({ innerHeight: 760 }, 440);
+  assert.equal(h.state().viewportOffsetTop, 0);
+  h.mobile.matches = true;
+  h.blur();
+  assert.equal(h.state().viewportOffsetTop, 0);
+  h.cleanup();
 });
 
 test("rotating with Android keyboard open retains keyboard layout in both directions", () => {

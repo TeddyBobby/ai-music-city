@@ -59,6 +59,10 @@
   }
 
   .app-shell[data-keyboard-open="true"] {
+    position: fixed;
+    top: var(--app-viewport-offset-top, 0px);
+    inset-inline: 0;
+    width: 100%;
     height: var(--app-viewport-height, 100dvh);
   }
 
@@ -95,31 +99,32 @@
 
 /* A landscape phone can have less than 250px above its keyboard. Keep the
    composer reachable instead of allowing fixed headers to push it out. */
-@media (max-height: 500px) and (pointer: coarse) {
-  .app-shell[data-keyboard-open="true"] .workspace-topbar,
-  .app-shell[data-keyboard-open="true"] .as-chat-top {
+/* iOS keeps the layout viewport tall while the keyboard shrinks the visual one. */
+@media (max-width: 760px), (pointer: coarse) {
+  .app-shell[data-keyboard-compact="true"] .workspace-topbar,
+  .app-shell[data-keyboard-compact="true"] .as-chat-top {
     display: none;
   }
 
-  .app-shell[data-keyboard-open="true"] .as-messages {
+  .app-shell[data-keyboard-compact="true"] .as-messages {
     padding-block: 0;
   }
 
-  .app-shell[data-keyboard-open="true"] .as-compose-wrap {
+  .app-shell[data-keyboard-compact="true"] .as-compose-wrap {
     padding: 8px 12px;
   }
 
-  .app-shell[data-keyboard-open="true"] .as-composer {
+  .app-shell[data-keyboard-compact="true"] .as-composer {
     padding: 10px 12px;
     gap: 8px;
   }
 
-  .app-shell[data-keyboard-open="true"] .as-composer textarea {
+  .app-shell[data-keyboard-compact="true"] .as-composer textarea {
     min-height: 44px !important;
     max-height: 64px;
   }
 
-  .app-shell[data-keyboard-open="true"] .as-chat > .as-error {
+  .app-shell[data-keyboard-compact="true"] .as-chat > .as-error {
     max-height: 44px;
     overflow: auto;
     margin-block: 0;

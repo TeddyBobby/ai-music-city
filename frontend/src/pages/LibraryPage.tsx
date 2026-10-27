@@ -427,8 +427,8 @@ export function LibraryPage() {
                 >
                   {when(job.created_at)}
                 </time>
-                {desktop ? (
-                  <div className="simple-song-actions">
+                <div className="simple-song-actions">
+                  {desktop && (
                     <Link
                       className="simple-song-action simple-song-edit"
                       to={`/generation/${encodeURIComponent(job.id)}`}
@@ -438,35 +438,7 @@ export function LibraryPage() {
                       <SlidersHorizontal size={18} />
                       <span>微调</span>
                     </Link>
-                    <a
-                      className="simple-song-action"
-                      href={download.url}
-                      download={download.name}
-                      aria-label={`下载 ${titleOf(job)}`}
-                      title="下载"
-                    >
-                      <Download size={19} />
-                      <span>下载</span>
-                    </a>
-                    <button
-                      className="simple-song-action"
-                      onClick={() => setSharing(job)}
-                      aria-label={`分享 ${titleOf(job)}`}
-                      title="分享"
-                    >
-                      <Share2 size={19} />
-                      <span>分享</span>
-                    </button>
-                    <button
-                      className="simple-song-action simple-song-open"
-                      onClick={() => openPlayer(job.id)}
-                      aria-label={`打开 ${titleOf(job)} 的播放页`}
-                      title="打开播放页"
-                    >
-                      <Maximize2 size={17} />
-                    </button>
-                  </div>
-                ) : (
+                  )}
                   <Menu
                     position="bottom-end"
                     width={180}
@@ -513,7 +485,7 @@ export function LibraryPage() {
                       </Menu.Item>
                     </Menu.Dropdown>
                   </Menu>
-                )}
+                </div>
               </article>
             );
           })}

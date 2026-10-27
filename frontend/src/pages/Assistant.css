@@ -72,33 +72,59 @@
   overflow-y: auto;
 }
 .as-workspace.is-empty .as-messages {
-  /* 空会话：欢迎语在消息区顶部展示 */
-  display: block;
+  flex: 0 0 0;
+  padding: 0;
+  overflow: hidden;
 }
 .as-workspace.is-empty .as-compose-wrap {
+  flex-shrink: 0;
+  max-width: 860px;
   max-height: none;
   overflow: visible;
-  margin-block: 0;
-  /* 输入区贴底：空会话时欢迎语在输入框正上方，输入框沉到页面底部 */
-  margin-top: auto;
-  padding-block: 0 clamp(16px, 4vh, 32px);
+  margin-block: auto;
+  padding-block: 24px clamp(44px, 10dvh, 96px);
 }
 .as-welcome {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 17px;
+  gap: 20px;
   margin-bottom: 28px;
 }
 .as-welcome-wave {
-  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  height: 44px;
   color: var(--accent);
-  opacity: 0.72;
+}
+.as-welcome-wave span {
+  width: 3px;
+  border-radius: 4px;
+  background: currentColor;
+  animation: assistant-wave 3.4s ease-in-out infinite alternate;
+  transform-origin: center;
+}
+@keyframes assistant-wave {
+  from {
+    transform: scaleY(0.62);
+    opacity: 0.55;
+  }
+  to {
+    transform: scaleY(1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .as-welcome-wave span {
+    animation: none;
+  }
 }
 .as-welcome-title {
   margin: 0;
   text-align: center;
-  font-size: clamp(28px, 2.8vw, 38px);
+  font-size: clamp(28px, 2.7vw, 36px);
   line-height: 1.4;
   font-weight: 500;
   letter-spacing: -1px;
@@ -665,17 +691,15 @@ button.as-connect-notice {
     max-height: 68%;
   }
   .as-workspace.is-empty .as-compose-wrap {
-    /* 移动端空会话：输入区整体贴底（配合桌面版的 margin-top:auto） */
-    margin-top: auto;
-    padding-block: 0 16px;
+    margin-block: auto;
+    padding-block: 20px clamp(32px, 8dvh, 64px);
   }
   .as-welcome {
     gap: 12px;
     margin-bottom: 22px;
   }
   .as-welcome-wave {
-    width: 64px;
-    height: 24px;
+    height: 38px;
   }
   .as-welcome-title {
     font-size: 28px;
@@ -801,24 +825,12 @@ button.as-connect-notice {
   }
 }
 
-/* empty-state layout: welcome at top, quick choices above the composer */
-.as-welcome-top {
-  align-items: flex-start;
-  text-align: left;
-  margin: 0 0 24px;
-  gap: 8px;
-}
-.as-welcome-sub {
-  margin: 0;
-  color: var(--text-dim, #9aa4b2);
-  font-size: 14px;
-  line-height: 1.6;
-}
 .as-quick-choices {
   display: flex;
+  justify-content: center;
   flex-wrap: wrap;
   gap: 8px;
-  margin-bottom: 10px;
+  margin-bottom: 18px;
 }
 .as-quick-choices button {
   display: inline-flex;
@@ -827,14 +839,35 @@ button.as-connect-notice {
   min-height: 36px;
   padding: 6px 14px;
   border-radius: 999px;
-  border: 1px solid rgba(127, 127, 127, 0.25);
+  border: 1px solid var(--line);
   background: transparent;
   color: inherit;
   font-size: 13px;
   cursor: pointer;
 }
 .as-quick-choices button:hover:not(:disabled) {
-  border-color: var(--accent, #22d3ee);
-  color: var(--accent, #22d3ee);
+  border-color: var(--accent);
+  color: var(--accent);
 }
-.as-quick-choices button:disabled { opacity: 0.5; }
+.as-quick-choices button:disabled {
+  opacity: 0.5;
+}
+
+@media (max-height: 520px) {
+  .as-workspace.is-empty .as-compose-wrap {
+    padding-block: 12px;
+  }
+  .as-welcome {
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+  .as-welcome-wave {
+    display: none;
+  }
+  .as-welcome-title {
+    font-size: 25px;
+  }
+  .as-quick-choices {
+    margin-bottom: 10px;
+  }
+}

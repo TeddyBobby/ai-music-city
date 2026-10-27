@@ -3,14 +3,14 @@
   padding-inline: 24px;
 }
 .route-settings .page-container {
-  max-width: none;
+  max-width: 1040px;
 }
 .preferences-page {
   --settings-padding: 18px;
-  --settings-columns: minmax(0, 1fr) minmax(240px, 380px);
+  --settings-columns: minmax(180px, 1fr) minmax(240px, 380px);
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 16px;
   width: 100%;
   min-width: 0;
   font-size: 14px;
@@ -29,7 +29,7 @@
   width: 100%;
   min-width: 0;
   border: 1px solid var(--line);
-  border-radius: 10px;
+  border-radius: 12px;
   background: var(--surface);
 }
 .preferences-section-heading {
@@ -187,7 +187,7 @@
 }
 @media (max-width: 760px), (pointer: coarse) {
   .preferences-page h2 {
-    font-size: 16px;
+    font-size: 14px;
   }
   .preferences-page .preferences-section .mantine-Input-input,
   .preferences-page .preferences-section .mantine-Button-root.btn {

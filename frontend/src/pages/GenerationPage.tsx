@@ -3,14 +3,19 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
-  AudioLines,  Clock3,
+  AudioLines,
+  Check,
+  ChevronDown,
+  Clock3,
   Download,
   LoaderCircle,
   Pause,
   Play,
   RefreshCw,
   Share2,
-  SlidersHorizontal,} from "lucide-react";
+  SlidersHorizontal,
+  X,
+} from "lucide-react";
 import { api } from "../lib/api";
 import {
   draftFromJob,
@@ -90,6 +95,7 @@ function GenerationWorkspace({ id }: { id: string }) {
   const [revisionPhase, setRevisionPhase] = useState("");
   const [canceling, setCanceling] = useState(false);
   const [sharing, setSharing] = useState(false);
+  const [editorOpen, setEditorOpen] = useState<boolean | null>(null);
   const [now, setNow] = useState(Date.now());
   const [reload, setReload] = useState(0);
   const watch = useRef<ReturnType<typeof watchGeneration> | null>(null);
@@ -114,6 +120,12 @@ function GenerationWorkspace({ id }: { id: string }) {
   }, [id, reload]);
 
   useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (!editorOpen || !editor.current) return;
+    editor.current.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    if (window.matchMedia("(min-width: 1180px)").matches)
+      editor.current.querySelector("textarea")?.focus({ preventScroll: true });
+  }, [editorOpen]);
   useEffect(() => {
     if (job?.id) page.current?.scrollIntoView({ block: "start" });
   }, [job?.id]);
@@ -240,6 +252,10 @@ function GenerationWorkspace({ id }: { id: string }) {
   const busy = !!revisionPhase;
   const original = draftFromJob(job);
 
+  const showEditor = editorOpen ?? ["failed", "cancelled"].includes(job.status);
+  const showLyrics =
+    original.musicKind === "vocal" && !!original.lyrics.trim() && !showEditor;
+
   return (
     <div className="generation-page" ref={page}>
       <header className="generation-heading">
@@ -247,16 +263,6 @@ function GenerationWorkspace({ id }: { id: string }) {
           <ArrowLeft size={17} />
           我的音乐
         </Link>
-        <div className="generation-heading-main">
-          <div>
-            <span className="generation-eyebrow">第 {versionNumber} 版</span>
-            <h1>{titleOf(job)}</h1>
-          </div>
-          <span className={`generation-status is-${job.status}`}>
-            {active && <span />}
-            {statusText(job)}
-          </span>
-        </div>
       </header>
       {loadError && (
         <div className="generation-notice" role="alert">
@@ -264,42 +270,97 @@ function GenerationWorkspace({ id }: { id: string }) {
           <button onClick={() => void watch.current?.refresh()}>刷新</button>
         </div>
       )}
-      <div className="generation-layout">
+      <div
+        className={`generation-layout ${showEditor || showLyrics ? "has-panel" : ""}`}
+      >
         <div className="generation-main">
           <section
             className={`generation-result ${playable ? "is-ready" : ""}`}
             aria-label={playable ? "生成结果" : "生成状态"}
           >
             <div className="generation-result-art">
-              <Artwork job={job} size={128} />
+              <Artwork job={job} size={200} />
               {active && (
                 <span className="generation-art-orbit" aria-hidden="true" />
               )}
             </div>
             <div className="generation-result-copy">
-              <h2 role="status">{active ? statusText(job) : progress.title}</h2>
-              {job.status === "failed" && <p>{progress.description}</p>}
-              {active && (
-                <div className="generation-live-meta">
-                  <Clock3 size={14} />
-                  {job.status === "queued"
-                    ? job.position
-                      ? `前面还有 ${job.position} 个任务`
-                      : "等待开始"
-                    : time
-                      ? `已进行 ${time}`
-                      : "准备开始"}
+              <details className="generation-versions" aria-label="版本记录">
+                <summary>
+                  第 {versionNumber} 版
+                  {history.length > 1 && <span> / {history.length}</span>}
+                  <ChevronDown size={14} />
+                </summary>
+                <div className="generation-version-popover">
+                  {versionError && (
+                    <p className="generation-version-error">
+                      {versionError}
+                      <button onClick={() => setReload((n) => n + 1)}>
+                        重试
+                      </button>
+                    </p>
+                  )}
+                  <div className="generation-version-list">
+                    {history.map((version, index) => (
+                      <Link
+                        key={version.id}
+                        to={`/generation/${encodeURIComponent(version.id)}`}
+                        className={version.id === id ? "is-selected" : ""}
+                        aria-current={version.id === id ? "page" : undefined}
+                        onClick={(event) =>
+                          event.currentTarget
+                            .closest("details")
+                            ?.removeAttribute("open")
+                        }
+                      >
+                        <span className="generation-version-number">
+                          {String(index + 1).padStart(2, "0")}
+                        </span>
+                        <div>
+                          <strong>{titleOf(version)}</strong>
+                          <small>
+                            {when(version.created_at)} · {statusText(version)}
+                          </small>
+                        </div>
+                        {version.id === id ? (
+                          <Check size={15} />
+                        ) : (
+                          <ArrowRight size={15} />
+                        )}
+                      </Link>
+                    ))}
+                  </div>
                 </div>
+              </details>
+              <h1>{titleOf(job)}</h1>
+              <div className="generation-audio-meta">
+                <span>
+                  {original.musicKind === "instrumental" ? "纯音乐" : "带歌词"}
+                </span>
+                {playable && (
+                  <>
+                    <span>·</span>
+                    <span>{duration(audioDuration)}</span>
+                  </>
+                )}
+              </div>
+              {playable && time && (
+                <span className="generation-elapsed">创作用时 {time}</span>
               )}
-              {playable && (
-                <div className="generation-audio-meta">
-                  <AudioLines size={15} />
-                  {draftFromJob(job).musicKind === "instrumental"
-                    ? "纯音乐"
-                    : "带歌词"}
-                  <span>·</span>
-                  {duration(audioDuration)}
-                </div>
+              {!playable && (
+                <button
+                  className="generation-edit-link"
+                  onClick={() => setEditorOpen(!showEditor)}
+                  aria-expanded={showEditor}
+                  aria-controls="generation-editor"
+                >
+                  <SlidersHorizontal size={16} />
+                  {showEditor
+                    ? "收起微调"
+                    : active
+                      ? "调整下一版"
+                      : "调整并重试"}
+                </button>
               )}
             </div>
             {playable && (
@@ -341,6 +402,15 @@ function GenerationWorkspace({ id }: { id: string }) {
                   </div>
                 </div>
                 <div className="generation-result-actions">
+                  <button
+                    className="generation-edit-action"
+                    onClick={() => setEditorOpen(!showEditor)}
+                    aria-expanded={showEditor}
+                    aria-controls="generation-editor"
+                  >
+                    <SlidersHorizontal size={17} />
+                    {showEditor ? "收起微调" : "微调"}
+                  </button>
                   <a href={download.url} download={download.name}>
                     <Download size={17} />
                     下载
@@ -349,123 +419,136 @@ function GenerationWorkspace({ id }: { id: string }) {
                     <Share2 size={17} />
                     分享
                   </button>
-                  <button
-                    onClick={() => {
-                      const desktop = window.matchMedia(
-                        "(min-width: 1024px)",
-                      ).matches;
-                      editor.current?.scrollIntoView({
-                        behavior: "smooth",
-                        block: desktop ? "nearest" : "start",
-                      });
-                      if (desktop)
-                        editor.current
-                          ?.querySelector("textarea")
-                          ?.focus({ preventScroll: true });
-                    }}
-                  >
-                    <SlidersHorizontal size={17} />
-                    微调
-                  </button>
                 </div>
               </div>
             )}
           </section>
 
-          <section className="generation-process" aria-label="生成流程">
-            <div className="generation-section-heading">
-              <h2>{statusText(job)}</h2>
-              {time && (
-                <span>
-                  {active ? "已用时" : "用时"} {time}
-                </span>
-              )}
-            </div>
-            {active && (
-              <div className="generation-running">
-                <LoaderCircle className="spin" size={22} />
-                <span>正在生成你的音乐，完成后自动保存…</span>
-              </div>
-            )}
-            {active && (
-              <div className="generation-process-footer">
-                <button disabled={canceling} onClick={cancel}>
-                  {canceling ? "正在停止…" : "停止生成"}
-                </button>
-              </div>
-            )}
-            {job.error && (
-              <details className="generation-error-detail">
-                <summary>查看错误详情</summary>
-                <pre>{job.error}</pre>
-              </details>
-            )}
-          </section>
-
-          {original.musicKind === "vocal" && original.lyrics.trim() && (
-            <section
-              className="generation-original-lyrics"
-              aria-label="当前版本歌词"
-            >
+          {!playable && (
+            <section className="generation-process" aria-label="生成流程">
               <div className="generation-section-heading">
-                <h2>歌词</h2>
+                <h2 role="status">{progress.title}</h2>
+                {time && (
+                  <span>
+                    <Clock3 size={13} />
+                    {time}
+                  </span>
+                )}
               </div>
-              <div className="generation-original-lyrics-text">
-                {original.lyrics}
-              </div>
+              {!active && (
+                <p className="generation-process-description">
+                  {progress.description}
+                </p>
+              )}
+              {active && (
+                <ol className="generation-steps" aria-label="生成阶段">
+                  {progress.steps.map((step, index) => (
+                    <li
+                      key={step.id}
+                      className={`is-${step.state}`}
+                      aria-current={
+                        step.state === "current" ? "step" : undefined
+                      }
+                    >
+                      <span className="generation-step-icon">
+                        {step.state === "complete" ? (
+                          <Check size={13} />
+                        ) : step.state === "current" ? (
+                          <LoaderCircle size={14} className="spin" />
+                        ) : (
+                          index + 1
+                        )}
+                      </span>
+                      <strong>{step.label}</strong>
+                    </li>
+                  ))}
+                </ol>
+              )}
+              {active && progress.stagePercent !== undefined && (
+                <div className="generation-stage-progress">
+                  <div>
+                    <span>{progress.stageDetail}</span>
+                    <strong>{progress.stagePercent}%</strong>
+                  </div>
+                  <progress
+                    max={100}
+                    value={progress.stagePercent}
+                    aria-label="当前阶段进度"
+                  />
+                </div>
+              )}
+              {active && (
+                <div className="generation-process-footer">
+                  <span>
+                    {job.status === "queued" && job.position
+                      ? `前面还有 ${job.position} 个任务`
+                      : "完成后自动保存"}
+                  </span>
+                  <button disabled={canceling} onClick={cancel}>
+                    {canceling ? "正在停止…" : "停止生成"}
+                  </button>
+                </div>
+              )}
+              {job.error && (
+                <details className="generation-error-detail">
+                  <summary>查看错误详情</summary>
+                  <pre>{job.error}</pre>
+                </details>
+              )}
+              {actionError && !showEditor && (
+                <p className="generation-action-error" role="alert">
+                  {actionError}
+                </p>
+              )}
             </section>
           )}
+          {original.style && (
+            <details className="generation-original-style">
+              <summary>
+                创作设定
+                <ChevronDown size={15} />
+              </summary>
+              <p>{original.style}</p>
+            </details>
+          )}
+        </div>
 
-          <section className="generation-versions" aria-label="版本记录">
+        {showLyrics && (
+          <section
+            className="generation-original-lyrics"
+            aria-label="当前版本歌词"
+          >
             <div className="generation-section-heading">
-              <h2>版本记录</h2>
-              <span>{history.length} 个版本</span>
+              <h2>歌词</h2>
+              <button onClick={() => setEditorOpen(true)}>
+                <SlidersHorizontal size={15} />
+                修改
+              </button>
             </div>
-            {versionError && (
-              <p className="generation-version-error">
-                {versionError}
-                <button onClick={() => setReload((n) => n + 1)}>重试</button>
-              </p>
-            )}
-            <div className="generation-version-list">
-              {history.map((version, index) => (
-                <Link
-                  key={version.id}
-                  to={`/generation/${encodeURIComponent(version.id)}`}
-                  className={version.id === id ? "is-selected" : ""}
-                  aria-current={version.id === id ? "page" : undefined}
-                >
-                  <span className="generation-version-number">
-                    {String(index + 1).padStart(2, "0")}
-                  </span>
-                  <div>
-                    <strong>{titleOf(version)}</strong>
-                    <small>
-                      {when(version.created_at)} · {statusText(version)}
-                    </small>
-                  </div>
-                  {version.id === id ? (
-                    <span className="generation-version-current">当前</span>
-                  ) : (
-                    <ArrowRight size={15} />
-                  )}
-                </Link>
-              ))}
+            <div className="generation-original-lyrics-text">
+              {original.lyrics}
             </div>
           </section>
-        </div>
+        )}
 
         <form
           ref={editor}
+          id="generation-editor"
           className="generation-editor"
+          hidden={!showEditor}
           onSubmit={revise}
           aria-label="微调音乐"
         >
           <div className="generation-editor-heading">
-            <span>
-              <SlidersHorizontal size={18} />
-            </span>
+            <SlidersHorizontal size={19} />
             <h2>微调</h2>
+            <button
+              type="button"
+              aria-label="收起微调"
+              onClick={() => setEditorOpen(false)}
+            >
+              <X size={18} />
+            </button>
           </div>
           <div className="generation-editor-fields">
             <fieldset disabled={busy}>
@@ -489,7 +572,7 @@ function GenerationWorkspace({ id }: { id: string }) {
                 音乐描述
                 <textarea
                   value={draft.style}
-                  rows={5}
+                  rows={4}
                   maxLength={2000}
                   onChange={(e) => edit({ style: e.target.value })}
                   placeholder="调整情绪、节奏、乐器或人声…"
@@ -555,7 +638,9 @@ function GenerationWorkspace({ id }: { id: string }) {
                 ? "正在提交新版本…"
                 : active
                   ? "等待当前版本完成"
-                  : "生成新版本"}
+                  : job.status === "failed" || job.status === "cancelled"
+                    ? "重新生成"
+                    : "生成新版本"}
             <ArrowRight size={17} />
           </button>
         </form>

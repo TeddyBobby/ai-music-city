@@ -41,7 +41,9 @@ export function EngineToggle({ disabled }: { disabled?: boolean }) {
     try {
       const info = await api.switchEngine(key);
       setActive(info.active || key);
-      const label = (info.engines || []).find((e: EngineInfo) => e.key === key)?.label || key;
+      const label =
+        (info.engines || []).find((e: EngineInfo) => e.key === key)?.label ||
+        key;
       toast(`已切换到${label}`, "ok");
     } catch (e: any) {
       toast(e?.message || "切换失败，请重试。", "error");
@@ -52,6 +54,24 @@ export function EngineToggle({ disabled }: { disabled?: boolean }) {
 
   if (loading && !engines.length) return null;
   if (!engines.length) return null;
+
+  const current = engines.find((engine) => engine.key === active);
+  if (!isAdmin) {
+    if (!current) return null;
+    return (
+      <span
+        className="engine-current"
+        aria-label={`生成引擎：${current.label}`}
+      >
+        {current.kind === "cloud" ? (
+          <Cloud size={14} aria-hidden="true" />
+        ) : (
+          <Server size={14} aria-hidden="true" />
+        )}
+        <span>{current.label}</span>
+      </span>
+    );
+  }
 
   return (
     <div className="engine-toggle" role="radiogroup" aria-label="生成引擎">
@@ -68,7 +88,9 @@ export function EngineToggle({ disabled }: { disabled?: boolean }) {
         >
           {e.kind === "cloud" ? <Cloud size={14} /> : <Server size={14} />}
           <span>{e.label}</span>
-          {e.key === active && loading && <LoaderCircle size={12} className="spin" />}
+          {e.key === active && loading && (
+            <LoaderCircle size={12} className="spin" />
+          )}
         </button>
       ))}
     </div>

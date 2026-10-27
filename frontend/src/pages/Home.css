@@ -28,7 +28,7 @@
   line-height: 1.45;
 }
 .music-composer-card {
-  --composer-panel-height: 360px;
+  --composer-panel-height: 300px;
   width: min(100%, 720px);
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -243,7 +243,7 @@
     letter-spacing: -1.2px;
   }
   .music-composer-card {
-    --composer-panel-height: 300px;
+    --composer-panel-height: 272px;
     border-radius: 20px;
   }
   .music-mode-tabs {
@@ -409,17 +409,41 @@
     width: 60px;
     height: 60px;
   }
+  .music-input-panel .hum-composer[data-has-audio="false"] .hum-recording-area {
+    display: grid;
+    grid-template-columns: 60px minmax(0, 1fr);
+    align-self: center;
+    gap: 0 14px;
+    max-width: 100%;
+    padding: 6px 8px;
+  }
+  .music-input-panel .hum-composer[data-has-audio="false"] .hum-record-button {
+    grid-column: 1;
+    grid-row: 1 / 3;
+  }
+  .music-input-panel .hum-composer[data-has-audio="false"] .hum-record-caption {
+    grid-column: 2;
+    grid-row: 1;
+    align-self: end;
+  }
+  .music-input-panel .hum-composer[data-has-audio="false"] .hum-upload-button {
+    grid-column: 2;
+    grid-row: 2;
+    justify-self: start;
+    padding-inline: 0;
+  }
+  .music-input-panel
+    .hum-composer[data-has-audio="false"]
+    .hum-recording-area
+    .hum-note {
+    grid-column: 1 / -1;
+    margin-top: 4px;
+    text-align: center;
+  }
   .music-input-panel .image-music-upload,
   .music-input-panel .image-music-preview {
-    height: 160px;
-    min-height: 160px;
-  }
-  .app-shell[data-keyboard-open="true"] .music-composer-card {
-    --composer-panel-height: clamp(
-      210px,
-      calc(var(--app-viewport-height, 100dvh) - 150px),
-      330px
-    );
+    height: 112px;
+    min-height: 112px;
   }
 }
 
@@ -589,10 +613,57 @@
     padding-bottom: calc(16px + var(--mobile-nav-height));
   }
   .app-shell[data-keyboard-open="true"] .workspace-content.route-home {
-    padding-bottom: 12px;
+    padding-block: 12px;
+  }
+  .app-shell[data-keyboard-open="true"][data-route="home"] .workspace-topbar {
+    display: none;
   }
   .app-shell[data-keyboard-open="true"] .route-home .page-container {
     align-items: flex-start;
+    height: 100%;
+    min-height: 0;
+  }
+  .app-shell[data-keyboard-open="true"] .simple-home,
+  .app-shell[data-keyboard-open="true"] .home-hero-grid {
+    height: 100%;
+    min-height: 0;
+  }
+  .app-shell[data-keyboard-open="true"] .simple-home .home-hero-grid {
+    padding-block: 0;
+    gap: 0;
+  }
+  .app-shell[data-keyboard-open="true"] .music-composer-card {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-height: 260px;
+  }
+  .app-shell[data-keyboard-open="true"] .music-composer-toolbar {
+    flex: 0 0 auto;
+    gap: 8px;
+  }
+  .app-shell[data-keyboard-open="true"] .engine-toggle {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .app-shell[data-keyboard-open="true"] .engine-choice {
+    min-width: 0;
+    min-height: 44px;
+    padding-inline: 4px;
+    gap: 4px;
+    justify-content: center;
+    white-space: nowrap;
+  }
+  .app-shell[data-keyboard-open="true"] .music-input-panel {
+    flex: 1 1 auto;
+    height: auto;
+  }
+  .app-shell[data-keyboard-open="true"] .music-input-panel > * {
+    gap: 8px;
+    padding-block: 12px;
+  }
+  .app-shell[data-keyboard-open="true"] .music-input-panel textarea {
+    min-height: 56px;
   }
 }
 
@@ -618,10 +689,25 @@
 }
 @media (max-width: 760px) {
   .music-composer-toolbar {
-    flex-direction: column;
-    align-items: stretch;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto;
+    align-items: center;
     padding: 12px 14px 0;
-    gap: 12px;
+    gap: 8px;
+  }
+  .music-composer-toolbar .music-mode-tabs {
+    grid-column: 1 / -1;
+  }
+  .music-composer-toolbar .engine-toggle {
+    grid-column: 1 / -1;
+  }
+  .music-composer-toolbar .engine-current {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .music-composer-toolbar .home-music-kind {
+    grid-column: 2;
+    grid-row: 2;
   }
   .music-composer-toolbar .music-mode-tabs {
     width: 100%;
@@ -661,18 +747,53 @@
   border-radius: 999px;
   border: 1px solid rgba(127, 127, 127, 0.28);
   background: transparent;
-  color: var(--text-dim, #9aa4b2);
+  color: var(--muted);
   font-size: 13px;
   cursor: pointer;
 }
 .engine-choice.is-active {
-  border-color: var(--accent, #22d3ee);
-  color: var(--accent, #22d3ee);
-  background: rgba(34, 211, 238, 0.08);
+  border-color: var(--accent);
+  color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, transparent);
 }
-.engine-choice:disabled { opacity: 0.6; cursor: default; }
-.engine-choice .spin { animation: engine-spin 1s linear infinite; }
+.engine-choice:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+.engine-choice .spin {
+  animation: engine-spin 1s linear infinite;
+}
 @keyframes engine-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.engine-current {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+.engine-current svg {
+  flex: none;
+}
+.engine-current > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@media (max-width: 360px) {
+  .engine-current {
+    gap: 4px;
+    font-size: 11px;
+  }
+  .engine-current svg {
+    display: none;
+  }
 }
