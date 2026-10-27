@@ -28,7 +28,7 @@
   line-height: 1.45;
 }
 .music-composer-card {
-  --composer-panel-height: 300px;
+  --composer-panel-height: 352px;
   width: min(100%, 720px);
   border: 1px solid var(--line);
   border-radius: 24px;
@@ -316,7 +316,7 @@
   }
 }
 
-/* Every mode shares the same frame; variable content scrolls above its actions. */
+/* Share an initial frame; media previews and feedback can grow the card. */
 .music-input-panel {
   height: var(--composer-panel-height);
   min-height: 0;
@@ -365,6 +365,23 @@
   flex: 0 0 auto;
   max-height: 72px;
   overflow-y: auto;
+}
+.music-input-panel:is([aria-labelledby="hum-tab"], [aria-labelledby="image-tab"]) {
+  height: auto;
+  min-height: var(--composer-panel-height);
+}
+.music-input-panel > :is(.hum-composer, .image-composer) {
+  height: auto;
+  min-height: inherit;
+}
+.music-input-panel :is(.hum-composer, .image-composer) .music-composer-body {
+  flex: 1 0 auto;
+  overflow: visible;
+  scrollbar-gutter: auto;
+}
+.music-input-panel > :is(.hum-composer, .image-composer) > [role="alert"] {
+  max-height: none;
+  overflow: visible;
 }
 .music-input-panel .hum-recording-area {
   gap: 6px;
@@ -664,6 +681,11 @@
   }
   .app-shell[data-keyboard-open="true"] .music-input-panel textarea {
     min-height: 56px;
+  }
+  .app-shell[data-keyboard-open="true"]
+    .music-composer-card:has(.hum-composer, .image-composer) {
+    flex: 0 0 auto;
+    height: auto;
   }
 }
 
