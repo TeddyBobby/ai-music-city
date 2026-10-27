@@ -53,6 +53,13 @@ give the model more freedom. Don't reference artists or songs by name — descri
 
 ## 3. The lyrics
 
+- Keep musical direction separate from sung content: genre, instruments, timbre, tempo and
+  production instructions belong in `style`, not in the lyric lines. A short music prompt is not
+  a list of words to include in the song. Unless the user specifies a lyrical subject, story or
+  wording, choose an original subject and concrete images that suit the music's emotional tone.
+  Aim for natural, expressive, singable writing with literary detail, without ornate word piles
+  or stock phrases. Explicit lyric requests take priority; preserve supplied lines and all
+  existing lyrics outside the requested edit scope (see the Refinement rule).
 - One section per block, tag first, a blank line between sections. These are the **only** allowed
   tag names: `[Intro]` `[Verse]` / `[Verse N]` `[Pre-Chorus]` `[Chorus]` `[Post-Chorus]` `[Bridge]`
   `[Interlude]` `[Instrumental Break]` `[Outro]` — optionally followed by `: instruments or

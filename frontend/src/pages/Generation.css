@@ -570,6 +570,65 @@
   color: var(--muted);
   font-size: 12px;
 }
+.generation-advanced {
+  margin: 0 0 18px;
+  border-top: 1px solid var(--line);
+}
+.generation-advanced > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 46px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 500;
+  list-style: none;
+  cursor: pointer;
+}
+.generation-advanced > summary::-webkit-details-marker {
+  display: none;
+}
+.generation-advanced > summary:hover {
+  color: var(--accent);
+}
+.generation-advanced[open] > summary > svg {
+  transform: rotate(180deg);
+}
+.generation-advanced-note {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.generation-advanced-note button {
+  margin-left: 8px;
+  padding: 4px 0;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  cursor: pointer;
+}
+.generation-advanced-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding: 4px 0 6px;
+}
+.generation-advanced-grid > * {
+  min-width: 0;
+}
+.generation-advanced-wide {
+  grid-column: 1 / -1;
+}
+.generation-advanced-grid .mantine-InputWrapper-label {
+  margin-bottom: 7px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 500;
+}
+.generation-advanced-grid .mantine-Input-input {
+  font-size: 14px;
+}
 .generation-submit {
   display: flex;
   align-items: center;
@@ -806,6 +865,13 @@
   }
   .generation-adjustments button {
     min-height: 40px;
+  }
+  .generation-advanced-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 15px;
+  }
+  .generation-advanced-grid .mantine-Input-input {
+    font-size: 16px;
   }
 }
 @media (max-width: 360px) {

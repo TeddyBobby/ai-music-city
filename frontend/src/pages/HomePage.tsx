@@ -14,6 +14,8 @@ import { HumComposer } from "../components/HumComposer";
 import { ImageComposer } from "../components/ImageComposer";
 import { MusicKindToggle } from "../components/MusicKindToggle";
 import { EngineToggle } from "../components/EngineToggle";
+import { MusicPromptShortcuts } from "../components/MusicPromptShortcuts";
+import { hasMusicPromptContent } from "../lib/musicPrompt";
 import { generateFromPrompt, readMusicStatus, defaultMusicOptions, type MusicKind } from "../lib/musicCreation";
 import { api } from "../lib/api";
 import type { Job } from "../lib/types";
@@ -103,7 +105,7 @@ export function HomePage() {
   }
   async function generate(event: FormEvent) {
     event.preventDefault();
-    if (!prompt.trim() || busy || controller.current) return;
+    if (!hasMusicPromptContent(prompt) || busy || controller.current) return;
     // 未登录（游客）：直接跳登录页，不带提示语
     const user = useAuth.getState().user;
     if (!user) {
@@ -250,7 +252,7 @@ export function HomePage() {
                         !event.nativeEvent.isComposing &&
                         event.nativeEvent.keyCode !== 229 &&
                         !event.repeat &&
-                        prompt.trim() &&
+                        hasMusicPromptContent(prompt) &&
                         !busy
                       ) {
                         event.preventDefault();
@@ -263,6 +265,13 @@ export function HomePage() {
                     rows={4}
                   />
                 </div>
+                <MusicPromptShortcuts
+                  value={prompt}
+                  onChange={setPrompt}
+                  inputRef={promptField}
+                  disabled={busy}
+                  maxLength={1000}
+                />
                 {error && (
                   <p className="music-inline-error" role="alert">
                     {error}
@@ -286,7 +295,7 @@ export function HomePage() {
                     <button
                       className="generate-music-button"
                       type="submit"
-                      disabled={!prompt.trim() || !!phase}
+                      disabled={!hasMusicPromptContent(prompt) || !!phase}
                     >
                       {phase ? (
                         <LoaderCircle size={18} className="music-spinning" />

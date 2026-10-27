@@ -8,12 +8,18 @@ import {
   type MusicKind,
 } from "./musicCreation";
 import type { Job } from "./types";
+import {
+  sunoOptionsForRevision,
+  validateSunoText,
+  type SunoOptions,
+} from "./suno";
 
 export type GenerationDraft = {
   title: string;
   style: string;
   lyrics: string;
   musicKind: MusicKind;
+  suno?: SunoOptions;
 };
 
 export type GenerationStep = {
@@ -57,9 +63,10 @@ export function draftFromJob(job: Job): GenerationDraft {
       (adapter) => adapter.name === name && (adapter.scale ?? 1) > 0,
     ),
   );
-  const musicKind =
-    hasInstrumentalAdapters ||
-    (!hasLyricText(lyrics) && isInstrumentalPrompt(style))
+  const musicKind = ["instrumental", "vocal"].includes(job.params?.music_kind)
+    ? (job.params.music_kind as MusicKind)
+    : hasInstrumentalAdapters ||
+        (!hasLyricText(lyrics) && isInstrumentalPrompt(style))
       ? "instrumental"
       : "vocal";
   return {
@@ -68,6 +75,9 @@ export function draftFromJob(job: Job): GenerationDraft {
     // A section marker is engine score grammar, not a lyric the user can sing.
     lyrics: hasLyricText(lyrics) ? lyrics : "",
     musicKind,
+    ...(job.params?.suno && typeof job.params.suno === "object"
+      ? { suno: { ...job.params.suno } }
+      : {}),
   };
 }
 
@@ -77,8 +87,8 @@ const stageInfo: Record<
 > = {
   writing: {
     step: "write",
-    title: "AI 正在创作歌词",
-    description: "根据你的描述补全歌词与曲风，完成后自动进入生成。",
+    title: "正在构思音乐",
+    description: "整理曲风与编排，按需补全歌词。",
   },
   load: {
     step: "prepare",
@@ -157,9 +167,7 @@ export function generationProgress(job: Job): GenerationProgress {
     ...(job.kind === "hum" || job.kind === "cover"
       ? [{ id: "melody", label: "识别旋律" }]
       : []),
-    ...(job.params?.description
-      ? [{ id: "write", label: "AI 写词" }]
-      : []),
+    ...(job.params?.description ? [{ id: "write", label: "构思音乐" }] : []),
     { id: "compose", label: "编排旋律" },
     { id: "generate", label: "生成音乐" },
     { id: "finish", label: "合成与保存" },
@@ -254,6 +262,7 @@ export async function submitRevision(
   const source = { ...job.params };
   const originalId = job.id;
   const humming = job.kind === "hum";
+  const sunoDraft = edited.suno ? { ...edited.suno } : undefined;
   const draft = {
     title: text(edited.title),
     style: text(edited.style),
@@ -268,6 +277,15 @@ export async function submitRevision(
 
   const status = await api.status();
   checkAborted(options.signal);
+  const suno = status?.generation?.engine === "suno";
+  const sunoOptions = sunoOptionsForRevision(
+    sunoDraft,
+    job.kind,
+    draft.musicKind,
+  );
+  if (!suno && Object.keys(sunoOptions).length)
+    throw new Error("当前生成引擎未启用 Suno，请切换引擎后使用这些高级设置。");
+  if (suno) validateSunoText(draft, draft.musicKind);
   if (status?.models?.present === false)
     throw new Error("音乐模型尚未就绪，请先完成模型配置后重试。");
   if (humming && !status?.hum?.available)
@@ -282,17 +300,30 @@ export async function submitRevision(
     draft.lyrics = text(generated.lyrics);
     draft.title ||= text(generated.title);
   }
-  const { draft: engineDraft, loras } = musicDraftForEngine(
-    { title: draft.title, description: draft.style, lyrics: draft.lyrics },
-    status,
-    draft.musicKind,
-  );
+  if (suno) validateSunoText(draft, draft.musicKind);
+  const { draft: engineDraft, loras } = suno
+    ? {
+        draft: {
+          title: draft.title || "未命名的音乐",
+          style: draft.style,
+          lyrics: draft.musicKind === "instrumental" ? "纯音乐" : draft.lyrics,
+          music_kind: draft.musicKind,
+          // An empty object deliberately opts hum revisions into custom audio generation.
+          suno: sunoOptions,
+        },
+        loras: [],
+      }
+    : musicDraftForEngine(
+        { title: draft.title, description: draft.style, lyrics: draft.lyrics },
+        status,
+        draft.musicKind,
+      );
   const params = humming
     ? {
         ...engineDraft,
         upload_id: source.upload_id,
         melody: source.melody ?? "continue",
-        adapter: source.adapter ?? null,
+        adapter: suno ? null : (source.adapter ?? null),
         hum_influence: source.hum_influence ?? 1,
         offset_s: source.offset_s ?? 0,
         cfg_scale: source.cfg_scale ?? null,

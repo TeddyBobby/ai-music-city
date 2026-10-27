@@ -34,7 +34,9 @@ import { AssistantImageInput } from "../components/AssistantImageInput";
 import { AssistantCopyButton } from "../components/AssistantCopyButton";
 import { AssistantMarkdown } from "../components/AssistantMarkdown";
 import { MusicKindToggle, type MusicKind } from "../components/MusicKindToggle";
+import { MusicPromptShortcuts } from "../components/MusicPromptShortcuts";
 import { assistantConversation } from "../lib/assistantConversation";
+import { hasMusicPromptContent } from "../lib/musicPrompt";
 import { useAuth } from "../state/auth";
 import "./Assistant.css";
 import "./AssistantMessage.css";
@@ -243,6 +245,7 @@ export function AssistantPage() {
   const field = useRef<HTMLTextAreaElement>(null);
   const follow = useRef(true);
   const disabled = busy || sessionLoading || recording;
+  const canSend = hasMusicPromptContent(input) || Boolean(audio || image);
   const empty = !messages.length && !sessionLoading;
   const lyricsMode = mode === "lyrics";
   const initialSession = search.get("session") || undefined;
@@ -290,7 +293,7 @@ export function AssistantPage() {
     setHistoryOpen(false);
   };
   const send = () => {
-    if (disabled) return;
+    if (disabled || !canSend) return;
     follow.current = true;
     void assistantConversation.send();
   };
@@ -580,6 +583,12 @@ export function AssistantPage() {
                 }
               }}
             />
+            <MusicPromptShortcuts
+              value={input}
+              onChange={assistantConversation.setInput}
+              inputRef={field}
+              disabled={disabled}
+            />
             <div
               className="as-compose-controls"
               data-recording={recording || undefined}
@@ -713,7 +722,7 @@ export function AssistantPage() {
                   type="submit"
                   aria-label="发送消息"
                   title="发送消息（⌘ / Ctrl + Enter）"
-                  disabled={(!input.trim() && !audio && !image) || disabled}
+                  disabled={!canSend || disabled}
                 >
                   <ArrowUp size={21} />
                 </button>

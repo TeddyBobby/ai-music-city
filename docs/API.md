@@ -170,6 +170,39 @@ Hum jobs always run with `cot=melody`; the transcription is `melody-vocal`. `Job
 `hum/hum.abc` (the open score) exists. Hum adapters are rejected in the `loras` stack (400) and plain LoRAs
 are rejected as `adapter`.
 
+### Suno refinement controls (`params.suno`)
+
+Create, hum, cover and regeneration accept an optional `suno` object. The frontend shows these
+controls only for the Suno engine and keeps the advanced group collapsed initially. All fields are
+optional; null/blank values are omitted upstream, while numeric zero is preserved. Unknown nested
+fields are rejected. An explicit empty object `{}` selects custom refinement with provider defaults.
+
+| Field | Rule |
+|-------|------|
+| `model` | `V6`, `V6_WILD`, `V6_MINI`; the adapter keeps `V6` when omitted |
+| `negativeTags` | excluded styles, up to 1000 characters |
+| `vocalGender` | `m` or `f`; omitted for instrumental music |
+| `styleWeight`, `weirdnessConstraint`, `audioWeight` | 0..1 in steps of 0.01; `audioWeight` is omitted for instrumental create, but accepted for instrumental audio cover |
+| `variety` | integer 0..4 |
+| `duration` | integer 10..360 seconds; omitted unless selected |
+| `personaId` | existing provider Persona/Voice ID |
+| `personaModel` | `style_persona` or `voice_persona`; sent only with a Persona ID |
+
+`params.music_kind` (`vocal` or `instrumental`) controls whether vocals are generated. For a custom
+Suno request, `title` is limited to 80 characters, `style` to 1000 and vocal `lyrics` to 5000. The
+adapter sends `style` and `lyrics` as separate fields; production instructions never become lyrics.
+Instrumental create may use empty lyrics. The local YuE2 request receives no Suno-only fields.
+
+Refinement creates a new job with `parent_id`; it never edits the source. A hum refinement retains its
+original upload and, when `suno` is present (including `{}`), uses `/api/v1/generate/upload-cover` so
+custom controls and edited lyrics are applied. Without `suno`, existing hum/image reference requests
+keep their original non-custom behavior. An image request with `suno` uses the already analyzed style
+in custom mode; it does not send an incompatible `imageUrls` field. If the engine is switched away
+from Suno before a marked job starts, that job fails explicitly instead of silently ignoring controls.
+
+Provider contracts: [Generate Music](https://docs.sunoapi.org/suno-api/generate-music),
+[Upload and Cover Audio](https://docs.sunoapi.org/suno-api/upload-and-cover-audio).
+
 ### VariationsParams (submit only)
 
 | Field | Type | Rule |
@@ -296,6 +329,7 @@ and immediately before `done` with the terminal status.
 {
   "engine":  {"state": "ready", "precision": "bf16", "memory_gib": 11.2, "current_job_id": null,
               "loras": [{"name": "ar_lora_inst_v3abc.bf16", "scale": 1.0}], "low_memory": false},
+  "generation": {"engine": "local"},
   "memory":  {"machine_ram_gib": 48.0, "min_memory_budget_gib": 6.0, "max_memory_budget_gib": 44.0,
               "memory_budget_gib": 24.0, "low_memory": "auto", "low_memory_effective": false},
   "queue":   {"queued": 2, "running": null},
@@ -318,6 +352,7 @@ and immediately before `done` with the terminal status.
 
 `engine.state ∈ cold|loading|ready|busy`; `precision`/`memory_gib` null when cold (`memory_gib` is the MLX active
 memory sampled by the worker at stage boundaries, so it lags slightly). `queue.running` = job id or null.
+`generation.engine` identifies the active generation provider (`local`, `suno`, or a registered legacy engine).
 `models.precisions` lists the AR weight files present; `fake` is true under `--fake` (then `models.present` and
 `cover.available` are reported true so jobs can be submitted). `engine.loras` is the stack merged into the resident
 pipeline (`[]` when cold or none); `loras` rescans `models/loras/` on every call (header reads only).

@@ -14,6 +14,7 @@ from typing import Callable
 import httpx
 
 from yue2_studio.config import EngineOptions
+from yue2_studio.jobs import SunoParams
 
 SAMPLE_RATE = 44100
 
@@ -21,6 +22,8 @@ SAMPLE_RATE = 44100
 class SunoEngine:
     """Cloud engine: submits (style, lyrics) to sunoapi.org and polls
     record-info until the audio is ready, then downloads it."""
+
+    engine_id = "suno"
 
     def __init__(self, *, api_key: str | None = None, base_url: str = "https://api.sunoapi.org"):
         self.api_key = api_key
@@ -47,9 +50,42 @@ class SunoEngine:
     def _lyrics_for(self, request: dict) -> tuple[str, str]:
         style = (request.get("style") or "").strip()
         lyrics = (request.get("lyrics") or "").strip()
-        if not lyrics or lyrics.lower() in {"instrumental", "纯音乐", "[inst]"}:
+        if (request.get("music_kind") == "instrumental" or not lyrics
+                or lyrics.lower() in {"instrumental", "纯音乐", "[inst]", "[intro]"}):
             return style, ""
         return style, lyrics
+
+    def _custom_payload(self, request: dict, *, audio_reference: bool = False) -> dict:
+        """Build a custom-generation payload from validated, optional controls."""
+        style, lyrics = self._lyrics_for(request)
+        instrumental = request.get("music_kind") == "instrumental" or (
+            request.get("music_kind") != "vocal" and not lyrics)
+        controls = SunoParams.model_validate(request.get("suno") or {}).model_dump(exclude_none=True)
+        if instrumental:
+            controls.pop("vocalGender", None)
+        if not audio_reference and instrumental:
+            controls.pop("audioWeight", None)
+        if not controls.get("personaId"):
+            controls.pop("personaModel", None)
+        title = (request.get("title") or "").strip() or "未命名的音乐"
+        for label, value, limit in (("作品名称", title, 80), ("音乐风格", style, 1000),
+                                    ("歌词", lyrics, 5000)):
+            if len(value) > limit:
+                raise ValueError(f"{label}最多支持 {limit} 个字符")
+        payload = {
+            "customMode": True,
+            "instrumental": instrumental,
+            "model": "V6",
+            "callBackUrl": "https://music.myzai.top/s/ping",
+            "style": style,
+            "title": title,
+            **controls,
+        }
+        if audio_reference:
+            payload.pop("customMode")  # upload-cover always uses custom mode.
+        if not instrumental:
+            payload["lyrics"] = lyrics
+        return payload
 
     # -- jobs -----------------------------------------------------------------------
     # -- reference upload -----------------------------------------------------------
@@ -75,9 +111,10 @@ class SunoEngine:
             raise RuntimeError(f"Suno file upload failed: {pdata.get('msg')}")
         return url
 
-    def _submit(self, client: httpx.Client, payload: dict) -> str:
-        """POST /api/v1/generate; returns taskId."""
-        resp = client.post(f"{self.base_url}/api/v1/generate", json=payload, headers=self._headers())
+    def _submit(self, client: httpx.Client, payload: dict, *, path: str = "/api/v1/generate") -> str:
+        """Submit generation or an upload cover; returns taskId."""
+        resp = client.post(f"{self.base_url}{path}", json=payload, headers=self._headers())
+        resp.raise_for_status()
         data = resp.json()
         if data.get("code") != 200:
             raise RuntimeError(f"Suno submit failed: {data.get('msg')}")
@@ -174,7 +211,7 @@ class SunoEngine:
             # 参考（图片/音频）存在时走非 custom 模式：imageUrls/audioUrls 驱动
             ref_image = request.get("ref_image_url")
             ref_audio = request.get("ref_audio_url")
-            if ref_image or ref_audio:
+            if (ref_image or ref_audio) and "suno" not in request:
                 payload = {
                     "customMode": False,
                     "instrumental": not lyrics,
@@ -189,19 +226,7 @@ class SunoEngine:
                 if tags:
                     payload["style"] = tags
             else:
-                payload = {
-                    "customMode": bool(lyrics),
-                    "instrumental": not lyrics,
-                    "model": "V6",
-                    "callBackUrl": "https://music.myzai.top/s/ping",
-                }
-                if lyrics:
-                    payload["prompt"] = lyrics
-                    payload["tags"] = tags
-                    payload["title"] = (request.get("title") or "")[:80] or None
-                else:
-                    payload["prompt"] = tags
-                payload = {k: v for k, v in payload.items() if v is not None}
+                payload = self._custom_payload(request)
             task_id = self._submit(client, payload)
             emit("Cloud generation", total=100)
             final_audio = self._poll_and_save(client, task_id, song_dir, cancelled, emit)
@@ -224,19 +249,24 @@ class SunoEngine:
             ref_url = self._upload_file(client, Path(audio_path), "amc/hum")
             request = {**request, "ref_audio_url": ref_url,
                        "description": request.get("description") or "围绕这段哼唱创作完整歌曲"}
-            payload = {
-                "customMode": False,
-                "instrumental": not lyrics,
-                "model": "V6",
-                "callBackUrl": "https://music.myzai.top/s/ping",
-                "prompt": request["description"],
-                "audioUrls": [ref_url],
-            }
-            if tags:
-                payload["style"] = tags
-            if lyrics:
-                payload["lyrics"] = lyrics
-            task_id = self._submit(client, payload)
+            if "suno" in request:
+                payload = self._custom_payload(request, audio_reference=True)
+                payload["uploadUrl"] = ref_url
+                task_id = self._submit(client, payload, path="/api/v1/generate/upload-cover")
+            else:
+                payload = {
+                    "customMode": False,
+                    "instrumental": not lyrics,
+                    "model": "V6",
+                    "callBackUrl": "https://music.myzai.top/s/ping",
+                    "prompt": request["description"],
+                    "audioUrls": [ref_url],
+                }
+                if tags:
+                    payload["style"] = tags
+                if lyrics:
+                    payload["lyrics"] = lyrics
+                task_id = self._submit(client, payload)
             emit("Cloud generation", total=100)
             final_audio = self._poll_and_save(client, task_id, song_dir, cancelled, emit)
         summary = self._finish_summary(final_audio, song_dir, options, request)
@@ -247,7 +277,6 @@ class SunoEngine:
         """翻唱：上传原曲，Suno 保留旋律换风格（upload-cover 接口）。"""
         out_dir = Path(out_dir)
         song_dir = out_dir / "song"
-        tags, _ = self._lyrics_for(request)
 
         def emit(label, **kw2):
             if on_event:
@@ -257,15 +286,9 @@ class SunoEngine:
         with httpx.Client(timeout=httpx.Timeout(120, connect=10), trust_env=False) as client:
             emit("Uploading source track")
             ref_url = self._upload_file(client, Path(audio_path), "amc/cover")
-            payload = {
-                "model": "V6",
-                "callBackUrl": "https://music.myzai.top/s/ping",
-                "uploadUrl": ref_url,
-                "style": tags or None,
-                "instrumental": False,
-            }
-            payload = {k: v for k, v in payload.items() if v is not None}
-            task_id = self._submit(client, payload)
+            payload = self._custom_payload(request, audio_reference=True)
+            payload["uploadUrl"] = ref_url
+            task_id = self._submit(client, payload, path="/api/v1/generate/upload-cover")
             emit("Cloud generation", total=100)
             final_audio = self._poll_and_save(client, task_id, song_dir, cancelled, emit)
         return self._finish_summary(final_audio, song_dir, options, request)

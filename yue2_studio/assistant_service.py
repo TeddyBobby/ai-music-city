@@ -24,6 +24,7 @@ import httpx
 
 from yue2_studio.api import ApiError
 from yue2_studio import audio
+from yue2_studio.music_prompts import MUSIC_INTENT_POLICY
 
 
 SYSTEM_PROMPT = '''你是中文音乐创作助手。通过自然对话理解用户想表达的画面、情绪和音乐想法。
@@ -33,10 +34,10 @@ SYSTEM_PROMPT = '''你是中文音乐创作助手。通过自然对话理解用�
 title（作品名）、description（具体曲风、氛围和配器）、music_kind（vocal或instrumental）、lyrics（vocal时为完整歌词，instrumental时为空字符串）。
 歌词用 [verse]、[chorus]、[bridge] 分段。不要用Markdown代码围栏包裹提案，也不要在自然正文中重复JSON。
 只在方案可供用户审核和生成时输出提案，普通聊天、问候、追问和解释无需提案。不要输出其他格式的歌曲JSON。
-提案只是一份待确认的创作方案；不操作文件、不运行命令、不调用工具、不声称已经生成音频或应用修改。直接给出简洁中文回答。'''
+提案只是一份待确认的创作方案；不操作文件、不运行命令、不调用工具、不声称已经生成音频或应用修改。直接给出简洁中文回答。''' + '\n\n' + MUSIC_INTENT_POLICY
 MODES = {
     'chat': '当前交流重点是聊天和整理灵感。自然回应当前问题，理解意图；仅在方向充分或用户准备发歌时给出音乐提案。',
-    'lyrics': '当前交流重点是歌词。先理解主题和表达需要，必要时讨论或润色片段；完整歌词和音乐方向成熟后再给出音乐提案。',
+    'lyrics': '当前交流重点是歌词。尊重用户明确指定的主题、故事、原句和修改范围；仅有曲风、配器或情绪时，自主构思具体的歌词内容，不把音乐关键词逐词写进歌词。必要时讨论或润色片段；完整歌词和音乐方向成熟后再给出音乐提案。',
     'style': '仅输出JSON对象，字段 title、description；description为供音乐模型使用的曲风、配器、节奏、人声描述。不要Markdown围栏。',
     'cover_prompt': '仅输出JSON对象，字段 cover_prompt；内容为详细中文方形专辑封面提示词，不包含生成或保存成功的陈述。不要Markdown围栏。',
 }

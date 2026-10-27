@@ -24,6 +24,7 @@ from typing import Any, Protocol
 
 from yue2_studio import config
 from yue2_studio.jobs import Job, JobStore, engine_request, hum_options, iso
+from yue2_studio.music_prompts import MUSIC_INTENT_POLICY
 
 log = logging.getLogger("yue2_studio.worker")
 
@@ -270,66 +271,44 @@ def _error_text(error: BaseException) -> str:
 # ---------------------------------------------------------------------------------------------
 
 
-def _ai_complete_draft(description: str, music_kind: str = "vocal") -> dict:
-    """用平台配置的 Agent（GLM）把一句话描述补全为完整创作方案。
+def _ai_complete_draft(description: str, music_kind: str = "vocal", *, context: dict | None = None) -> dict:
+    """Design the sound first, then fill unspecified lyrics through the configured Agent."""
+    import re
 
-    music_kind="instrumental" 时不写歌词（引擎按纯音乐处理）。
-    返回 {"title":…, "style":…, "lyrics":…}；失败抛异常（由 _run_job 兜底为 failed）。
-    """
     import httpx
-    from yue2_studio.assistant_service import provider_headers, endpoint_url
+
+    from yue2_studio.assistant_service import endpoint_url, provider_headers
 
     cfg = _assistant_cfg()
-    if music_kind == "instrumental":
-        system = (
-            "你是专业的音乐制作人。根据用户的一句话想法，输出一段纯音乐（无人声）的创作方案。"
-            "只输出一个 JSON 对象，不要任何解释或 markdown 代码块。字段："
-            '{"title": "曲名(20字内)", "style": "英文风格标签(逗号分隔, 如 cinematic piano, ambient, warm strings, no vocals)"}'
-        )
-        body = {
-            "model": cfg.get("hermes_model") or "ZhipuAi/GLM-5.3",
-            "messages": [
-                {"role": "system", "content": system},
-                {"role": "user", "content": f"创作想法：{description}"},
-            ],
-            "stream": False,
-            "max_tokens": 600,
-        }
-        with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
-            resp = client.post(
-                endpoint_url(cfg["hermes_base_url"], "chat/completions"),
-                headers=provider_headers(cfg),
-                json=body,
-            )
-            resp.raise_for_status()
-            text = resp.json()["choices"][0]["message"]["content"].strip()
-        import re as _re
-        m = _re.search(r"\{[\s\S]*\}", text)
-        if not m:
-            raise ValueError("AI 方案返回无法解析")
-        data = json.loads(m.group(0))
-        for key in ("title", "style"):
-            if not isinstance(data.get(key), str) or not data[key].strip():
-                raise ValueError(f"AI 方案缺少字段 {key}")
-        return {
-            "title": data["title"].strip(),
-            "style": f"{data['style'].strip()}, instrumental, no vocals",
-            "lyrics": "纯音乐",
-        }
-    system = (
-        "你是专业的词曲创作助手。根据用户的一句话想法，输出一个可执行的歌曲创作方案。"
-        "只输出一个 JSON 对象，不要任何解释或 markdown 代码块。字段："
-        '{"title": "歌名(20字内)", "style": "英文风格标签(逗号分隔, 如 pop ballad, female vocal, piano)", '
-        '"lyrics": "完整歌词，段落用 [verse]/[chorus]/[bridge] 标记，50-90 秒长度"}'
+    instrumental = music_kind == "instrumental"
+    contract = (
+        '输出纯音乐（无人声）方案。字段：'
+        '{"title": "曲名(20字内)", "style": "英文音乐风格，含具体配器、节奏、氛围与制作要求"}。'
+        '不要生成歌词。'
+        if instrumental else
+        '输出带歌词的人声歌曲方案。字段：'
+        '{"title": "歌名(20字内)", "style": "英文音乐风格，含具体曲风、配器、节奏、制作与演唱方式", '
+        '"lyrics": "完整可演唱歌词，段落用 [verse]/[chorus]/[bridge] 标记，50-90 秒长度"}。'
     )
+    system = (
+        "你是专业的音乐制作人与词曲创作者。将用户的一句话想法整理成可执行的音乐方案。\n\n"
+        + MUSIC_INTENT_POLICY
+        + "\n\n只输出一个 JSON 对象，不要解释或 Markdown 代码块。"
+        + contract
+    )
+    content = f"创作想法：{description}"
+    existing = {key: context[key] for key in ("title", "style", "lyrics")
+                if context and isinstance(context.get(key), str) and context[key].strip()}
+    if existing:
+        content += "\n\n已指定字段（保留原文，仅补齐缺失项）：\n" + json.dumps(existing, ensure_ascii=False)
     body = {
         "model": cfg.get("hermes_model") or "ZhipuAi/GLM-5.3",
         "messages": [
             {"role": "system", "content": system},
-            {"role": "user", "content": f"创作想法：{description}"},
+            {"role": "user", "content": content},
         ],
         "stream": False,
-        "max_tokens": 1600,
+        "max_tokens": 600 if instrumental else 1600,
     }
     with httpx.Client(timeout=httpx.Timeout(180, connect=10), trust_env=False) as client:
         resp = client.post(
@@ -339,16 +318,22 @@ def _ai_complete_draft(description: str, music_kind: str = "vocal") -> dict:
         )
         resp.raise_for_status()
         text = resp.json()["choices"][0]["message"]["content"].strip()
-    # 允许模型包一层 ```json …``` 或 <music_proposal> 标签
-    import re as _re
-    m = _re.search(r"\{[\s\S]*\}", text)
-    if not m:
-        raise ValueError("AI 写词返回无法解析")
-    data = json.loads(m.group(0))
-    for key in ("title", "style", "lyrics"):
+    # Tolerate a JSON fence or proposal wrapper without mixing style and sung text.
+    match = re.search(r"\{[\s\S]*\}", text)
+    if not match:
+        raise ValueError("AI 创作方案返回无法解析")
+    data = json.loads(match.group(0))
+    fields = ("title", "style") if instrumental else ("title", "style", "lyrics")
+    # Providers may return only missing fields; supplied text remains authoritative.
+    data.update({key: value for key, value in existing.items() if key in fields})
+    for key in fields:
         if not isinstance(data.get(key), str) or not data[key].strip():
-            raise ValueError(f"AI 写词缺少字段 {key}")
-    return {"title": data["title"].strip(), "style": data["style"].strip(), "lyrics": data["lyrics"].strip()}
+            raise ValueError(f"AI 创作方案缺少字段 {key}")
+    return {
+        "title": data["title"].strip(),
+        "style": f"{data['style'].strip()}, instrumental, no vocals" if instrumental else data["style"].strip(),
+        "lyrics": "纯音乐" if instrumental else data["lyrics"].strip(),
+    }
 
 
 _ASSISTANT_CFG_CACHE: dict = {}
@@ -668,8 +653,8 @@ class Worker:
             self._on_engine_event(job.id, raw)
 
         final_status, error, summary = "done", None, None
-        # AI 写词阶段：一句话描述（description）在任务内先补全为 style/lyrics。
-        # 用户点击生成立即拿到任务 ID 并跳转详情页，写词成为任务生命周期的第一阶段。
+        # 音乐构思阶段：优先设计声音，再按需补全歌词。
+        # 用户点击生成立即拿到任务 ID，音乐构思成为任务生命周期的第一阶段。
         params = dict(job.params or {})
         if job.kind in {"create", "regenerate", "hum"} and params.get("description") and not (params.get("lyrics") and params.get("style")):
             try:
@@ -691,20 +676,21 @@ class Worker:
                 beat_thread = threading.Thread(target=_beat, daemon=True)
                 beat_thread.start()
                 _desc = params["description"] or ""
-                _kind = "instrumental" if (
-                    params.get("music_kind") == "instrumental"
-                    or "纯音乐" in _desc
-                    or "instrumental" in _desc.lower()
-                    or "无人声" in _desc
-                ) else "vocal"
-                draft = _ai_complete_draft(_desc, _kind)
+                _kind = params.get("music_kind")
+                if _kind not in {"vocal", "instrumental"}:
+                    _kind = "instrumental" if (
+                        "纯音乐" in _desc or "instrumental" in _desc.lower() or "无人声" in _desc
+                    ) else "vocal"
+                draft = _ai_complete_draft(_desc, _kind, context=params)
                 heartbeat.set()
-                params.update({"style": draft["style"], "lyrics": draft["lyrics"]})
+                # An existing field is an explicit user choice, never replace it while filling the other.
+                params["style"] = params.get("style") or draft["style"]
+                params["lyrics"] = params.get("lyrics") or draft["lyrics"]
                 if params.get("title") is None:
                     params["title"] = draft["title"]
                 # 时长与歌词匹配：60 步扩散对 180s 去噪不足（人声电音）。
                 # 每行约 4.2s + 8s 前奏尾奏余量，钳在 60–120s。
-                lines = [ln for ln in draft["lyrics"].splitlines() if ln.strip() and not ln.strip().startswith("[")]
+                lines = [ln for ln in params["lyrics"].splitlines() if ln.strip() and not ln.strip().startswith("[")]
                 estimated = min(120.0, max(60.0, len(lines) * 4.2 + 8.0))
                 if not params.get("duration"):
                     params["duration"] = estimated
@@ -734,13 +720,15 @@ class Worker:
             if cancel.is_set():
                 raise InterruptedError("Cancelled before start")
             engine = self.engine
+            if "suno" in job.params and getattr(engine, "engine_id", None) != "suno":
+                raise ValueError("生成引擎已切换，这个版本需要 Suno；请恢复云端引擎后重新生成。")
             if (engine.state == "cold" or engine.precision != options.precision
                     or getattr(engine, "low_memory", options.low_memory) != options.low_memory):
                 self._publish(job.id, status_event(job.id, "running",
                                                    f"loading models ({options.precision})…", stage="load"))
             engine.ensure(options, on_event)
             self._sample_memory(force=True)
-            request = engine_request(job)
+            request = engine_request(job, engine=getattr(engine, "engine_id", None))
             if job.kind == "cover":
                 audio_path = self._upload_path(job.params["upload_id"])
                 p = job.params

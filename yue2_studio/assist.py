@@ -27,9 +27,14 @@ from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError, field_validator
 
+from yue2_studio.music_prompts import MUSIC_INTENT_POLICY
+
 log = logging.getLogger("yue2_studio.assist")
 
-SYSTEM_PROMPT = Path(__file__).with_name("assist_prompt.md").read_text(encoding="utf-8")
+SYSTEM_PROMPT = (
+    Path(__file__).with_name("assist_prompt.md").read_text(encoding="utf-8")
+    + "\n\n" + MUSIC_INTENT_POLICY
+)
 
 API_URL = "https://api.anthropic.com/v1/messages"
 API_VERSION = "2023-06-01"

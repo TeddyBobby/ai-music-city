@@ -97,7 +97,7 @@ test("one prompt writes a real structured draft before submitting one default mu
     api.calls.messages[0].body.content,
     /用户已确认开始生成.*无需再追问/,
   );
-  assert.equal(api.calls.messages[0].body.mode, "lyrics");
+  assert.equal(api.calls.messages[0].body.mode, "chat");
   assert.deepEqual(phases, ["writing", "submitting"]);
   assert.deepEqual(plain(api.calls.submissions), [
     {
@@ -112,9 +112,31 @@ test("one prompt writes a real structured draft before submitting one default mu
         seed: null,
         cfg_scale: null,
         abc: null,
+        ref_image_url: null,
       },
     },
   ]);
+});
+
+test("music drafts treat sound keywords as style and preserve explicit lyric instructions", async () => {
+  for (const prompt of [
+    "lo-fi hip hop，96 BPM，温暖电钢琴，干燥鼓组，克制女声",
+    "轻快民谣，歌词写离家求学的故事，副歌保留原句：明天的车票在口袋里",
+  ]) {
+    const api = setup();
+    await api.generateFromPrompt(prompt, { musicKind: "vocal" });
+    const message = api.calls.messages[0].body;
+    assert.equal(message.mode, "chat");
+    assert.ok(message.content.startsWith(`${prompt}\n\n`));
+    assert.match(message.content, /曲风.*节奏.*配器.*description/);
+    assert.match(message.content, /不要把这些关键词逐词写进歌词/);
+    assert.match(message.content, /用户明确指定的歌词主题、故事、原句.*优先保留/);
+    assert.match(message.content, /未指定歌词内容时.*原创歌词/);
+    const { style, lyrics } = api.calls.submissions[0].params;
+    assert.ok(style.startsWith(song.description.trim()));
+    assert.equal(lyrics, song.lyrics.trim());
+    assert.notEqual(lyrics, prompt);
+  }
 });
 
 test("missing structured output, missing style and placeholder lyrics never reach the engine", async () => {

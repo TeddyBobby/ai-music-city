@@ -113,6 +113,35 @@ class SemanticSamplingLimit(BaseModel):
     max_tokens: int = Field(strict=True, ge=200, le=9000)
 
 
+class SunoParams(BaseModel):
+    """Optional cloud controls. Keep provider names and reject misspelled controls."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    model: Literal["V6", "V6_WILD", "V6_MINI"] | None = None
+    negativeTags: str | None = Field(default=None, max_length=1000)
+    vocalGender: Literal["m", "f"] | None = None
+    styleWeight: float | None = Field(default=None, strict=True, ge=0, le=1, allow_inf_nan=False)
+    weirdnessConstraint: float | None = Field(default=None, strict=True, ge=0, le=1, allow_inf_nan=False)
+    audioWeight: float | None = Field(default=None, strict=True, ge=0, le=1, allow_inf_nan=False)
+    variety: int | None = Field(default=None, strict=True, ge=0, le=4)
+    duration: int | None = Field(default=None, strict=True, ge=10, le=360)
+    personaId: str | None = None
+    personaModel: Literal["style_persona", "voice_persona"] | None = None
+
+    @field_validator("*", mode="before")
+    @classmethod
+    def _optional_text(cls, value):
+        return value.strip() or None if isinstance(value, str) else value
+
+    @field_validator("styleWeight", "weirdnessConstraint", "audioWeight")
+    @classmethod
+    def _weight_step(cls, value):
+        if value is not None and not math.isclose(value * 100, round(value * 100), abs_tol=1e-8):
+            raise ValueError("Suno weights use steps of 0.01")
+        return value
+
+
 class CreateParams(_Params):
     # description: 用户的一句话想法。提供时 style/lyrics 可为空，
     # 由 worker 先调 AI 补全歌词（“AI 写词”阶段）再进入引擎生成。
@@ -130,6 +159,7 @@ class CreateParams(_Params):
     title: str | None = None
     abc_sampling: AbcSamplingLimit | None = None
     semantic_sampling: SemanticSamplingLimit | None = None
+    suno: SunoParams | None = None
 
     @field_validator("description")
     @classmethod
@@ -159,7 +189,7 @@ class CreateParams(_Params):
     def check(self) -> None:
         # 有 description 时允许 style/lyrics 为空（worker 会先 AI 写词）；
         # 没有 description 则必须直接给出风格与歌词。
-        if not (self.description or (self.style and self.lyrics)):
+        if not (self.description or (self.style and (self.lyrics or self.music_kind == "instrumental"))):
             raise ValidationFailure("提供一句话描述（description），或同时给出风格（style）与歌词（lyrics）")
         if self.abc is not None and self.cot == "off":
             raise ValidationFailure("a supplied abc score requires cot=melody or cot=full")
@@ -174,6 +204,8 @@ class RegenerateParams(_Params):
     title: str | None = None
     abc_sampling: AbcSamplingLimit | None = None
     semantic_sampling: SemanticSamplingLimit | None = None
+    music_kind: Literal["vocal", "instrumental"] | None = None
+    suno: SunoParams | None = None
 
     @field_validator("abc")
     @classmethod
@@ -203,6 +235,8 @@ class CoverParams(_Params):
     seed: int | None = None
     title: str | None = None
     cfg_scale: float | None = Field(default=None, allow_inf_nan=False)
+    music_kind: Literal["vocal", "instrumental"] | None = None
+    suno: SunoParams | None = None
 
     @field_validator("cfg_scale")
     @classmethod
@@ -240,6 +274,8 @@ class HumParams(_Params):
 
     upload_id: str
     description: str | None = None
+    music_kind: Literal["vocal", "instrumental"] | None = None
+    suno: SunoParams | None = None
     style: str = ""
     lyrics: str = ""
     seed: int | None = None
@@ -1444,15 +1480,29 @@ def _create_params_dict(p: CreateParams, seed: int) -> dict:
               "cfg_scale": p.cfg_scale, "abc": p.abc, "title": p.title}
     if p.description:
         params["description"] = p.description
-    if getattr(p, "music_kind", None):
-        params["music_kind"] = p.music_kind
     if getattr(p, "ref_image_url", None):
         params["ref_image_url"] = p.ref_image_url
     for name in ("abc_sampling", "semantic_sampling"):
         value = getattr(p, name)
         if value is not None:
             params[name] = value.model_dump()
+    _cloud_params_dict(p, params)
     return params
+
+
+def _cloud_params_dict(p, params: dict) -> None:
+    """Only persist selected controls; zero is meaningful and must survive."""
+    if p.music_kind is not None:
+        params["music_kind"] = p.music_kind
+    if p.suno is not None:
+        params["suno"] = p.suno.model_dump(exclude_none=True)
+    if "suno" in params:
+        for name, limit in (("title", 80), ("style", 1000), ("lyrics", 5000)):
+            value = params.get(name) or ""
+            if name == "lyrics" and params.get("music_kind") == "instrumental":
+                continue
+            if len(value) > limit:
+                raise ValidationFailure(f"Suno {name} must be at most {limit} characters")
 
 
 def default_group_label(base: CreateParams, count: int) -> str:
@@ -1593,6 +1643,10 @@ def _submit(store: JobStore, req: SubmitRequest, *, upload_lookup, lora_lookup,
                     params[name] = value.model_dump()
             elif pp.get(name) is not None:
                 params[name] = dict(pp[name])
+        for name in ("music_kind", "suno"):
+            if name not in p.model_fields_set and pp.get(name) is not None:
+                params[name] = dict(pp[name]) if name == "suno" else pp[name]
+        _cloud_params_dict(p, params)
         if not params["style"] or not params["lyrics"]:
             raise ValidationFailure("parent job has no style/lyrics to inherit")
         job = store.create(kind="regenerate", params=params, options=options, seed=seed, parent_id=parent.id)
@@ -1611,6 +1665,7 @@ def _submit(store: JobStore, req: SubmitRequest, *, upload_lookup, lora_lookup,
             title = Path(upload.get("filename", "")).stem or None
         params = {"upload_id": p.upload_id, "task": p.task, "mode": p.mode, "style": p.style,
                   "lyrics": p.lyrics, "seed": seed, "title": title, "cfg_scale": p.cfg_scale}
+        _cloud_params_dict(p, params)
         if p.clip_start_s or p.clip_end_s is not None:
             params.update(clip_start_s=float(p.clip_start_s), clip_end_s=p.clip_end_s)
         job = store.create(kind="cover", params=params, options=options, seed=seed)
@@ -1633,6 +1688,9 @@ def _submit(store: JobStore, req: SubmitRequest, *, upload_lookup, lora_lookup,
                   "title": title, "melody": p.melody, "adapter": p.adapter,
                   "hum_influence": float(p.hum_influence), "offset_s": float(p.offset_s),
                   "cfg_scale": p.cfg_scale}
+        if p.description:
+            params["description"] = p.description
+        _cloud_params_dict(p, params)
         job = store.create(kind="hum", params=params, options=options, seed=seed, parent_id=req.parent_id)
         return Submission([job])
 
@@ -1647,11 +1705,17 @@ def hum_options(job: Job) -> hum.HumOptions:
                           offset_s=float(p.get("offset_s", 0.0)))
 
 
-def engine_request(job: Job) -> dict:
+def engine_request(job: Job, *, engine: str | None = None) -> dict:
     """The engine request, including any validated planning / semantic length limits."""
     p = job.params
     request = {"style": p["style"], "lyrics": p["lyrics"], "cot": p.get("cot", "full"), "seed": job.seed,
                "id": job.id}
+    if engine == "suno":
+        for name in ("title", "music_kind"):
+            if p.get(name) is not None:
+                request[name] = p[name]
+        if p.get("suno") is not None:
+            request["suno"] = dict(p["suno"])
     if p.get("duration"):
         request["duration"] = float(p["duration"])
     if p.get("description"):

@@ -15,10 +15,59 @@ const compiled = ts.transpileModule(
   },
 ).outputText;
 
-function setup() {
+const promptContext = { exports: {} };
+vm.runInNewContext(
+  ts.transpileModule(
+    await readFile(
+      new URL("../src/lib/musicPrompt.ts", import.meta.url),
+      "utf8",
+    ),
+    {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+      },
+    },
+  ).outputText,
+  promptContext,
+);
+const shortcutContext = {
+  exports: {},
+  requestAnimationFrame: (callback) => callback(),
+  require(name) {
+    if (name === "react/jsx-runtime")
+      return {
+        jsx: (type, props) => ({ type, props }),
+        jsxs: (type, props) => ({ type, props }),
+      };
+    if (name === "@mantine/core") return { UnstyledButton: "UnstyledButton" };
+    if (name === "../lib/musicPrompt") return promptContext.exports;
+    if (name.endsWith(".css")) return {};
+    throw new Error(`Unexpected shortcut import: ${name}`);
+  },
+};
+vm.runInNewContext(
+  ts.transpileModule(
+    await readFile(
+      new URL("../src/components/MusicPromptShortcuts.tsx", import.meta.url),
+      "utf8",
+    ),
+    {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+        jsx: ts.JsxEmit.ReactJSX,
+      },
+    },
+  ).outputText,
+  shortcutContext,
+);
+
+function setup({ authenticated = true } = {}) {
   const hooks = [],
     effects = [],
-    submissions = [];
+    submissions = [],
+    navigations = [];
   let cursor = 0,
     tree,
     component,
@@ -80,19 +129,37 @@ function setup() {
       if (name === "react-router-dom")
         return {
           Link: "Link",
-          useNavigate: () => () => {},
+          useNavigate: () => (path) => navigations.push(path),
           useSearchParams: () => [new URLSearchParams(), () => {}],
         };
       if (name === "lucide-react")
         return new Proxy({}, { get: (_, key) => String(key) });
       if (name === "../state/app") return { useApp };
-      if (name === "../lib/musicCreation")
+      if (name === "../state/auth")
         return {
-          generateFromPrompt(prompt, options) {
-            submissions.push({ prompt, options });
-            return new Promise(() => {});
+          useAuth: {
+            getState: () => ({
+              user: authenticated ? { id: "test-user" } : null,
+            }),
           },
         };
+      if (name === "../lib/api")
+        return {
+          api: {
+            submit(body) {
+              submissions.push(body);
+              return new Promise(() => {});
+            },
+          },
+        };
+      if (name === "../lib/musicCreation")
+        return {
+          readMusicStatus: async () => ({ models: { present: true } }),
+          defaultMusicOptions: () => ({ preset: "fast" }),
+        };
+      if (name === "../lib/musicPrompt") return promptContext.exports;
+      if (name === "../components/MusicPromptShortcuts")
+        return shortcutContext.exports;
       if (name.startsWith("../components/")) {
         const key = name.split("/").at(-1);
         return { [key]: key };
@@ -118,6 +185,7 @@ function setup() {
   const field = () => find((node) => node.type === "textarea");
   return {
     submissions,
+    navigations,
     find,
     get value() {
       return field().props.value;
@@ -127,6 +195,18 @@ function setup() {
     },
     edit(value) {
       field().props.onChange({ target: { value } });
+    },
+    shortcut(label) {
+      const node = find(
+        (node) => node.type === shortcutContext.exports.MusicPromptShortcuts,
+      );
+      const controls = node.type(node.props);
+      const button = all(controls).find(
+        (node) => node.props?.children === label,
+      );
+      assert.ok(button, `expected shortcut ${label}`);
+      assert.equal(button.props.type, "button");
+      button.props.onClick();
     },
     key(overrides = {}) {
       let prevented = false;
@@ -159,7 +239,7 @@ function setup() {
   };
 }
 
-test("Ctrl/Command Enter uses the normal generation form once and ignores a repeated submission", () => {
+test("Ctrl/Command Enter uses the normal generation form once and ignores a repeated submission", async () => {
   for (const modifier of [
     { ctrlKey: true },
     { ctrlKey: false, metaKey: true },
@@ -167,12 +247,27 @@ test("Ctrl/Command Enter uses the normal generation form once and ignores a repe
     const h = setup();
     h.edit("森林里安静的钢琴");
     assert.equal(h.key(modifier), true);
+    await new Promise(setImmediate);
     assert.equal(h.submissions.length, 1);
-    assert.equal(h.submissions[0].prompt, "森林里安静的钢琴");
+    assert.equal(h.submissions[0].kind, "create");
+    assert.equal(h.submissions[0].params.description, "森林里安静的钢琴");
+    assert.equal(h.submissions[0].params.style, "");
+    assert.equal(h.submissions[0].params.lyrics, "");
+    assert.equal(h.submissions[0].params.music_kind, "vocal");
     assert.equal(h.key(modifier), false);
     assert.equal(h.submitEvents, 1);
     h.close();
   }
+});
+
+test("guests reach login without submitting a generation job", async () => {
+  const h = setup({ authenticated: false });
+  h.edit("森林里安静的钢琴");
+  assert.equal(h.key(), true);
+  await new Promise(setImmediate);
+  assert.deepEqual(h.navigations, ["/login"]);
+  assert.equal(h.submissions.length, 0);
+  h.close();
 });
 
 test("empty drafts, normal newlines and IME confirmation never start music generation", () => {
@@ -199,5 +294,50 @@ test("choosing inspiration only fills the composer and leaves generation explici
   assert.match(h.value, /木吉他/);
   assert.equal(h.submissions.length, 0);
   assert.equal(h.submitEvents, 0);
+  h.close();
+});
+
+test("home shortcuts preserve freeform text and music kind without auto-generation", () => {
+  const h = setup();
+  const original = "写给即将离家的朋友\n副歌保留：门前的灯还亮着";
+  h.edit(original);
+  h.find((node) => node.type === "MusicKindToggle").props.onChange(
+    "instrumental",
+  );
+  h.shortcut("音乐风格");
+  assert.equal(h.value, `${original}\n音乐风格：`);
+  h.shortcut("歌词/歌词风格");
+  assert.equal(h.value, `${original}\n音乐风格：\n歌词/歌词风格：`);
+  h.shortcut("音乐风格");
+  assert.equal(h.value, `${original}\n音乐风格：\n歌词/歌词风格：`);
+  assert.equal(
+    h.find((node) => node.type === "MusicKindToggle").props.value,
+    "instrumental",
+  );
+  assert.equal(h.submissions.length, 0);
+  assert.equal(h.submitEvents, 0);
+  h.close();
+});
+
+test("empty shortcut templates cannot submit until an actual requirement is entered", async () => {
+  const h = setup();
+  for (const label of promptContext.exports.MUSIC_PROMPT_LABELS)
+    h.shortcut(label);
+  assert.equal(
+    h.find((node) => node.props?.type === "submit").props.disabled,
+    true,
+  );
+  assert.equal(h.key(), false);
+  assert.equal(h.submitEvents, 0);
+  assert.equal(h.submissions.length, 0);
+  h.edit(h.value + "不要电音");
+  assert.equal(
+    h.find((node) => node.props?.type === "submit").props.disabled,
+    false,
+  );
+  assert.equal(h.key(), true);
+  await new Promise(setImmediate);
+  assert.equal(h.submissions.length, 1);
+  assert.equal(h.submissions[0].params.description, h.value);
   h.close();
 });

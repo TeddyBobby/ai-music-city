@@ -246,6 +246,8 @@ def _lora_usable(request: Request, name: str) -> bool:
 
 @router.get("/status")
 async def get_status(request: Request):
+    from yue2_studio.engines import current_id
+
     state = _state(request)
     store, worker = state.store, state.worker
     counts = store.counts()
@@ -253,6 +255,7 @@ async def get_status(request: Request):
     settings = store.get_settings()
     return {
         "engine": worker.engine_status(),
+        "generation": {"engine": current_id() or "local"},
         "memory": jobs.memory_info(settings),
         "queue": {"queued": counts.get("queued", 0), "running": store.running_id()},
         "presets": config.presets_summary(),

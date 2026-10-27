@@ -18,6 +18,23 @@ const compiled = ts.transpileModule(
   },
 ).outputText;
 
+const musicPromptModule = { exports: {} };
+vm.runInNewContext(
+  ts.transpileModule(
+    await readFile(
+      new URL("../src/lib/musicPrompt.ts", import.meta.url),
+      "utf8",
+    ),
+    {
+      compilerOptions: {
+        target: ts.ScriptTarget.ES2022,
+        module: ts.ModuleKind.CommonJS,
+      },
+    },
+  ).outputText,
+  { module: musicPromptModule, exports: musicPromptModule.exports },
+);
+
 function setup({
   desktop = true,
   busy = false,
@@ -121,6 +138,9 @@ function setup({
         return { AssistantMarkdown: "AssistantMarkdown" };
       if (name === "../components/MusicKindToggle")
         return { MusicKindToggle: "MusicKindToggle" };
+      if (name === "../components/MusicPromptShortcuts")
+        return { MusicPromptShortcuts: "MusicPromptShortcuts" };
+      if (name === "../lib/musicPrompt") return musicPromptModule.exports;
       if (name === "../lib/musicCreation")
         return { isInstrumentalPrompt: () => false };
       return {};
@@ -201,6 +221,63 @@ test("desktop quick inspiration fills the draft without sending", () => {
   assert.equal(h.drafts.length, 1);
   assert.match(h.drafts[0], /海边日落/);
   assert.deepEqual(h.sends, []);
+});
+
+test("prompt shortcuts edit the same composer draft without submitting or changing mode", () => {
+  const h = setup({ input: "已有想法", mode: "lyrics" });
+  const shortcuts = h.find((node) => node.type === "MusicPromptShortcuts");
+  const field = h.find((node) => node.type === "textarea");
+  const form = h.find((node) => node.type === "form");
+  assert.equal(h.within(form, (node) => node === shortcuts).length, 1);
+  assert.equal(shortcuts.props.inputRef, field.props.ref);
+  assert.equal(shortcuts.props.value, "已有想法");
+  assert.equal(shortcuts.props.disabled, false);
+  shortcuts.props.onChange("已有想法\n音乐风格：");
+  assert.deepEqual(h.drafts, ["已有想法\n音乐风格："]);
+  assert.deepEqual(h.sends, []);
+  assert.deepEqual(h.selectedModes, []);
+  assert.equal(
+    setup({ busy: true }).find((node) => node.type === "MusicPromptShortcuts")
+      .props.disabled,
+    true,
+  );
+});
+
+test("empty prompt labels cannot submit by button, keyboard or form", () => {
+  for (const input of [
+    "",
+    "音乐风格：",
+    "音乐风格：\n歌词/歌词风格：\n避免的风格：",
+  ]) {
+    const h = setup({ input });
+    assert.equal(
+      h.find((node) => node.props?.["aria-label"] === "发送消息").props
+        .disabled,
+      true,
+    );
+    h.key({ ctrlKey: true });
+    h.find((node) => node.type === "form").props.onSubmit({
+      preventDefault() {},
+    });
+    assert.deepEqual(h.sends, []);
+  }
+});
+
+test("prompt labels with content or media remain sendable", () => {
+  for (const options of [
+    { input: "音乐风格：爵士\n歌词/歌词风格：\n避免的风格：" },
+    { input: "音乐风格：", audio: { name: "哼唱.webm" } },
+    { input: "歌词/歌词风格：", image: { name: "日落.jpg" } },
+  ]) {
+    const h = setup(options);
+    assert.equal(
+      h.find((node) => node.props?.["aria-label"] === "发送消息").props
+        .disabled,
+      false,
+    );
+    h.key({ ctrlKey: true });
+    assert.equal(h.sends.length, 1);
+  }
 });
 
 test("model picker groups and searches known models without accepting free text", () => {

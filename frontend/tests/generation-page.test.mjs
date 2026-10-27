@@ -18,6 +18,19 @@ const compiled = ts.transpileModule(
   },
 ).outputText;
 const flush = () => new Promise(setImmediate);
+const advancedCompiled = ts.transpileModule(
+  await readFile(
+    new URL("../src/components/SunoAdvancedSettings.tsx", import.meta.url),
+    "utf8",
+  ),
+  {
+    compilerOptions: {
+      target: ts.ScriptTarget.ES2022,
+      module: ts.ModuleKind.CommonJS,
+      jsx: ts.JsxEmit.ReactJSX,
+    },
+  },
+).outputText;
 const plain = (value) => JSON.parse(JSON.stringify(value));
 const song = (status = "done", extra = {}) => ({
   id: "music-1",
@@ -40,7 +53,7 @@ function deferred() {
 
 // The page's hooks, event handlers, draft persistence and conditional rendering
 // are real. Transport and engine boundaries are inert, controllable stand-ins.
-function setup({ storage = new Map() } = {}) {
+function setup({ storage = new Map(), engine = "yue2" } = {}) {
   const hooks = [],
     effects = [],
     observers = [],
@@ -107,7 +120,8 @@ function setup({ storage = new Map() } = {}) {
       }
     },
   };
-  const useApp = (select) => select({ status: { ffmpeg: true } });
+  const useApp = (select) =>
+    select({ status: { ffmpeg: true, generation: { engine } } });
   useApp.getState = () => ({
     refresh: async () => {
       refreshes++;
@@ -135,9 +149,14 @@ function setup({ storage = new Map() } = {}) {
       if (name === "react") return react;
       if (name === "react/jsx-runtime")
         return {
-          jsx: (type, props) => ({ type, props }),
+          jsx: (type, props) =>
+            type?.name === "SunoAdvancedSettings"
+              ? type(props)
+              : { type, props },
           jsxs: (type, props) => ({ type, props }),
         };
+      if (name === "@mantine/core")
+        return new Proxy({}, { get: (_, key) => String(key) });
       if (name === "react-router-dom")
         return {
           Link: "Link",
@@ -182,7 +201,8 @@ function setup({ storage = new Map() } = {}) {
             title: job.title,
             style: job.params.style,
             lyrics: job.params.lyrics,
-            musicKind: "vocal",
+            musicKind: job.params.music_kind || "vocal",
+            suno: job.params.suno,
           }),
           generationProgress: (job) => ({
             title: job.status === "done" ? "音乐已完成" : "正在生成",
@@ -221,6 +241,11 @@ function setup({ storage = new Map() } = {}) {
         return { MusicKindToggle: "MusicKindToggle" };
       if (name === "../components/ShareSongDialog")
         return { ShareSongDialog: "ShareSongDialog" };
+      if (name === "../components/SunoAdvancedSettings") {
+        const child = { ...context, exports: {} };
+        vm.runInNewContext(advancedCompiled, child);
+        return child.exports;
+      }
       if (name.endsWith(".css")) return {};
       throw new Error(`Unexpected import ${name}`);
     },
@@ -243,8 +268,8 @@ function setup({ storage = new Map() } = {}) {
   const field = (name) =>
     find(
       (node) =>
-        node.props?.maxLength ===
-        { title: 160, style: 2000, lyrics: 10000 }[name],
+        node.props?.["aria-label"] ===
+        { title: "作品名称", style: "音乐风格", lyrics: "歌词" }[name],
     );
   return {
     observers,
@@ -256,6 +281,7 @@ function setup({ storage = new Map() } = {}) {
     storage,
     findAll,
     find,
+    advanced: (label) => find((node) => node.props?.label === label).props,
     field: (name) => field(name).props.value,
     edit(name, value) {
       field(name).props.onChange({ target: { value } });
@@ -404,4 +430,192 @@ test("play, seek, download and share controls appear only for a completed result
   );
   h.unmount();
   await flush();
+});
+
+test("Suno settings start collapsed, inherit the version and use provider text limits", () => {
+  const h = setup({ engine: "suno" });
+  h.push(
+    song("done", {
+      params: {
+        style: "木吉他",
+        lyrics: "[Verse]\n屋檐下",
+        music_kind: "vocal",
+        suno: {
+          model: "V6_WILD",
+          negativeTags: "重金属",
+          styleWeight: 0.65,
+          variety: 0,
+          duration: 120,
+        },
+      },
+    }),
+  );
+  assert.equal(
+    h.find((node) => node.props?.className === "generation-advanced").props
+      .open,
+    undefined,
+  );
+  assert.equal(h.advanced("Suno 模型").value, "V6_WILD");
+  assert.equal(h.advanced("避免的风格").value, "重金属");
+  assert.equal(h.advanced("风格遵循").value, 65);
+  assert.equal(h.advanced("变化幅度").value, "0");
+  assert.equal(h.advanced("时长").value, 120);
+  for (const [name, limit] of [
+    ["作品名称", 80],
+    ["音乐风格", 1000],
+    ["歌词", 5000],
+  ]) {
+    assert.equal(
+      h.find((node) => node.props?.["aria-label"] === name).props.maxLength,
+      limit,
+    );
+  }
+  h.unmount();
+});
+
+test("advanced values remain optional, retain zero and convert percentages on submit", async () => {
+  const h = setup({ engine: "suno" });
+  h.push(song());
+  assert.equal(h.advanced("Suno 模型").value, "V6");
+  h.advanced("风格遵循").onChange(0);
+  h.advanced("创意强度").onChange(82);
+  h.advanced("变化幅度").onChange("0");
+  h.advanced("时长").onChange(180);
+  h.advanced("避免的风格").onChange({ currentTarget: { value: "重金属" } });
+  h.advanced("人声").onChange("f");
+  const sending = h.submit();
+  assert.deepEqual(h.submissions[0].draft.suno, {
+    styleWeight: 0,
+    weirdnessConstraint: 0.82,
+    variety: 0,
+    duration: 180,
+    negativeTags: "重金属",
+    vocalGender: "f",
+  });
+  assert.equal(h.advanced("Suno 模型").disabled, true);
+  h.submissions[0].resolve(song("queued", { id: "advanced-version" }));
+  await sending;
+  h.unmount();
+});
+
+test("restoring automatic settings stays cleared after reload without reviving the original values", () => {
+  const storage = new Map();
+  const original = song("done", {
+    params: {
+      style: "木吉他",
+      lyrics: "屋檐下",
+      suno: { styleWeight: 0.7, duration: 120, variety: 2 },
+    },
+  });
+  const h = setup({ engine: "suno", storage });
+  h.push(original);
+  h.advanced("风格遵循").rightSection.props.onClick();
+  h.advanced("时长").onChange("");
+  h.advanced("变化幅度").onChange("auto");
+  h.unmount();
+  const refreshed = setup({ engine: "suno", storage });
+  refreshed.push(original);
+  assert.equal(refreshed.advanced("风格遵循").value, "");
+  assert.equal(refreshed.advanced("时长").value, "");
+  assert.equal(refreshed.advanced("变化幅度").value, "auto");
+  assert.equal(original.params.suno.styleWeight, 0.7);
+  refreshed.unmount();
+});
+
+test("legacy drafts without Suno fields retain edits and inherit the original advanced options", () => {
+  const storage = new Map([
+    [
+      "music.revision.music-1",
+      JSON.stringify({
+        title: "保留的歌名",
+        style: "保留的风格",
+        lyrics: "保留的歌词",
+        musicKind: "vocal",
+      }),
+    ],
+  ]);
+  const h = setup({ engine: "suno", storage });
+  h.push(
+    song("done", {
+      params: {
+        style: "旧风格",
+        lyrics: "旧歌词",
+        suno: { model: "V6_MINI", vocalGender: "m" },
+      },
+    }),
+  );
+  assert.equal(h.field("style"), "保留的风格");
+  assert.equal(h.advanced("Suno 模型").value, "V6_MINI");
+  assert.equal(h.advanced("人声").value, "m");
+  h.unmount();
+});
+
+test("voice and audio controls reflect the actual music kind and source", () => {
+  const h = setup({ engine: "suno" });
+  h.push(song("done", { kind: "hum" }));
+  assert.equal(h.advanced("音频影响").value, "");
+  h.advanced("音频影响").onChange(40);
+  assert.equal(h.advanced("音频影响").value, 40);
+  h.find((node) => node.type === "MusicKindToggle").props.onChange(
+    "instrumental",
+  );
+  assert.equal(h.findAll((node) => node.props?.label === "人声").length, 0);
+  assert.equal(h.advanced("音频影响").value, 40);
+  h.find((node) => node.type === "MusicKindToggle").props.onChange("vocal");
+  assert.equal(h.advanced("音频影响").value, 40);
+  h.unmount();
+  const text = setup({ engine: "suno" });
+  text.push(song());
+  assert.equal(text.advanced("音频影响").value, "");
+  text
+    .find((node) => node.type === "MusicKindToggle")
+    .props.onChange("instrumental");
+  assert.equal(
+    text.findAll((node) => node.props?.label === "音频影响").length,
+    0,
+  );
+  text.unmount();
+});
+
+test("Persona type appears only with an ID and remains editable", () => {
+  const h = setup({ engine: "suno" });
+  h.push(song());
+  assert.equal(
+    h.findAll((node) => node.props?.label === "Persona 类型").length,
+    0,
+  );
+  h.advanced("Persona ID").onChange({
+    currentTarget: { value: "persona-test" },
+  });
+  assert.equal(h.advanced("Persona 类型").value, "style_persona");
+  h.advanced("Persona 类型").onChange("voice_persona");
+  assert.equal(h.advanced("Persona 类型").value, "voice_persona");
+  h.advanced("Persona ID").onChange({ currentTarget: { value: "" } });
+  assert.equal(
+    h.findAll((node) => node.props?.label === "Persona 类型").length,
+    0,
+  );
+  h.unmount();
+});
+
+test("non-Suno engines disable provider fields and can clear incompatible inherited settings", () => {
+  const h = setup();
+  h.push(
+    song("done", {
+      params: {
+        style: "钢琴",
+        lyrics: "清晨",
+        suno: { model: "V6", styleWeight: 0.8 },
+      },
+    }),
+  );
+  assert.equal(h.advanced("Suno 模型").disabled, true);
+  assert.equal(h.advanced("时长").disabled, true);
+  h.find(
+    (node) =>
+      node.type === "button" && node.props?.children === "清除 Suno 设置",
+  ).props.onClick();
+  const saved = JSON.parse(h.storage.get("music.revision.music-1"));
+  assert.deepEqual(saved.suno, {});
+  h.unmount();
 });

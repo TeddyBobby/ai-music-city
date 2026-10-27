@@ -32,6 +32,7 @@ import { usePlayer } from "../state/player";
 import { Artwork } from "../components/ui";
 import { MusicKindToggle } from "../components/MusicKindToggle";
 import { ShareSongDialog } from "../components/ShareSongDialog";
+import { SunoAdvancedSettings } from "../components/SunoAdvancedSettings";
 import "./Generation.css";
 
 const draftKey = (id: string) => `music.revision.${id}`;
@@ -48,7 +49,16 @@ function initialDraft(job: Job): GenerationDraft {
       ) &&
       ["instrumental", "vocal"].includes(saved.musicKind)
     )
-      return saved;
+      return {
+        ...fallback,
+        ...saved,
+        suno:
+          saved.suno &&
+          typeof saved.suno === "object" &&
+          !Array.isArray(saved.suno)
+            ? saved.suno
+            : fallback.suno,
+      };
   } catch {}
   return fallback;
 }
@@ -104,6 +114,7 @@ function GenerationWorkspace({ id }: { id: string }) {
   const page = useRef<HTMLDivElement | null>(null);
   const player = usePlayer();
   const mp3 = Boolean(useApp((s) => s.status?.ffmpeg));
+  const sunoEnabled = useApp((s) => s.status?.generation?.engine === "suno");
 
   useEffect(() => {
     watch.current = watchGeneration(id, {
@@ -556,7 +567,8 @@ function GenerationWorkspace({ id }: { id: string }) {
                 作品名称
                 <input
                   value={draft.title}
-                  maxLength={160}
+                  maxLength={sunoEnabled ? 80 : 160}
+                  aria-label="作品名称"
                   onChange={(e) => edit({ title: e.target.value })}
                 />
               </label>
@@ -569,11 +581,12 @@ function GenerationWorkspace({ id }: { id: string }) {
                 />
               </div>
               <label className="generation-field">
-                音乐描述
+                音乐风格
                 <textarea
                   value={draft.style}
                   rows={4}
-                  maxLength={2000}
+                  maxLength={sunoEnabled ? 1000 : 2000}
+                  aria-label="音乐风格"
                   onChange={(e) => edit({ style: e.target.value })}
                   placeholder="调整情绪、节奏、乐器或人声…"
                 />
@@ -588,7 +601,7 @@ function GenerationWorkspace({ id }: { id: string }) {
                         style:
                           `${draft.style.trim()}${draft.style.trim() ? "\n" : ""}${label}`.slice(
                             0,
-                            2000,
+                            sunoEnabled ? 1000 : 2000,
                           ),
                       })
                     }
@@ -603,7 +616,8 @@ function GenerationWorkspace({ id }: { id: string }) {
                   <textarea
                     value={draft.lyrics}
                     rows={8}
-                    maxLength={10000}
+                    maxLength={sunoEnabled ? 5000 : 10000}
+                    aria-label="歌词"
                     onChange={(e) => edit({ lyrics: e.target.value })}
                     placeholder="留空则重新生成歌词"
                   />
@@ -615,6 +629,16 @@ function GenerationWorkspace({ id }: { id: string }) {
                   沿用哼唱旋律
                 </p>
               )}
+              <SunoAdvancedSettings
+                value={draft.suno || {}}
+                onChange={(patch) =>
+                  edit({ suno: { ...draft.suno, ...patch } })
+                }
+                enabled={sunoEnabled}
+                disabled={busy}
+                vocal={draft.musicKind === "vocal"}
+                hasAudio={job.kind === "hum"}
+              />
             </fieldset>
           </div>
           {actionError && (

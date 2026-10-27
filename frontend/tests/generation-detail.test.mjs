@@ -15,6 +15,7 @@ const compile = async (name) =>
     },
   ).outputText;
 const compiled = {
+  suno: await compile("suno"),
   musicCreation: await compile("musicCreation"),
   generationDetail: await compile("generationDetail"),
 };
@@ -445,4 +446,163 @@ test("failed and ambiguous submissions are attempted once without automatic retr
     /我的音乐.*避免重复生成/,
   );
   assert.equal(ambiguous.calls.submissions.length, 1);
+});
+
+const sunoRuntime = { generation: { engine: "suno" }, loras: { adapters: [] } };
+
+test("Suno revisions retain every applicable setting, including explicit zero, without rewriting lyrics", async () => {
+  const settings = {
+    model: "V6_WILD",
+    negativeTags: " 重金属 ",
+    vocalGender: "f",
+    styleWeight: 0,
+    weirdnessConstraint: 1,
+    audioWeight: 0.6,
+    variety: 0,
+    duration: 180,
+    personaId: " persona-123 ",
+    personaModel: "voice_persona",
+  };
+  const source = original({
+    params: { style: "流行", lyrics, music_kind: "vocal", suno: settings },
+  });
+  const helper = setup({ runtime: sunoRuntime });
+  const draft = helper.draftFromJob(source);
+  assert.deepEqual(plain(draft.suno), settings);
+  draft.suno.negativeTags = "摇滚";
+  assert.equal(source.params.suno.negativeTags, " 重金属 ");
+  await helper.submitRevision(source, { ...draft, title: "微调版" });
+  const body = helper.calls.submissions[0];
+  assert.deepEqual(plain(body.params.suno), {
+    ...settings,
+    negativeTags: "摇滚",
+    personaId: "persona-123",
+  });
+  assert.equal(body.params.music_kind, "vocal");
+  assert.equal(body.params.lyrics, lyrics);
+  assert.deepEqual(plain(body.loras), []);
+  assert.equal(helper.calls.messages.length, 0);
+  assert.equal(body.parent_id, source.id);
+});
+
+test("Suno instrumental revisions do not require local LoRAs or submit dormant vocal settings", async () => {
+  const helper = setup({ runtime: sunoRuntime });
+  await helper.submitRevision(
+    original(),
+    edited({
+      musicKind: "instrumental",
+      suno: {
+        vocalGender: "f",
+        audioWeight: 0.2,
+        styleWeight: 0,
+        negativeTags: "人声",
+      },
+    }),
+  );
+  const body = helper.calls.submissions[0];
+  assert.equal(body.params.music_kind, "instrumental");
+  assert.equal(body.params.lyrics, "纯音乐");
+  assert.deepEqual(plain(body.params.suno), {
+    negativeTags: "人声",
+    styleWeight: 0,
+  });
+  assert.deepEqual(plain(body.loras), []);
+  assert.equal(helper.calls.messages.length, 0);
+  assert.equal(
+    helper.draftFromJob(
+      original({
+        params: { style: "钢琴", lyrics: "纯音乐", music_kind: "instrumental" },
+      }),
+    ).musicKind,
+    "instrumental",
+  );
+});
+
+test("Suno humming keeps original recording and audio influence, but drops local adapter requirements", async () => {
+  const helper = setup({ runtime: sunoRuntime });
+  await helper.submitRevision(
+    original({
+      kind: "hum",
+      params: { upload_id: "hum-source", adapter: "local-lora" },
+    }),
+    edited({ suno: { audioWeight: 0, duration: 120 } }),
+  );
+  const body = helper.calls.submissions[0];
+  assert.equal(body.kind, "hum");
+  assert.equal(body.params.upload_id, "hum-source");
+  assert.equal(body.params.adapter, null);
+  assert.deepEqual(plain(body.params.suno), { audioWeight: 0, duration: 120 });
+  await helper.submitRevision(
+    original({ kind: "hum", params: { upload_id: "hum-source" } }),
+    edited({
+      musicKind: "instrumental",
+      suno: { audioWeight: 0.5, vocalGender: "m" },
+    }),
+  );
+  assert.deepEqual(plain(helper.calls.submissions[1].params.suno), {
+    audioWeight: 0.5,
+  });
+});
+
+test("Suno defaults stay unspecified and clearing stored settings does not restore them", async () => {
+  const helper = setup({ runtime: sunoRuntime });
+  await helper.submitRevision(
+    original({ params: { suno: { styleWeight: 0.8, personaId: "old" } } }),
+    edited({ suno: {} }),
+  );
+  assert.deepEqual(plain(helper.calls.submissions[0].params.suno), {});
+  await helper.submitRevision(
+    original(),
+    edited({
+      suno: {
+        negativeTags: " ",
+        personaId: "",
+        personaModel: "voice_persona",
+      },
+    }),
+  );
+  assert.deepEqual(plain(helper.calls.submissions[1].params.suno), {});
+});
+
+test("Suno settings are snapshotted before asynchronous readiness checks", async () => {
+  const draft = edited({ suno: { model: "V6", styleWeight: 0.2 } });
+  const helper = setup({
+    runtime: sunoRuntime,
+    onStatus() {
+      draft.suno.styleWeight = 0.9;
+    },
+  });
+  await helper.submitRevision(original(), draft);
+  assert.equal(helper.calls.submissions[0].params.suno.styleWeight, 0.2);
+});
+
+test("out-of-range Suno settings and oversized text fail before submitting or writing lyrics", async () => {
+  for (const draft of [
+    edited({ suno: { model: "imaginary" } }),
+    edited({ suno: { styleWeight: -0.1 } }),
+    edited({ suno: { weirdnessConstraint: Infinity } }),
+    edited({ suno: { variety: 5 } }),
+    edited({ suno: { variety: 1.5 } }),
+    edited({ suno: { duration: 9 } }),
+    edited({ suno: { duration: 361 } }),
+    edited({ suno: { duration: 30.5 } }),
+    edited({ suno: { negativeTags: "风".repeat(1001) } }),
+    edited({ title: "曲".repeat(81), lyrics: "" }),
+    edited({ style: "风".repeat(1001), lyrics: "" }),
+    edited({ lyrics: "词".repeat(5001) }),
+  ]) {
+    const helper = setup({ runtime: sunoRuntime });
+    await assert.rejects(helper.submitRevision(original(), draft));
+    assert.equal(helper.calls.submissions.length, 0);
+    assert.equal(helper.calls.messages.length, 0);
+  }
+});
+
+test("configured Suno fields are never silently discarded after a switch to the local engine", async () => {
+  const helper = setup();
+  await assert.rejects(
+    helper.submitRevision(original(), edited({ suno: { model: "V6" } })),
+    /未启用 Suno/,
+  );
+  assert.equal(helper.calls.submissions.length, 0);
 });
