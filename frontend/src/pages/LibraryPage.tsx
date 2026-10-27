@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
-import { Menu, SegmentedControl, UnstyledButton } from "@mantine/core";
+import { Checkbox as MantineCheckbox, Menu, SegmentedControl, UnstyledButton } from "@mantine/core";
 import { useMediaQuery } from "@mantine/hooks";
 import {
-  Check,
+  CheckCheck,
+  ListChecks,
   Download,
   LoaderCircle,
   Maximize2,
@@ -13,6 +14,7 @@ import {
   Play,
   Share2,
   SlidersHorizontal,
+  Square,
   Trash2,
   X,
 } from "lucide-react";
@@ -25,7 +27,7 @@ import { duration, errorMessage, titleOf, when } from "../lib/utils";
 import { useApp } from "../state/app";
 import { usePlayer } from "../state/player";
 import { usePlayerOverlay } from "../state/playerOverlay";
-import { Artwork, Button, EmptyState, IconButton } from "../components/ui";
+import { Artwork, Button, Dialog, EmptyState, IconButton } from "../components/ui";
 import { ShareSongDialog } from "../components/ShareSongDialog";
 import "./SimpleLibrary.css";
 
@@ -97,9 +99,13 @@ export function LibraryPage() {
   const [reload, setReload] = useState(0);
   const [canceling, setCanceling] = useState("");
   const [sharing, setSharing] = useState<Job | null>(null);
-  // 批量管理：selecting 模式开关，selectedIds 勾选集合，removing 删除进行中
+  // 批量管理：selecting 模式开关，selectedIds 勾选集合
   const [selecting, setSelecting] = useState(false);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  // 删除确认（单首/批量共用一个 Dialog）：pending 为 null 时关闭
+  const [confirmDelete, setConfirmDelete] = useState<
+    { ids: string[]; label: string } | null
+  >(null);
   const [removing, setRemoving] = useState(false);
   const focused = useRef("");
   const selectedFailure = failed.find((job) => job.id === selectedId);
@@ -236,32 +242,30 @@ export function LibraryPage() {
     setSelectedIds([]);
   }
 
+  /** 打开删除确认对话框（单首/批量共用） */
+  function askDelete(ids: string[], label: string) {
+    if (removing || !ids.length) return;
+    setConfirmDelete({ ids, label });
+  }
+
   async function removeOne(job: Job) {
-    if (removing) return;
-    if (!window.confirm(`确定删除《${titleOf(job)}》？删除后无法恢复。`)) return;
-    setRemoving(true);
-    try {
-      await api.remove(job.id);
-      toast("已删除");
-      setReload((value) => value + 1);
-    } catch (cause) {
-      toast(errorMessage(cause), "err");
-    } finally {
-      setRemoving(false);
-    }
+    askDelete([job.id], `《${titleOf(job)}》`);
   }
 
   async function removeSelected() {
-    if (removing || !selectedIds.length) return;
-    if (
-      !window.confirm(
-        `确定删除选中的 ${selectedIds.length} 首歌曲？删除后无法恢复。`,
-      )
-    )
-      return;
+    askDelete(selectedIds, `选中的 ${selectedIds.length} 首歌曲`);
+  }
+
+  /** Dialog 确认后真正执行删除 */
+  async function doDelete() {
+    if (!confirmDelete || removing) return;
     setRemoving(true);
     try {
-      const result = await api.batchRemoveSongs(selectedIds);
+      const ids = confirmDelete.ids;
+      const result =
+        ids.length === 1
+          ? (await api.remove(ids[0]), { deleted: ids, skipped: [] })
+          : await api.batchRemoveSongs(ids);
       const done = (result?.deleted || []).length;
       const skipped = (result?.skipped || []).length;
       toast(
@@ -269,6 +273,7 @@ export function LibraryPage() {
           ? `已删除 ${done} 首，${skipped} 首生成中已跳过`
           : `已删除 ${done} 首`,
       );
+      setConfirmDelete(null);
       exitSelecting();
       setReload((value) => value + 1);
     } catch (cause) {
@@ -343,6 +348,8 @@ export function LibraryPage() {
         {songs.length > 0 && !selecting && (
           <Button
             className="simple-library-manage"
+            variant="default"
+            leftSection={<ListChecks size={16} />}
             onClick={() => setSelecting(true)}
           >
             管理
@@ -351,6 +358,14 @@ export function LibraryPage() {
         {selecting && (
           <div className="simple-library-batch">
             <Button
+              variant="default"
+              leftSection={
+                selectedIds.length === songs.length ? (
+                  <Square size={16} />
+                ) : (
+                  <CheckCheck size={16} />
+                )
+              }
               onClick={() =>
                 setSelectedIds((prev) =>
                   prev.length === songs.length
@@ -363,14 +378,13 @@ export function LibraryPage() {
             </Button>
             <Button
               variant="danger"
+              color="red"
               disabled={!selectedIds.length || removing}
+              leftSection={<Trash2 size={16} />}
+              loading={removing}
               onClick={() => void removeSelected()}
             >
-              {removing
-                ? "删除中…"
-                : selectedIds.length
-                  ? `删除 (${selectedIds.length})`
-                  : "删除"}
+              删除{selectedIds.length ? ` (${selectedIds.length})` : ""}
             </Button>
             <Button variant="ghost" onClick={exitSelecting}>
               完成
@@ -484,18 +498,13 @@ export function LibraryPage() {
                 }
               >
                 {selecting ? (
-                  <UnstyledButton
+                  <MantineCheckbox
                     className="simple-song-check"
                     aria-label={`选择 ${titleOf(job)}`}
-                    aria-pressed={selectedIds.includes(job.id)}
-                    tabIndex={0}
-                  >
-                    {selectedIds.includes(job.id) ? (
-                      <Check size={18} />
-                    ) : (
-                      <span className="simple-song-check-empty" />
-                    )}
-                  </UnstyledButton>
+                    checked={selectedIds.includes(job.id)}
+                    onChange={() => toggleSelected(job.id)}
+                    size="lg"
+                  />
                 ) : (
                   <span className="simple-song-number" aria-hidden="true">
                     {String(index + 1).padStart(2, "0")}
@@ -636,6 +645,30 @@ export function LibraryPage() {
       )}
       {sharing && (
         <ShareSongDialog job={sharing} onClose={() => setSharing(null)} />
+      )}
+      {confirmDelete && (
+        <Dialog
+          title="删除歌曲"
+          onClose={() => setConfirmDelete(null)}
+        >
+          <p className="simple-delete-confirm">
+            确定删除{confirmDelete.label}吗？删除后歌曲与音频将无法恢复。
+          </p>
+          <div className="simple-delete-actions">
+            <Button variant="ghost" onClick={() => setConfirmDelete(null)}>
+              取消
+            </Button>
+            <Button
+              variant="danger"
+              color="red"
+              leftSection={<Trash2 size={16} />}
+              loading={removing}
+              onClick={() => void doDelete()}
+            >
+              确认删除
+            </Button>
+          </div>
+        </Dialog>
       )}
     </div>
   );

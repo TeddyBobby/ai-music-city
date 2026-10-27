@@ -645,21 +645,18 @@
 .simple-song.is-selecting.is-checked {
   background: color-mix(in srgb, var(--accent, #22d3ee) 10%, transparent);
 }
-.simple-song-check {
-  width: 34px;
-  height: 34px;
-  border-radius: 50%;
-  border: 2px solid var(--line, #ccc);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+/* Mantine Checkbox in select mode */
+.simple-song .simple-song-check {
   flex-shrink: 0;
-  color: var(--accent, #22d3ee);
 }
-.simple-song.is-selecting .simple-song-check[aria-pressed="true"] {
-  border-color: var(--accent, #22d3ee);
-  background: color-mix(in srgb, var(--accent, #22d3ee) 15%, transparent);
+/* delete confirm dialog */
+.simple-delete-confirm {
+  margin: 0 0 18px;
+  line-height: 1.7;
+  color: var(--text, #333);
 }
-.simple-song-check-empty {
-  display: block;
+.simple-delete-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
 }

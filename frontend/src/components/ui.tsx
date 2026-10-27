@@ -27,8 +27,15 @@ import { request } from "../lib/api";
 
 export const Button = forwardRef<
   HTMLButtonElement,
-  ButtonHTMLAttributes<HTMLButtonElement> & { variant?: string }
->(({ variant = "", className = "", ...props }, ref) => (
+  ButtonHTMLAttributes<HTMLButtonElement> & {
+    variant?: string;
+    /** Mantine icon section (left of the label) */
+    leftSection?: ReactNode;
+    /** Mantine semantic color, e.g. "red" */
+    color?: string;
+    loading?: boolean;
+  }
+>(({ variant = "", className = "", leftSection, color, loading, ...props }, ref) => (
   <MantineButton
     ref={ref}
     type="button"
@@ -41,7 +48,9 @@ export const Button = forwardRef<
             ? "light"
             : "default"
     }
-    color={variant === "danger" ? "red" : undefined}
+    color={color ?? (variant === "danger" ? "red" : undefined)}
+    leftSection={leftSection}
+    loading={loading}
     className={`btn ${variant} ${className}`}
     {...props}
   />
